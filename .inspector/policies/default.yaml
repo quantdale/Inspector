@@ -1,0 +1,33 @@
+version: 1
+name: default-local-safe
+
+capabilities:
+  observe: true
+  interact: true
+  mutate_test_state: false
+  modify_source: false
+  publish: false
+
+network:
+  mode: configured-origins-only
+  allow_external_navigation: false
+
+budgets:
+  wall_clock_minutes: 60
+  max_actions: 2000
+  max_environment_resets: 100
+  max_concurrent_environments: 1
+  max_artifact_megabytes: 2048
+  max_model_requests: 1000
+  max_repairs_per_finding: 0
+
+autonomy:
+  confirm_findings: true
+  auto_repair: false
+  auto_commit: false
+  auto_push: false
+
+safety:
+  require_disposable_environment_for_fault_injection: true
+  allow_host_mouse_keyboard: false
+  redact_secrets: true

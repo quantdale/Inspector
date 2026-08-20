@@ -1,0 +1,30 @@
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+
+# Inspector run artifacts
+.inspector/runs/
+.inspector/cache/
+.inspector/worktrees/
+.inspector/tmp/
+artifacts/
+traces/
+screenshots/
+videos/
+*.trace.zip
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

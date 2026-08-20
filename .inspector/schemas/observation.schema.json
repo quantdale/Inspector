@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspector.local/schema/observation-0.1.json",
+  "title": "Inspector Observation",
+  "type": "object",
+  "required": ["id", "runId", "environmentId", "sequence", "source", "capturedAt", "summary"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "environmentId": { "type": "string", "minLength": 1 },
+    "stepId": { "type": ["string", "null"] },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "source": { "type": "string", "minLength": 1 },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "summary": { "type": "object", "additionalProperties": true },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sha256", "mime", "size", "path"],
+        "properties": {
+          "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "mime": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "path": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
