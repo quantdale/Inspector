@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspector.local/schema/action-0.1.json",
+  "title": "Inspector Action",
+  "type": "object",
+  "required": ["id", "runId", "environmentId", "kind", "risk", "deadlineMs", "idempotency"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "environmentId": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "risk": { "enum": ["observe", "interact", "mutate-test-state", "modify-source", "publish"] },
+    "deadlineMs": { "type": "integer", "minimum": 1 },
+    "idempotency": { "enum": ["safe-retry", "observe-before-retry", "never-retry"] },
+    "target": { "type": ["object", "null"], "additionalProperties": true },
+    "input": { "type": ["object", "null"], "additionalProperties": true },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

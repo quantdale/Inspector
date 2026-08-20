@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspector.local/schema/finding-0.1.json",
+  "title": "Inspector Finding",
+  "type": "object",
+  "required": ["id", "runId", "status", "title", "confidence", "revision", "reproduction"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["OBSERVED", "CANDIDATE", "REPRODUCING", "MINIMIZED", "CONFIRMED", "PATCHING", "VERIFYING", "RESOLVED", "REGRESSED", "REJECTED", "FLAKY", "NEEDS_HUMAN_ORACLE"]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "severity": { "enum": ["unknown", "low", "medium", "high", "critical"] },
+    "revision": { "type": "string", "minLength": 1 },
+    "oracleIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "reproduction": {
+      "type": "object",
+      "required": ["attempts", "successes"],
+      "properties": {
+        "attempts": { "type": "integer", "minimum": 0 },
+        "successes": { "type": "integer", "minimum": 0 },
+        "minimized": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "artifactRefs": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}
