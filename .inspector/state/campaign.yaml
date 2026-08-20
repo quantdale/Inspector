@@ -1,0 +1,62 @@
+schema_version: 1
+project: Inspector
+campaign:
+  mode: IMPLEMENTATION
+  status: ACTIVE
+  objective: "Execute the implementation roadmap autonomously through M0-M7; keep hardening as a separately invoked campaign."
+  initialized_at: "2026-08-20"
+  initialized_from:
+    branch: main
+    commit: ac74afbcc3824acee457a5cc5b26956ea5c98562
+  working_branch: implementation/autonomous-campaign
+
+autonomy:
+  unattended_continuation: true
+  continue_after_task_group: true
+  continue_after_milestone: true
+  create_missing_detailed_specs_from_roadmap: true
+  hardening_automatic: false
+  external_write_actions_require_runtime_authorization: true
+
+active:
+  milestone_id: M0
+  milestone_name: Foundation kernel
+  spec: specs/000-foundation/SPEC.md
+  tasks: specs/000-foundation/TASKS.md
+  task_group: F0
+  waypoint: M0.F0.workspace
+  waypoint_status: READY
+  next_action: "Initialize pnpm workspace, TypeScript config, root quality scripts, CI, and the Spec 000 package skeletons; run the F0 gate."
+
+progress:
+  completed_milestones: []
+  completed_task_groups: []
+  completed_waypoints: []
+  deferred_milestones: []
+
+verification:
+  last_verified_commit: null
+  last_gate: null
+  last_gate_result: NOT_RUN
+  last_gate_at: null
+
+blockers: []
+known_debt: []
+
+hardening:
+  active: false
+  saved_implementation_waypoint: null
+  scope: null
+
+stop_conditions:
+  - unavailable_required_secret_or_login
+  - irreversible_external_action_without_authority
+  - publish_merge_or_release_without_authority
+  - unresolved_material_product_decision
+  - security_boundary_would_need_weakening
+  - licensing_conflict
+  - required_hardware_or_os_unavailable_with_no_independent_work
+  - irreconcilable_authoritative_contracts
+  - deterministic_gate_failure_with_no_safe_forward_path
+
+next_milestone_after_completion: M1
