@@ -48,12 +48,32 @@ The first proof depends heavily on Playwright and likely Appium/MCP interoperabi
                                |
                     Inspector Adapter Protocol
                                |
-       +-----------------------+-------------------------+
-       |             |             |          |          |
-    Web adapter    CLI adapter   Android    Windows     iOS
-       |             |             |          |          |
- Playwright         PTY        ADB/UIA2   UIA/Appium XCUITest
+        +-----------------------+-------------------------+
+        |             |             |          |          |
+     Web adapter    CLI adapter   Android    Windows     iOS
+        |             |             |          |          |
+  Playwright         PTY        ADB/UIA2   UIA/Appium XCUITest
 ```
+
+## Packages (implemented in M0)
+
+The monorepo under `packages/` currently contains:
+
+| Package | Responsibility |
+|---|---|
+| `@inspector/protocol` | Inspector Adapter Protocol v0.1: envelope, IDs, error model, ajv JSON-Schema validation, capability negotiation, observe/act/lifecycle messages, ordered adapter event envelope. |
+| `@inspector/store-sqlite` | Durable SQLite store (better-sqlite3): runs/environments/steps/actions/observations/checkpoints, transactional step commit, in-flight recovery. |
+| `@inspector/artifact-store` | Run-scoped content-addressed artifacts: SHA-256 hashing, dedup, size limits, corruption detection. |
+| `@inspector/adapter-sdk` | Line-delimited JSON-RPC 2.0 over stdio transport, `AdapterServer`/`AdapterClient` with deadline enforcement, event notifications, subprocess spawning. |
+| `@inspector/adapter-fake` | Deterministic 5-state / 8-action fake adapter with a deterministic failure oracle, reset, artifact stubs, and fault injection (timeout, crash). |
+| `@inspector/core` | Policy/budget engine and `RunManager`/`RunController`: lifecycle, policy enforcement, durable step commit, checkpointing, crash recovery. |
+| `@inspector/cli` | `inspector` CLI: `doctor`, `run --adapter fake`, `runs list`, `runs show <id>`, JSON output. |
+
+Runtime notes:
+
+- Adapters speak JSON-RPC 2.0 over stdio (see `docs/ADR/0002-typed-adapter-protocol.md`).
+- The core runs TypeScript directly via `tsx` in development; `pnpm test`/`test:integration` use Vitest with path aliases.
+- Durable state lives in `<cwd>/.inspector/runs.db`; run artifacts under `<cwd>/.inspector/artifacts/`.
 
 ## Inspector Adapter Protocol (IAP)
 

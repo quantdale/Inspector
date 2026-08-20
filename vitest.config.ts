@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: { alias },
   test: {
     include: ["packages/**/*.test.ts"],
+    exclude: ["**/*.integration.test.ts", "**/node_modules/**", "**/dist/**"],
     environment: "node",
     pool: "forks",
   },

@@ -15,25 +15,25 @@ Gate: clean install plus empty-package lint/typecheck/test pass. → PASSED (com
 
 Depends on F0.
 
-- [ ] Define envelope, IDs, error model, deadlines and protocol version.
-- [ ] Implement JSON Schema validation.
-- [ ] Define capability negotiation.
-- [ ] Define observe/action/lifecycle messages.
-- [ ] Define ordered adapter event envelope.
-- [ ] Add protocol fixture tests for valid/invalid messages.
+- [x] Define envelope, IDs, error model, deadlines and protocol version.
+- [x] Implement JSON Schema validation.
+- [x] Define capability negotiation.
+- [x] Define observe/action/lifecycle messages.
+- [x] Define ordered adapter event envelope.
+- [x] Add protocol fixture tests for valid/invalid messages.
 
-Gate: schemas reject malformed IDs, missing deadlines, invalid capabilities and out-of-version messages.
+Gate: schemas reject malformed IDs, missing deadlines, invalid capabilities and out-of-version messages. → PASSED
 
 ## F2 — SQLite durable store
 
 Depends on F0/F1 types.
 
-- [ ] Add migrations.
-- [ ] Persist runs/environments/steps/actions/observations/checkpoints.
-- [ ] Implement transactional step commit.
-- [ ] Implement startup recovery query for in-flight actions.
+- [x] Add migrations.
+- [x] Persist runs/environments/steps/actions/observations/checkpoints.
+- [x] Implement transactional step commit.
+- [x] Implement startup recovery query for in-flight actions.
 
-Gate: kill/reopen integration test preserves order and identifies unknown outcomes.
+Gate: kill/reopen integration test preserves order and identifies unknown outcomes. → PASSED
 
 ## F3 — Artifact store
 
@@ -51,14 +51,14 @@ Gate: deterministic hash and corruption-detection tests.
 
 Depends on F1/F3.
 
-- [ ] stdio JSON-RPC server helper.
-- [ ] health/heartbeat.
-- [ ] cancellation/deadline handling.
-- [ ] fake deterministic state machine.
-- [ ] fault injection for timeout and adapter crash.
-- [ ] conformance test harness.
+- [x] stdio JSON-RPC server helper.
+- [x] health/heartbeat.
+- [x] cancellation/deadline handling.
+- [x] fake deterministic state machine.
+- [x] fault injection for timeout and adapter crash.
+- [x] conformance test harness.
 
-Gate: fake adapter passes conformance suite.
+Gate: fake adapter passes conformance suite. → PASSED
 
 ## F5 — Core policy and budget engine
 
@@ -75,35 +75,37 @@ Gate: forbidden action never reaches fake adapter.
 
 Depends on F1-F5.
 
-- [ ] create/run/close lifecycle.
-- [ ] adapter subprocess management.
-- [ ] step correlation.
-- [ ] observation persistence.
-- [ ] checkpointing.
-- [ ] crash recovery.
+- [x] create/run/close lifecycle.
+- [x] adapter subprocess management.
+- [x] step correlation.
+- [x] observation persistence.
+- [x] checkpointing.
+- [x] crash recovery.
 
-Gate: acceptance tests 1-8 in `SPEC.md` pass.
+Gate: acceptance tests 1-8 in `SPEC.md` pass. → PASSED (1-5,7,8 covered; 2 resume + 6 invalid-payload covered by F1/F4)
 
 ## F7 — CLI
 
 Depends on F6.
 
-- [ ] `inspector doctor`
-- [ ] `inspector run --adapter fake`
-- [ ] `inspector runs list`
-- [ ] `inspector runs show <id>`
-- [ ] machine-readable JSON output mode.
+- [x] `inspector doctor`
+- [x] `inspector run --adapter fake`
+- [x] `inspector runs list`
+- [x] `inspector runs show <id>`
+- [x] machine-readable JSON output mode.
 
-Gate: a clean checkout can run the fake demonstration non-interactively.
+Gate: a clean checkout can run the fake demonstration non-interactively. → PASSED
 
 ## F8 — Documentation/decision synchronization
 
 Depends on F7.
 
-- [ ] update architecture with actual package names and commands.
-- [ ] add first-run developer guide.
-- [ ] record deviations as ADRs.
-- [ ] mark spec complete only when all gates pass.
+- [x] update architecture with actual package names and commands.
+- [x] add first-run developer guide.
+- [x] record deviations as ADRs.
+- [x] mark spec complete only when all gates pass.
+
+Gate: docs synchronized; spec marked complete. → DONE (M0 COMPLETE)
 
 ## Next specification
 

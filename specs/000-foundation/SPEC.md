@@ -2,7 +2,7 @@
 
 ## Status
 
-ACTIVE
+COMPLETE (M0 gates passing; see `.inspector/state/campaign.yaml`)
 
 ## Objective
 

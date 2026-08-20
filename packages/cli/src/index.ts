@@ -1,1 +1,1 @@
-export const PACKAGE = "@inspector/cli";
+export * from "./cli.js";

@@ -1,1 +1,1 @@
-export const PACKAGE = "@inspector/artifact-store";
+export * from "./artifact-store.js";

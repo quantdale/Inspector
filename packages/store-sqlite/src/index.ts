@@ -1,1 +1,2 @@
-export const PACKAGE = "@inspector/store-sqlite";
+export * from "./migrations.js";
+export * from "./store.js";

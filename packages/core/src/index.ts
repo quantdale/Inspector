@@ -1,1 +1,2 @@
-export const PACKAGE = "@inspector/core";
+export * from "./policy.js";
+export * from "./run-manager.js";

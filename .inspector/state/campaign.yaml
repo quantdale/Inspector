@@ -3,6 +3,7 @@ project: Inspector
 campaign:
   mode: IMPLEMENTATION
   status: ACTIVE
+  current_milestone: M1
   objective: "Execute the implementation roadmap autonomously through M0-M7; keep hardening as a separately invoked campaign."
   initialized_at: "2026-08-20"
   initialized_from:
@@ -23,22 +24,39 @@ active:
   milestone_name: Foundation kernel
   spec: specs/000-foundation/SPEC.md
   tasks: specs/000-foundation/TASKS.md
-  task_group: F1
-  waypoint: M0.F1.protocol
+  task_group: M1.F0
+  waypoint: M1.F0.web-adapter-prep
   waypoint_status: READY
-  next_action: "Implement the protocol package: envelope, IDs, error model, deadlines, version 0.1; JSON Schema validation; capability negotiation; observe/action/lifecycle messages; ordered adapter event envelope; fixture tests. Run the F1 gate."
+  next_action: "M0 is complete. Begin M1 (Web sensing and acting): create specs/001-web-adapter implementation plan if needed, then implement the Playwright/Chromium environment lifecycle, semantic observation, and conformance against the adapter SDK. Run the M1 exit gate."
 
 progress:
-  completed_milestones: []
+  completed_milestones:
+    - M0
   completed_task_groups:
     - F0
+    - F1
+    - F2
+    - F3
+    - F4
+    - F5
+    - F6
+    - F7
+    - F8
   completed_waypoints:
     - M0.F0.workspace
+    - M0.F1.protocol
+    - M0.F2.store
+    - M0.F3.artifact-store
+    - M0.F4.adapter
+    - M0.F5.policy
+    - M0.F6.run-manager
+    - M0.F7.cli
+    - M0.F8.docs
   deferred_milestones: []
 
 verification:
-  last_verified_commit: 1cca292
-  last_gate: F0
+  last_verified_commit: 98c7d3f
+  last_gate: F7
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 
