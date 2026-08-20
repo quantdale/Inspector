@@ -10,30 +10,30 @@
 
 ## Last trusted implementation state
 
-No implementation waypoint has been completed yet. The repository currently contains architecture/specification material but no bootstrapped TypeScript implementation workspace.
+M0.F0.workspace completed. The repository now contains a bootstrapped pnpm workspace with root TypeScript config (strict, NodeNext), ESLint flat config, Vitest unit + integration configs, a Node 22+ GitHub Actions CI workflow, and seven package skeletons (protocol, store-sqlite, artifact-store, adapter-sdk, adapter-fake, core, cli).
 
-Verified implementation gates: **none**.
+Verified implementation gates: **F0** (lint/typecheck/test/test:integration all green on empty packages).
 
 ## Active waypoint
 
 - Milestone: M0 Foundation kernel
 - Spec: `specs/000-foundation/SPEC.md`
-- Task group: F0 Workspace bootstrap
-- Waypoint: `M0.F0.workspace`
+- Task group: F1 Protocol package
+- Waypoint: `M0.F1.protocol`
 - State: READY
 
 ## Exact next action
 
-Create the pnpm workspace/root TypeScript configuration, repository scripts, Node 22+ CI scaffolding, and package skeletons required by Spec 000. Then execute the F0 gate: clean install plus empty-package lint/typecheck/test passing.
+Implement the protocol package (envelope, IDs, error model, deadlines, version 0.1; JSON Schema validation; capability negotiation; observe/action/lifecycle messages; ordered adapter event envelope; fixture tests). Run the F1 gate: schemas reject malformed IDs, missing deadlines, invalid capabilities and out-of-version messages.
 
 After the gate passes:
 
-1. mark F0 complete in the task graph;
-2. add `M0.F0.workspace` to completed waypoints in `campaign.yaml`;
-3. set active task group/waypoint to the first F1 protocol slice;
+1. mark F1 complete in the task graph;
+2. add `M0.F1.protocol` to completed waypoints in `campaign.yaml`;
+3. set active task group/waypoint to F2 SQLite store;
 4. record the actual gate commands/results and verified commit;
 5. checkpoint commit if authorized;
-6. continue immediately into F1.
+6. continue immediately into F2.
 
 ## Known blockers
 

@@ -4,12 +4,12 @@ Work in dependency order. Mark tasks complete only after their acceptance tests 
 
 ## F0 — Workspace bootstrap
 
-- [ ] Initialize pnpm workspace and root TypeScript config.
-- [ ] Add lint/typecheck/test scripts.
-- [ ] Add CI workflow for Node 22+.
-- [ ] Create package skeletons defined by the spec.
+- [x] Initialize pnpm workspace and root TypeScript config.
+- [x] Add lint/typecheck/test scripts.
+- [x] Add CI workflow for Node 22+.
+- [x] Create package skeletons defined by the spec.
 
-Gate: clean install plus empty-package lint/typecheck/test pass.
+Gate: clean install plus empty-package lint/typecheck/test pass. → PASSED (commit 1cca292..)
 
 ## F1 — Protocol package
 
