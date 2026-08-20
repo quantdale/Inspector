@@ -59,10 +59,39 @@ export interface ObservationRecord {
 
 export interface CheckpointRecord {
   id: string;
-  run_id: string;
-  step_id: string | null;
-  created_at: string;
+  runId: string;
+  stepId: string | null;
+  createdAt: string;
   payload_json: string;
+}
+
+export type FindingStatus =
+  | "OBSERVED"
+  | "CANDIDATE"
+  | "REPRODUCING"
+  | "MINIMIZED"
+  | "CONFIRMED"
+  | "PATCHING"
+  | "VERIFYING"
+  | "RESOLVED"
+  | "REGRESSED"
+  | "REJECTED"
+  | "FLAKY"
+  | "NEEDS_HUMAN_ORACLE";
+
+export interface FindingRecord {
+  id: string;
+  runId: string | null;
+  status: FindingStatus;
+  title: string;
+  confidence: number;
+  severity: string | null;
+  revision: string | null;
+  oracleIds: string | null;
+  reproductionJson: string | null;
+  artifactRefs: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StepBundle {
@@ -414,5 +443,49 @@ export class Store {
         observations: this.getStepObservations(s.id),
       };
     });
+  }
+
+  putFinding(f: FindingRecord): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO findings(id, run_id, status, title, confidence, severity, revision,
+           oracle_ids, reproduction_json, artifact_refs, created_at, updated_at)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           title = excluded.title,
+           confidence = excluded.confidence,
+           severity = excluded.severity,
+           revision = excluded.revision,
+           oracle_ids = excluded.oracle_ids,
+           reproduction_json = excluded.reproduction_json,
+           artifact_refs = excluded.artifact_refs,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        f.id,
+        f.runId,
+        f.status,
+        f.title,
+        f.confidence,
+        f.severity,
+        f.revision,
+        f.oracleIds,
+        f.reproductionJson,
+        f.artifactRefs,
+        f.createdAt,
+        now,
+      );
+  }
+
+  getFinding(id: string): FindingRecord | undefined {
+    return this.db.prepare(`SELECT * FROM findings WHERE id = ?`).get(id) as FindingRecord | undefined;
+  }
+
+  listFindings(limit = 100): FindingRecord[] {
+    return this.db
+      .prepare(`SELECT * FROM findings ORDER BY updated_at DESC LIMIT ?`)
+      .all(limit) as FindingRecord[];
   }
 }

@@ -81,6 +81,23 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_actions_run ON actions(run_id);
   CREATE INDEX IF NOT EXISTS idx_observations_seq ON observations(run_id, sequence);
   `,
+  `
+  CREATE TABLE IF NOT EXISTS findings (
+    id TEXT PRIMARY KEY,
+    run_id TEXT,
+    status TEXT NOT NULL,
+    title TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0,
+    severity TEXT,
+    revision TEXT,
+    oracle_ids TEXT,
+    reproduction_json TEXT,
+    artifact_refs TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_findings_run ON findings(run_id);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

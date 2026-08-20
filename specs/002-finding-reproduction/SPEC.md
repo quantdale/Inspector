@@ -2,7 +2,7 @@
 
 ## Status
 
-PENDING
+COMPLETE (M2 exit gate satisfied; see `.inspector/state/campaign.yaml`)
 
 ## Objective
 

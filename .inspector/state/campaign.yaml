@@ -3,7 +3,7 @@ project: Inspector
 campaign:
   mode: IMPLEMENTATION
   status: ACTIVE
-  current_milestone: M2
+  current_milestone: M3
   objective: "Execute the implementation roadmap autonomously through M0-M7; keep hardening as a separately invoked campaign."
   initialized_at: "2026-08-20"
   initialized_from:
@@ -24,15 +24,16 @@ active:
   milestone_name: Foundation kernel
   spec: specs/000-foundation/SPEC.md
   tasks: specs/000-foundation/TASKS.md
-  task_group: M2.F0
-  waypoint: M2.F0.finding-reproduction-prep
+  task_group: M3.F0
+  waypoint: M3.F0.autonomous-exploration-prep
   waypoint_status: READY
-  next_action: "M1 is complete. Begin M2 (Finding, evidence, reproduction, minimization): implement the finding lifecycle, deterministic oracle detectors, replay/reset, reproduction thresholds, minimization, and evidence bundle writer. Run the M2 exit gate."
+  next_action: "M2 is complete. Begin M3 (Autonomous exploration): implement the exploration loop, state-delta observation, curious action selection, coverage/state-diversity heuristics, exploration budget, and reproducible trace linkage to findings. Run the M3 exit gate."
 
 progress:
   completed_milestones:
     - M0
     - M1
+    - M2
   completed_task_groups:
     - F0
     - F1
@@ -49,6 +50,13 @@ progress:
     - W3
     - W4
     - W5
+    - R0
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -65,11 +73,18 @@ progress:
     - M1.W3.acting
     - M1.W4.protocol
     - M1.W5.demo
+    - M2.R0.lifecycle
+    - M2.R1.oracles
+    - M2.R2.replay
+    - M2.R3.policy
+    - M2.R4.minimization
+    - M2.R5.bundle
+    - M2.R6.regression
   deferred_milestones: []
 
 verification:
   last_verified_commit: af41a79
-  last_gate: M1
+  last_gate: M2
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 

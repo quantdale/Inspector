@@ -18,22 +18,23 @@ Verified implementation gates: **F0, F1, F2, F3, F4, F5, F6** (lint/typecheck/te
 
 - Milestone: M0 Foundation kernel — **COMPLETE**
 - Milestone: M1 Web sensing and acting — **COMPLETE**
-- Spec M1: `specs/001-web-adapter/SPEC.md` (status COMPLETE)
-- Task graph M1: `specs/001-web-adapter/TASKS.md` (W0–W5 all checked)
+- Milestone: M2 Finding, evidence, reproduction, minimization — **COMPLETE**
+- Spec M2: `specs/002-finding-reproduction/SPEC.md` (status COMPLETE)
+- Task graph M2: `specs/002-finding-reproduction/TASKS.md` (R0–R6 all checked)
 
-M1 exit gate (Inspector autonomously traverses the seeded web target through typed IAP actions and records a replayable, ordered, evidence-rich trace with deterministic reset) is satisfied: the `web-playwright` adapter implements create/reset/close, semantic observation (url/title/UI tree/screenshot/console/network/storage/trace), semantic acting, capability/origin policy, and adapter-vs-target crash classification. 7 web conformance tests + the `inspector run --adapter web` demonstration pass.
+M2 exit gate (seeded defects produce confirmed, minimized, replayable evidence bundles with low/controlled false positives) is satisfied: `@inspector/finding` provides a durable finding lifecycle (status machine + store persistence), hard oracles (target-failure, page-error, explicit DEFECT_* signals), clean replay drivers, reproduction policy (CONFIRMED/FLAKY/REJECTED), delta-debugging minimization, evidence bundle, and regression export. 8 M2 unit tests pass.
 
 ## Next milestone
 
-- Milestone: **M2 Finding, evidence, reproduction, minimization**
-- Spec: `specs/002-finding-reproduction/SPEC.md`
-- First waypoint: M2.F0 finding-reproduction-prep
+- Milestone: **M3 Autonomous exploration**
+- Spec: `specs/003-autonomous-exploration/SPEC.md`
+- First waypoint: M3.F0 autonomous-exploration-prep
 
 ## Exact next action
 
-Begin M2: implement the finding lifecycle state machine, hard deterministic oracle detectors, clean reset/replay, reproduction thresholds, sequence minimization, and evidence bundle writer. Run the M2 exit gate (seeded defects become confirmed findings with minimized reproducers and replayable evidence; non-defects rejected).
+Begin M3: implement the exploration loop, state-delta observation, curious action selection, coverage/state-diversity heuristics, exploration budget, and reproducible trace linkage to findings. Run the M3 exit gate.
 
-Continue autonomously; do not stop at the M1/M2 boundary.
+Continue autonomously; do not stop at the M2/M3 boundary.
 
 ## Known blockers
 

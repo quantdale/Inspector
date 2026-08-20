@@ -46,7 +46,7 @@ None currently known.
 |---|---|
 | M0 Foundation | COMPLETE |
 | M1 Web adapter | COMPLETE |
-| M2 Finding/reproduction | PENDING |
+| M2 Finding/reproduction | COMPLETE |
 | M3 Autonomous exploration | PENDING |
 | M4 Oracle/repair | PENDING |
 | M5 Android | PENDING |

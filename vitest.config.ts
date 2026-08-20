@@ -9,6 +9,7 @@ const alias = {
   "@inspector/adapter-fake": resolve(__dirname, "packages/adapter-fake/src/index.ts"),
   "@inspector/core": resolve(__dirname, "packages/core/src/index.ts"),
   "@inspector/cli": resolve(__dirname, "packages/cli/src/index.ts"),
+  "@inspector/finding": resolve(__dirname, "packages/finding/src/index.ts"),
 };
 
 export default defineConfig({

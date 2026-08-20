@@ -23,7 +23,8 @@
       "@inspector/adapter-sdk": ["packages/adapter-sdk/src/index.ts"],
       "@inspector/adapter-fake": ["packages/adapter-fake/src/index.ts"],
       "@inspector/core": ["packages/core/src/index.ts"],
-      "@inspector/cli": ["packages/cli/src/index.ts"]
+      "@inspector/cli": ["packages/cli/src/index.ts"],
+      "@inspector/finding": ["packages/finding/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts"],
