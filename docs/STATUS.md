@@ -45,7 +45,7 @@ None currently known.
 | Milestone | State |
 |---|---|
 | M0 Foundation | COMPLETE |
-| M1 Web adapter | PENDING (next) |
+| M1 Web adapter | COMPLETE |
 | M2 Finding/reproduction | PENDING |
 | M3 Autonomous exploration | PENDING |
 | M4 Oracle/repair | PENDING |

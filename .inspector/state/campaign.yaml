@@ -3,7 +3,7 @@ project: Inspector
 campaign:
   mode: IMPLEMENTATION
   status: ACTIVE
-  current_milestone: M1
+  current_milestone: M2
   objective: "Execute the implementation roadmap autonomously through M0-M7; keep hardening as a separately invoked campaign."
   initialized_at: "2026-08-20"
   initialized_from:
@@ -24,14 +24,15 @@ active:
   milestone_name: Foundation kernel
   spec: specs/000-foundation/SPEC.md
   tasks: specs/000-foundation/TASKS.md
-  task_group: M1.F0
-  waypoint: M1.F0.web-adapter-prep
+  task_group: M2.F0
+  waypoint: M2.F0.finding-reproduction-prep
   waypoint_status: READY
-  next_action: "M0 is complete. Begin M1 (Web sensing and acting): create specs/001-web-adapter implementation plan if needed, then implement the Playwright/Chromium environment lifecycle, semantic observation, and conformance against the adapter SDK. Run the M1 exit gate."
+  next_action: "M1 is complete. Begin M2 (Finding, evidence, reproduction, minimization): implement the finding lifecycle, deterministic oracle detectors, replay/reset, reproduction thresholds, minimization, and evidence bundle writer. Run the M2 exit gate."
 
 progress:
   completed_milestones:
     - M0
+    - M1
   completed_task_groups:
     - F0
     - F1
@@ -42,6 +43,12 @@ progress:
     - F6
     - F7
     - F8
+    - W0
+    - W1
+    - W2
+    - W3
+    - W4
+    - W5
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -52,11 +59,17 @@ progress:
     - M0.F6.run-manager
     - M0.F7.cli
     - M0.F8.docs
+    - M1.W0.seeded-target
+    - M1.W1.lifecycle
+    - M1.W2.sensing
+    - M1.W3.acting
+    - M1.W4.protocol
+    - M1.W5.demo
   deferred_milestones: []
 
 verification:
-  last_verified_commit: 98c7d3f
-  last_gate: F7
+  last_verified_commit: af41a79
+  last_gate: M1
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 

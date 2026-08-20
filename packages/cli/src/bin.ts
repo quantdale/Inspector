@@ -5,6 +5,6 @@ runCli(process.argv.slice(2))
     process.exit(result.code);
   })
   .catch((err) => {
-    process.stderr.write(`inspector error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`inspector error: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
     process.exit(1);
   });

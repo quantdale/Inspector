@@ -17,22 +17,23 @@ Verified implementation gates: **F0, F1, F2, F3, F4, F5, F6** (lint/typecheck/te
 ## Active waypoint
 
 - Milestone: M0 Foundation kernel — **COMPLETE**
-- Spec: `specs/000-foundation/SPEC.md` (status COMPLETE)
-- Task graph: `specs/000-foundation/TASKS.md` (F0–F8 all checked)
+- Milestone: M1 Web sensing and acting — **COMPLETE**
+- Spec M1: `specs/001-web-adapter/SPEC.md` (status COMPLETE)
+- Task graph M1: `specs/001-web-adapter/TASKS.md` (W0–W5 all checked)
 
-M0 exit gate (deterministic fake environment executes typed observe/act loops, persists ordered events, survives crash/restart, classifies unknown outcomes, passes acceptance tests) is satisfied by the F0–F7 waypoint gates and 45 automated tests.
+M1 exit gate (Inspector autonomously traverses the seeded web target through typed IAP actions and records a replayable, ordered, evidence-rich trace with deterministic reset) is satisfied: the `web-playwright` adapter implements create/reset/close, semantic observation (url/title/UI tree/screenshot/console/network/storage/trace), semantic acting, capability/origin policy, and adapter-vs-target crash classification. 7 web conformance tests + the `inspector run --adapter web` demonstration pass.
 
 ## Next milestone
 
-- Milestone: **M1 Web sensing and acting**
-- Spec: `specs/001-web-adapter/SPEC.md`
-- First waypoint: M1.F0 web-adapter-prep
+- Milestone: **M2 Finding, evidence, reproduction, minimization**
+- Spec: `specs/002-finding-reproduction/SPEC.md`
+- First waypoint: M2.F0 finding-reproduction-prep
 
 ## Exact next action
 
-Begin M1: implement the Playwright/Chromium environment lifecycle, semantic observation (accessibility/UI tree, screenshots, console, network), and conformance against the adapter SDK. Run the M1 exit gate (headless traversal of a seeded app with a complete replayable observation/action trace, conformance passing).
+Begin M2: implement the finding lifecycle state machine, hard deterministic oracle detectors, clean reset/replay, reproduction thresholds, sequence minimization, and evidence bundle writer. Run the M2 exit gate (seeded defects become confirmed findings with minimized reproducers and replayable evidence; non-defects rejected).
 
-Continue autonomously; do not stop at the M0/M1 boundary.
+Continue autonomously; do not stop at the M1/M2 boundary.
 
 ## Known blockers
 

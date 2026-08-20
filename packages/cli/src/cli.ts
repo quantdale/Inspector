@@ -9,6 +9,7 @@ import type { Action } from "@inspector/protocol";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeBin = join(here, "..", "..", "adapter-fake", "src", "bin.ts");
+const webBin = join(here, "..", "..", "adapter-web", "src", "bin.ts");
 
 export interface Workspace {
   store: Store;
@@ -27,10 +28,11 @@ export function openWorkspace(cwd: string): Workspace {
   return { store, artifacts, base };
 }
 
-export function fakeAdapterSpawn(): { adapterCommand: string; adapterArgs: string[]; adapterEnv: NodeJS.ProcessEnv } {
+export function adapterSpawn(name: string): { adapterCommand: string; adapterArgs: string[]; adapterEnv: NodeJS.ProcessEnv } {
+  const bin = name === "web" ? webBin : fakeBin;
   return {
     adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", fakeBin],
+    adapterArgs: ["--import", "tsx", bin],
     adapterEnv: { ...process.env },
   };
 }
@@ -126,40 +128,61 @@ async function doctor(json: boolean, out: (d: unknown) => void): Promise<CliResu
 
 async function runDemo(args: string[], json: boolean, out: (d: unknown) => void, cwd: string): Promise<CliResult> {
   const adapterArg = args[args.indexOf("--adapter") + 1];
-  if (adapterArg !== "fake") {
-    out("only --adapter fake is supported in M0");
+  if (adapterArg !== "fake" && adapterArg !== "web") {
+    out("only --adapter fake|web is supported");
     return { code: 1 };
   }
   const { store, artifacts } = openWorkspace(cwd);
   try {
     const mgr = new RunManager(store, artifacts);
-    const run = await mgr.startRun(fakeAdapterSpawn());
+    const run = await mgr.startRun(adapterSpawn(adapterArg));
     const steps: unknown[] = [];
 
-    const seq = [
-      act("d1", "openForm"),
-      act("d2", "fillField", { name: "default", value: "ok" }),
-      act("d3", "submit"),
-    ];
-    for (const a of seq) {
-      const r = await run.submitAction(a);
-      steps.push({ id: a.id, ...((r as { outcome?: unknown }).outcome ? { outcome: (r as { outcome: unknown }).outcome } : { result: r.kind }) });
+    if (adapterArg === "fake") {
+      for (const a of [act("d1", "openForm"), act("d2", "fillField", { name: "default", value: "ok" }), act("d3", "submit")]) {
+        const r = await run.submitAction(a);
+        steps.push({ id: a.id, outcome: (r as { outcome?: unknown }).outcome });
+      }
+      await run.observe(["state"]);
+      await run.reset();
+      await run.submitAction(act("d4", "openForm"));
+      await run.submitAction(act("d5", "fillField", { name: "default", value: "BAD" }));
+      const fail = await run.submitAction(act("d6", "submit"));
+      const summary = {
+        runId: run.runId,
+        adapter: "fake",
+        deterministicFailure: (fail as { outcome?: { status: string } }).outcome?.status ?? "none",
+      };
+      out(json ? summary : `run ${summary.runId} complete; deterministicFailure=${summary.deterministicFailure}`);
+      await run.close();
+      return { code: 0, data: summary };
     }
-    const obs = await run.observe(["state"]);
 
-    // Demonstrate the deterministic failure oracle (reset first so we start clean).
-    await run.reset();
-    await run.submitAction(act("d4", "openForm"));
-    await run.submitAction(act("d5", "fillField", { name: "default", value: "BAD" }));
-    const fail = await run.submitAction(act("d6", "submit"));
-
-    const summary = {
-      runId: run.runId,
-      steps: steps.length + 2,
-      finalState: (obs.summary as { state?: string }).state,
-      deterministicFailure: (fail as { outcome?: { status: string } }).outcome?.status ?? "none",
-    };
-    out(json ? summary : `run ${summary.runId} complete; finalState=${summary.finalState}; deterministicFailure=${summary.deterministicFailure}`);
+    // Web traversal of the seeded target.
+    await run.submitAction(act("w1", "fill", { selector: "#username", value: "admin" }));
+    await run.submitAction(act("w2", "fill", { selector: "#password", value: "admin" }));
+    await run.submitAction(act("w3", "click", { selector: "#loginBtn" }));
+      const obs1 = await run.observe(["url", "uiTree"]);
+      await run.submitAction(act("w4", "click", { selector: "#increment" }));
+      await run.submitAction(act("w5", "click", { selector: "#save" }));
+      const obs2 = await run.observe(["storage", "screenshot", "console", "network", "trace"]);
+      // Deterministic target crash (boom button) -> target-failure, not adapter crash.
+      const crash = await run.submitAction(act("w6", "click", { selector: "#boom" }));
+      // Forbidden origin navigation must be rejected by policy/adapter.
+      const forbidden = await run.submitAction(act("w7", "navigate", { value: "https://evil.example.com/secret" }));
+      const obs3 = await run.observe(["url", "pageErrors"]);
+      const uiTree = (obs1.summary as { uiTree?: Array<{ id: string; hidden?: boolean }> }).uiTree ?? [];
+      const incrementNode = uiTree.find((e) => e.id === "increment");
+      const summary = {
+        runId: run.runId,
+        adapter: "web",
+        reachedDashboard: incrementNode ? incrementNode.hidden === false : false,
+        savedPreference: ((obs2.summary as { storage?: Record<string, string> }).storage?.["pref"] ?? "").startsWith("saved-"),
+        boomOutcome: (crash as { outcome?: { status: string } }).outcome?.status ?? "none",
+        forbiddenOutcome: (forbidden as { outcome?: { status: string } }).outcome?.status ?? "none",
+        pageErrorsAfterBoom: ((obs3.summary as { pageErrors?: Array<{ message: string }> }).pageErrors ?? []).length,
+      };
+    out(json ? summary : `run ${summary.runId} complete; dashboard=${summary.reachedDashboard}; pref=${summary.savedPreference}; boom=${summary.boomOutcome}; forbidden=${summary.forbiddenOutcome}`);
     await run.close();
     return { code: 0, data: summary };
   } finally {

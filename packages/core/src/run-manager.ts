@@ -193,6 +193,7 @@ export class RunManager {
       env: opts.adapterEnv,
     });
     const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
+    await adapter.request("lifecycle", { op: "create" }, 30000);
     return new RunController(this.store, this.artifactStore, this.engine, {
       runId,
       envId,
