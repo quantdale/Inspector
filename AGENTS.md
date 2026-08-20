@@ -159,7 +159,7 @@ When a gate fails:
 
 ## Git and checkpoint discipline
 
-The implementation campaign branch is `implementation/autonomous-campaign` unless the invoking workflow chooses a child worktree/branch.
+Inspector develops directly on the single persistent branch `main`. Agents may use a disposable clone or detached worktree for temporary isolation, but must never leave a persistent feature or campaign branch behind.
 
 - Never force-push campaign history.
 - Never rewrite or discard another agent's work without evidence it is obsolete.

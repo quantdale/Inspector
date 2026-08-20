@@ -24,7 +24,7 @@ A fresh agent must execute this sequence:
 
 ```text
 fetch latest authorized remote state
-checkout implementation/autonomous-campaign
+checkout main
 read campaign.yaml
 read CHECKPOINT.md
 read AGENTS.md

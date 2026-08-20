@@ -4,12 +4,14 @@ campaign:
   mode: IMPLEMENTATION
   status: ACTIVE
   current_milestone: M3
-  objective: "Execute the implementation roadmap autonomously through M0-M7; keep hardening as a separately invoked campaign."
+  objective: >-
+    Autonomously execute the Inspector roadmap M0-M7 on the single 'main'
+    branch; hardening remains a separately invoked campaign.
   initialized_at: "2026-08-20"
   initialized_from:
     branch: main
     commit: ac74afbcc3824acee457a5cc5b26956ea5c98562
-  working_branch: implementation/autonomous-campaign
+  working_branch: main
 
 autonomy:
   unattended_continuation: true
@@ -20,14 +22,18 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M0
-  milestone_name: Foundation kernel
-  spec: specs/000-foundation/SPEC.md
-  tasks: specs/000-foundation/TASKS.md
-  task_group: M3.F0
-  waypoint: M3.F0.autonomous-exploration-prep
+  milestone_id: M3
+  milestone_name: Autonomous exploration
+  spec: specs/003-autonomous-exploration/SPEC.md
+  tasks: specs/003-autonomous-exploration/TASKS.md
+  task_group: E0
+  waypoint: M3.E0.state-model
   waypoint_status: READY
-  next_action: "M2 is complete. Begin M3 (Autonomous exploration): implement the exploration loop, state-delta observation, curious action selection, coverage/state-diversity heuristics, exploration budget, and reproducible trace linkage to findings. Run the M3 exit gate."
+  next_action: >-
+    M2 is complete. Begin M3 (Autonomous exploration): implement the
+    exploration loop, state-delta observation, curious action selection,
+    coverage/state-diversity heuristics, exploration budget, and reproducible
+    trace linkage to findings. Run the M3 exit gate.
 
 progress:
   completed_milestones:
@@ -83,7 +89,7 @@ progress:
   deferred_milestones: []
 
 verification:
-  last_verified_commit: af41a79
+  last_verified_commit: e638155
   last_gate: M2
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
@@ -107,4 +113,4 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: M1
+next_milestone_after_completion: M4

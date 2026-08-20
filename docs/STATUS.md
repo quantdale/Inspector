@@ -6,7 +6,7 @@ Last updated: 2026-08-20
 
 - Mode: **IMPLEMENTATION**
 - Campaign status: **ACTIVE**
-- Working branch: `implementation/autonomous-campaign`
+- Working branch: `main`
 - Hardening campaign: **NOT ACTIVE**
 
 ## Baseline

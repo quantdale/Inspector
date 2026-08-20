@@ -49,6 +49,15 @@ importers:
 
   packages/core: {}
 
+  packages/finding:
+    dependencies:
+      '@inspector/adapter-fake':
+        specifier: workspace:*
+        version: link:../adapter-fake
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/protocol:
     dependencies:
       ajv:

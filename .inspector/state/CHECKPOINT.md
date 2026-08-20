@@ -4,7 +4,7 @@
 
 - Campaign: IMPLEMENTATION
 - Status: ACTIVE / READY
-- Working branch: `implementation/autonomous-campaign`
+- Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
 
