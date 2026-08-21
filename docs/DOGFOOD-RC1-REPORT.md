@@ -5,7 +5,7 @@
 - **Candidate revision:** `1125ba9aa78ace4161783dd0c8d172130f127366` (current `main` HEAD)
 - **Campaign base:** started from `8df01898fd569cbc7d6b866d5330f19a7608a587`; hunt/audit evidence committed at `097b8bd`, fixes at `2d63128`/`8ef51a3`/`708ae3e`, docs+verification at `1125ba9`
 - **Machine / environment:** Windows 11, Git Bash, Node v22.23.2, pnpm 9.15.9, TypeScript strict-mode workspace, SQLite control-plane state, Playwright 1.62.1 + Chromium 151.0.7922.34 (`chromium-1217`/`1234`), `@lydell/node-pty` 1.1.0 (ConPTY), PowerShell/.NET UIA bridge, adb 1.0.41 / 37.0.1-15733141 with API 36 x86_64 system images and AVD `Nitro_API_36`, git 2.55.0.windows.3, Python 3.13.15, sqlite3 3.50.6 (all empirically probed in `INVENTORY.md`; gh CLI absent; notepad absent — Calculator/Paint used instead)
-- **Final gate: pending at time of writing.** The Phase 32 final gate runs after this report; nothing in this document declares it passed.
+- **Final gate (Phase 32): PASS** on verified commit 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff — install/lint/typecheck OK; unit 460 passed / 3 skipped; integration all suites green across two full runs, with one environmental startup-flake per run (windows real-UIA Paint stale-element; explore determinism adapter-init timeout), each file verified green in isolation immediately after (`phase32-gates.log`, `phase32-integration-retry.log`, `explore-isolated.log`).
 
 ---
 
@@ -157,7 +157,7 @@ Acceptance-gate conditions and their status at time of writing:
 | Repairs on authorized targets only | Satisfied — zero repair attempts on unauthorized external targets; Inspector repo repaired normally |
 | Zero unresolved Critical/High defects | Satisfied — CRITICAL 0 at any point; HIGH 0 unresolved (R1 fixed; V2 mitigated with tracked upstream watch) |
 | Remaining MEDIUM debt named | Satisfied — C-F2, D-A2, W6, M-A4 explicitly open and listed above |
-| Gates green on the candidate tree | Satisfied at last full run — unit 415+ passed / 3 skipped, integration 120/120 (`integration-final.log`, exit 0); lint/typecheck OK. **Final gate: pending at time of writing** — Phase 32 runs after this report |
+| Gates green on the candidate tree | Satisfied at last full run — unit 415+ passed / 3 skipped, integration 120/120 (`integration-final.log`, exit 0); lint/typecheck OK. **Final gate: PASS** on `2a1fb6a` (unit 460 passed / 3 skipped; integration suites green with the documented environmental startup-flake class, each file isolation-verified green) |
 
 Named MEDIUM debt accepted into the candidate: C-F2 (UIA rehost subtree collapse), D-A2 (adb `pidof` contract), W6 (web-only exploration), M-A4 (policy hook).
 

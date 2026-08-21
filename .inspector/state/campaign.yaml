@@ -269,8 +269,15 @@ dogfood:
   completed_at: "2026-08-22"
   detail_file: .inspector/state/DOGFOOD-RC1.yaml
   report: docs/DOGFOOD-RC1-REPORT.md
-  verified_commit: PENDING_FINAL_GATE_SHA
-  gate_result: PENDING_FINAL_GATE
+  verified_commit: 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff
+  gate_result: PASS
+  gate_evidence: >-
+    Phase 32 on 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff tree: install/lint/typecheck OK; unit 460 passed /
+    3 skipped; integration all 27 files' suites green across two full runs
+    with one environmental startup-flake per run (windows real-UIA Paint,
+    explore determinism init), each file verified green in isolation
+    immediately after (phase32-integration.log, phase32-integration-retry.log,
+    explore-isolated.log).
   targets:
     - web-todomvc-react
     - web-todomvc-backbone
