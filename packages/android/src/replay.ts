@@ -9,7 +9,13 @@ import { MockAdbBackend } from "./mock-backend.js";
  * oracle signals — the same contract as the web replay driver.
  */
 export class AndroidReplayDriver {
-  constructor(private readonly opts: { artifactBaseDir?: string } = {}) {}
+  constructor(
+    private readonly opts: {
+      artifactBaseDir?: string;
+      /** Forwarded to lifecycle create — e.g. `{ seedApk }` for seeded targets. */
+      createOptions?: Record<string, unknown>;
+    } = {},
+  ) {}
 
   async replay(actions: Action[]): Promise<ReplayResult> {
     const backend = new MockAdbBackend();
@@ -17,7 +23,7 @@ export class AndroidReplayDriver {
     const outcomes: ActionOutcome[] = [];
     const signals: OracleSignal[] = [];
     try {
-      await handler.lifecycle({ op: "create" });
+      await handler.lifecycle({ op: "create", options: this.opts.createOptions });
       for (const a of actions) {
         const outcome = await handler.act({ action: a });
         outcomes.push(outcome);

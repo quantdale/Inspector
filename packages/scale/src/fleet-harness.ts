@@ -1241,6 +1241,9 @@ export function makeCliExecutor(): LaneExecutor {
  * does not exist in this environment). Confirms both seeded defects through
  * AndroidReplayDriver + rotation/process-death/reset churn.
  */
+/** Host path of the seeded Android fixture APK (mock backend treats it symbolically). */
+const SEED_APK_PATH = "/fixtures/seeddroid.apk";
+
 export function makeAndroidExecutor(common: { effects: EffectsLedger; bundlesDir: string }): LaneExecutor {
   return async (ctx) => {
     switch (ctx.item.kind) {
@@ -1264,7 +1267,9 @@ async function androidConfirm(
   const backend = new MockAdbBackend();
   const handler = new AndroidAdapterHandler(backend, {}, join(ctx.workspace, "artifacts"));
   try {
-    await handler.lifecycle({ op: "create" });
+    // Seeded-conformance lane: install the seed APK explicitly (lifecycle
+    // seeding is opt-in since the AndroidLifecycleOptions change).
+    await handler.lifecycle({ op: "create", options: { seedApk: SEED_APK_PATH } });
     await handler.act({ action: act("a1", "fill", { selector: "#username", value: "admin" }) });
     await handler.act({ action: act("a2", "fill", { selector: "#password", value: "admin" }) });
     await handler.act({ action: act("a3", "click", { selector: "#login" }) });
@@ -1325,7 +1330,10 @@ async function androidConfirm(
               act(`i${i}`, "click", { selector: "#increment" }),
             ),
           ];
-    const driver = new AndroidReplayDriver({ artifactBaseDir: join(ctx.workspace, "replay-artifacts") });
+    const driver = new AndroidReplayDriver({
+      artifactBaseDir: join(ctx.workspace, "replay-artifacts"),
+      createOptions: { seedApk: SEED_APK_PATH },
+    });
     const rep = await engine.reproduce(finding, path, driver, { attempts: 1, minSuccesses: 1 });
     expectLike(rep.finding.status === "CONFIRMED", `android ${defect} reproduction must confirm`);
     const minimized = await engine.minimize(rep.finding, path, driver);
@@ -1370,14 +1378,14 @@ async function androidConfirm(
 async function androidRotation(ctx: LaneContext): Promise<LaneOutcome> {
   const backendA = new MockAdbBackend();
   const handlerA = new AndroidAdapterHandler(backendA, {}, join(ctx.workspace, "artifacts"));
-  await handlerA.lifecycle({ op: "create" });
+  await handlerA.lifecycle({ op: "create", options: { seedApk: SEED_APK_PATH } });
   await handlerA.act({ action: act("r1", "fill", { selector: "#username", value: "admin" }) });
   await handlerA.act({ action: act("r2", "fill", { selector: "#password", value: "admin" }) });
   await handlerA.act({ action: act("r3", "click", { selector: "#login" }) });
   await handlerA.act({ action: act("r4", "click", { selector: "#increment" }) });
 
   // Environment rotation: package-data reset restores the seeded baseline.
-  await handlerA.lifecycle({ op: "reset" });
+  await handlerA.lifecycle({ op: "reset", options: { seedApk: SEED_APK_PATH } });
   const baseline = await handlerA.observe({ observe: ["uiTree"] });
   const ids = (baseline.summary as { uiTree: Array<{ id?: string }> }).uiTree.map((el) => el.id);
   expectLike(ids.includes("login") && !ids.includes("increment"), "android reset must restore baseline");
@@ -1394,7 +1402,7 @@ async function androidRotation(ctx: LaneContext): Promise<LaneOutcome> {
   const backendB = new MockAdbBackend();
   const handlerB = new AndroidAdapterHandler(backendB, {}, join(ctx.workspace, "artifacts"));
   try {
-    await handlerB.lifecycle({ op: "create" });
+    await handlerB.lifecycle({ op: "create", options: { seedApk: SEED_APK_PATH } });
     const revived = await handlerB.observe({ observe: ["uiTree"] });
     const revivedIds = (revived.summary as { uiTree: Array<{ id?: string }> }).uiTree.map(
       (el) => el.id,
