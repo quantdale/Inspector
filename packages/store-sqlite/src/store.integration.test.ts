@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Store } from "./index.js";
+import { Store, type OracleEvaluationRecord } from "./index.js";
 import { MIGRATIONS } from "./migrations.js";
 
 let dir: string | null = null;
@@ -375,8 +375,7 @@ describe("hardening wave 2: sqlite store", () => {
     store.close();
   });
 
-  it("H10 (D3): countRunActions counts every admitted action regardless of status", () => {
-    const path = tmpDb();
+  it("H10 (D3): countRunActions counts every admitted action regardless of status", () => {    const path = tmpDb();
     const store = Store.open(path);
     const runId = "run_count";
     store.createRun({ id: runId });
@@ -407,6 +406,87 @@ describe("hardening wave 2: sqlite store", () => {
     });
     expect(store.countRunActions(runId)).toBe(2);
     expect(store.countRunActions("run_missing")).toBe(0);
+    store.close();
+  });
+});
+
+describe("oracle evaluation records", () => {
+  function evalRecord(i: number, overrides: Partial<OracleEvaluationRecord> = {}): OracleEvaluationRecord {
+    return {
+      id: `oev_${i}`,
+      runId: "run_oe",
+      stepId: null,
+      findingId: "find_oe",
+      subjectKey: "a1>a2>a3",
+      phase: "reproduce",
+      oracleId: i % 2 === 0 ? "page-error" : "target-failure",
+      oracleKind: "invariant",
+      oracleStrength: "hard",
+      oracleClass: "invariant",
+      reproduced: i % 2 === 0,
+      confidence: 0.9,
+      expected: "no defect signal on replay",
+      observed: i % 2 === 0 ? "PAGE_ERROR" : "(none)",
+      explanation: "test record",
+      version: "oracle-eval/1",
+      createdAt: `2026-01-01T00:00:0${i}.000Z`,
+      ...overrides,
+    };
+  }
+
+  it("round-trips records, preserves insertion order, and survives reopen", () => {
+    const path = tmpDb();
+    {
+      const store = Store.open(path);
+      store.putOracleEvaluation(evalRecord(1));
+      store.putOracleEvaluation(evalRecord(2));
+      store.putOracleEvaluation(evalRecord(3));
+      const listed = store.listOracleEvaluationsForFinding("find_oe");
+      expect(listed.map((r) => r.id)).toEqual(["oev_1", "oev_2", "oev_3"]);
+      expect(listed[0]!.reproduced).toBe(false);
+      expect(listed[1]!.reproduced).toBe(true);
+      expect(listed[1]!.confidence).toBeCloseTo(0.9);
+      expect(listed[1]!.oracleClass).toBe("invariant");
+      // By-run listing covers the same rows.
+      expect(store.listOracleEvaluationsForRun("run_oe").map((r) => r.id)).toEqual([
+        "oev_1",
+        "oev_2",
+        "oev_3",
+      ]);
+      store.close();
+    }
+    // Restart durability: the full history is readable after reopen.
+    const reopened = Store.open(path);
+    const rows = reopened.listOracleEvaluationsForFinding("find_oe");
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.oracleId)).toEqual(["target-failure", "page-error", "target-failure"]);
+    expect(rows.every((r) => r.version === "oracle-eval/1")).toBe(true);
+    expect(rows[2]!.phase).toBe("reproduce");
+    reopened.close();
+  });
+
+  it("keeps phases and nullable provenance fields distinct per row", () => {
+    const path = tmpDb();
+    const store = Store.open(path);
+    // Minimize-phase baseline probe: not yet attached to a finding (nullable
+    // provenance) — findable by run, not by finding id.
+    store.putOracleEvaluation(
+      evalRecord(4, { phase: "minimize", findingId: null, subjectKey: "a1>a3" }),
+    );
+    // Repair-verify row attached to the finding even when other fields are null.
+    store.putOracleEvaluation(
+      evalRecord(5, { phase: "repair-verify", runId: null, oracleKind: null, oracleStrength: null, oracleClass: null, confidence: null }),
+    );
+    const byRun = store.listOracleEvaluationsForRun("run_oe");
+    expect(byRun.map((r) => r.phase)).toEqual(["minimize"]);
+    expect(byRun[0]!.findingId).toBeNull();
+    expect(byRun[0]!.subjectKey).toBe("a1>a3");
+    const rows = store.listOracleEvaluationsForFinding("find_oe");
+    expect(rows.map((r) => r.phase)).toEqual(["repair-verify"]);
+    expect(rows[0]!.runId).toBeNull();
+    expect(rows[0]!.oracleKind).toBeNull();
+    expect(rows[0]!.confidence).toBeNull();
+    expect(store.listOracleEvaluationsForFinding("find_other")).toEqual([]);
     store.close();
   });
 });
