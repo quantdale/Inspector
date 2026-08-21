@@ -1,0 +1,60 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 C:/Users/Michael Roy/Documents/Inspector
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] life 1 ended (stopped); queue=5
+[fleet] audit(after-life-1): fleet/leases/ledger/telemetry parse clean
+[fleet] life 2 ended (stopped); queue=5
+[fleet] audit(after-life-2): fleet/leases/ledger/telemetry parse clean
+[fleet] life 3 ended (stopped); queue=5
+[fleet] audit(after-life-3): fleet/leases/ledger/telemetry parse clean
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-1 done: stopped=reset-failed actions=7 findings=1
+[fleet] stale completion fenced out: item=web-1 worker=fleet-w1-0 gen=1
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-3 done: stopped=reset-failed actions=7 findings=1
+[fleet] stale completion fenced out: item=web-3 worker=fleet-w1-2 gen=1
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-1 done: stopped=action-budget actions=45 findings=1
+[fleet] stale completion fenced out: item=web-1 worker=fleet-w1-3 gen=2
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-3 done: stopped=action-budget actions=45 findings=1
+[fleet] stale completion fenced out: item=web-3 worker=fleet-w2-0 gen=2
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-1 done: stopped=action-budget actions=45 findings=1
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-3 done: stopped=action-budget actions=45 findings=1
+[fleet] stale completion fenced out: item=web-3 worker=fleet-w4-0 gen=3
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-3 done: stopped=action-budget actions=45 findings=1
+
+stdout | packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[fleet] web item web-2 done: stopped=wall-budget actions=11 findings=0
+[fleet] stale completion fenced out: item=web-2 worker=fleet-w4-3 gen=3
+
+ ❯ packages/scale/src/fleet.integration.test.ts (1 test | 1 failed) 500706ms
+   × FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects 500675ms
+     → Test timed out in 480000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/scale/src/fleet.integration.test.ts > FLEET: concurrent multi-target unattended campaign > runs web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+Error: Test timed out in 480000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  00:44:00
+   Duration  502.45s (transform 462ms, setup 0ms, collect 1.20s, tests 500.71s, environment 0ms, prepare 224ms)
+
+EXIT=1
