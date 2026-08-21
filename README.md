@@ -19,9 +19,10 @@ Actuators include clicks/taps/typing/swipes, browser/device control, launch/kill
 
 ## Initial target
 
-The first executable proof is **web applications through Playwright**. This is deliberate: headless isolation, browser contexts, traces, network instrumentation, accessibility snapshots, screenshots, and deterministic fixtures let Inspector prove its hardest ideas before taking on emulator and desktop infrastructure.
-
-Planned platform order:
+The first executable proof was **web applications through Playwright**. That
+proof is complete, and the platform order below has been followed through
+CLI/PTY, Android/ADB, and Windows/UIA (see the capability summary above);
+Electron and iOS remain behind it. Platform order:
 
 1. Web / Playwright
 2. CLI / PTY
@@ -55,12 +56,61 @@ The core uses a typed, versioned internal adapter protocol. MCP is an **external
 
 ## Repository status
 
-This repository is at architecture/foundation stage. The active implementation specification is:
+The implementation campaign **M0–M7 is complete and hardened** (HARDENING_1 closed
+66 defects), and the **RC1 dogfood campaign** ran six unscripted hunts against real
+production backends (web/Playwright, CLI/ConPTY PTY, Windows UIA via PowerShell
+bridge, Android ADB on a headless emulator). The independent finding audit found
+zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferred
+for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
+and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-- `specs/000-foundation/SPEC.md`
-- `specs/000-foundation/TASKS.md`
+Current status: **release candidate 1; final gate pending**.
 
-Agents should read `AGENTS.md` before making changes.
+## Quickstart
+
+Prerequisites: Node.js 22+, pnpm 9+. See `docs/DEVELOPMENT.md` for details,
+optional backends, and troubleshooting.
+
+```bash
+git clone <repo-url> inspector && cd inspector
+pnpm install
+
+# Probe platform capabilities and workspace health
+pnpm cli doctor
+
+# Unscripted exploration against any localhost web target you serve, e.g.
+# a vendored todomvc target unpacked from its npm tarball:
+#   node dogfood/bin/serve-static.mjs --port 8123 --dir <target-root>
+pnpm cli hunt --url http://127.0.0.1:8123/ --max-actions 100 --max-minutes 5
+
+# No target handy? The deterministic fake adapter exercises the same
+# explore -> reproduce -> confirm -> bundle pipeline offline:
+pnpm cli hunt --adapter fake --max-actions 60 --json
+
+# Inspect results
+pnpm cli findings list
+pnpm cli findings show <findingId>
+```
+
+Evidence bundles land under `<workspace>/.inspector/bundles/<runId>/`, where the
+workspace resolves to `--workspace <dir>` > `$INSPECTOR_WORKSPACE` > the current
+directory. Recorded runs live in `<workspace>/.inspector/runs.db`; inspect them
+with `pnpm cli runs list` and `runs show <runId>`.
+
+Note that autonomous CLI/windows/android *exploration* currently requires bespoke
+out-of-tree loops — the production explorer (`ExploreController`) speaks the web
+vocabulary only. The non-web adapters are production-backed and drivable, but the
+autonomous hunt command targets web (and fake) adapters today.
+
+## Platform capability summary
+
+| Tier | Platforms |
+| --- | --- |
+| Proven real on dev machine | Web (Playwright + Chromium); CLI PTY (ConPTY via `@lydell/node-pty`); Windows UIA (PowerShell bridge); Android ADB (headless emulator) |
+| Proven via injectable backend only | Electron runtime binding; iOS interfaces |
+| Deferred | M8 iOS/Xcode |
+
+Details and known limitations: `docs/PLATFORM-ADAPTERS.md`.
 
 ## Design principles
 
@@ -92,4 +142,7 @@ Agents should read `AGENTS.md` before making changes.
 
 ## License
 
-No open-source license has been selected yet. Do not add one without an explicit project decision.
+No open-source license has been selected. All rights are reserved by the
+copyright holder; copying, distribution, and derivative use outside the
+development team are therefore **not permitted** until a license is chosen.
+Do not add a license file without an explicit project decision.
