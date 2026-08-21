@@ -14,6 +14,8 @@ export interface WorkItem {
 export interface LeaseRecord {
   itemId: string;
   workerId: string;
+  /** Fencing token: bumped on every acquire/reclaim so stale holders are rejected. */
+  generation: number;
   acquiredAtMs: number;
   expiresAtMs: number;
 }

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
@@ -9,6 +9,56 @@ const run = promisify(execFile);
 export interface GitResult {
   stdout: string;
 }
+
+/** Raised when a path violates the source-write policy (spec 004 P0/P3). */
+export class PathPolicyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PathPolicyError";
+  }
+}
+
+/** Raised when repository provenance cannot be established (fail closed). */
+export class ProvenanceError extends Error {
+  constructor(message: string, options?: { cause: unknown }) {
+    super(message, options ? { cause: options.cause } : undefined);
+    this.name = "ProvenanceError";
+  }
+}
+
+/**
+ * Resolve `relPath` strictly inside `rootDir` (source-write policy).
+ * Rejects absolute paths, drive-letter/UNC forms, `..` traversal and any
+ * `.git` segment; everything else must resolve under the root prefix.
+ */
+export function resolveContainedPath(rootDir: string, relPath: string): string {
+  if (typeof relPath !== "string" || relPath.trim().length === 0) {
+    throw new PathPolicyError(`invalid workspace path: ${JSON.stringify(relPath)}`);
+  }
+  if (relPath.includes("\0")) {
+    throw new PathPolicyError(`path contains NUL byte: ${JSON.stringify(relPath)}`);
+  }
+  if (isAbsolute(relPath) || /^[a-zA-Z]:[\\/]/.test(relPath) || /^\\\\/.test(relPath) || /^\/\//.test(relPath)) {
+    throw new PathPolicyError(`absolute paths are not allowed: ${relPath}`);
+  }
+  const segments = relPath.replace(/\\/g, "/").split("/");
+  if (segments.includes("..")) {
+    throw new PathPolicyError(`path traversal is not allowed: ${relPath}`);
+  }
+  if (segments.some((s) => s.toLowerCase() === ".git")) {
+    throw new PathPolicyError(`VCS metadata is not patchable: ${relPath}`);
+  }
+  const root = resolve(rootDir);
+  const full = resolve(root, relPath);
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  if (full !== root && !full.startsWith(prefix)) {
+    throw new PathPolicyError(`path escapes the workspace root: ${relPath}`);
+  }
+  return full;
+}
+
+const disposeDelayMs = (ms: number): Promise<void> =>
+  new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
 /**
  * Exact-revision repair workspace (M4 P0). A linked, detached git worktree is
@@ -21,6 +71,7 @@ export class RepairWorkspace {
     readonly repoRoot: string,
     readonly revision: string,
     private readonly wtPath: string,
+    private readonly baseDir: string,
   ) {}
 
   get path(): string {
@@ -29,23 +80,35 @@ export class RepairWorkspace {
 
   /**
    * Create a detached worktree at `revision` under a fresh temp directory.
-   * Refuses when the source repository has uncommitted changes (provenance
-   * must be unambiguous).
+   * Fails closed when provenance cannot be established: a failing `git
+   * status` is treated as refusal, not as a clean repository.
    */
   static async create(
     repoRoot: string,
     revision: string,
     baseDir: string = mkdtempSync(join(tmpdir(), "inspector-repair-")),
   ): Promise<RepairWorkspace> {
-    const status = await run("git", ["-C", repoRoot, "status", "--porcelain"]).catch(
-      () => ({ stdout: "" }) as GitResult,
-    );
+    let status: GitResult;
+    try {
+      status = await run("git", ["-C", repoRoot, "status", "--porcelain"]);
+    } catch (err) {
+      throw new ProvenanceError(
+        `git status failed for repository at ${repoRoot}; refusing to create repair workspace`,
+        { cause: err },
+      );
+    }
     if (status.stdout.trim().length > 0) {
-      throw new Error("repository has uncommitted changes; refusing to create repair workspace");
+      throw new ProvenanceError(
+        "repository has uncommitted changes; refusing to create repair workspace",
+      );
     }
     const wtPath = join(baseDir, "wt");
-    await run("git", ["-C", repoRoot, "worktree", "add", "--detach", wtPath, revision]);
-    return new RepairWorkspace(repoRoot, revision, wtPath);
+    try {
+      await run("git", ["-C", repoRoot, "worktree", "add", "--detach", wtPath, revision]);
+    } catch (err) {
+      throw new ProvenanceError(`failed to create repair worktree at ${revision}`, { cause: err });
+    }
+    return new RepairWorkspace(repoRoot, revision, wtPath, baseDir);
   }
 
   async isClean(): Promise<boolean> {
@@ -59,15 +122,22 @@ export class RepairWorkspace {
     await run("git", ["-C", this.wtPath, "clean", "-fd"]).catch(() => undefined);
   }
 
+  /** Detached HEAD commit of this worktree. */
+  async headCommit(): Promise<string> {
+    const { stdout } = await run("git", ["-C", this.wtPath, "rev-parse", "HEAD"]);
+    return stdout.trim();
+  }
+
   async readFile(relPath: string): Promise<string> {
+    const full = resolveContainedPath(this.wtPath, relPath);
     const { readFile } = await import("node:fs/promises");
-    return readFile(join(this.wtPath, relPath), "utf8");
+    return readFile(full, "utf8");
   }
 
   async writeFile(relPath: string, content: string): Promise<void> {
+    const full = resolveContainedPath(this.wtPath, relPath);
     const { writeFile, mkdir } = await import("node:fs/promises");
-    const full = join(this.wtPath, relPath);
-    await mkdir(join(full, ".."), { recursive: true });
+    await mkdir(dirname(full), { recursive: true });
     await writeFile(full, content, "utf8");
   }
 
@@ -77,10 +147,27 @@ export class RepairWorkspace {
     return stdout.split(/\r?\n/).filter((l) => l.length > 0);
   }
 
+  /**
+   * Remove the worktree AND its temp base directory. Best-effort and
+   * non-throwing: dispose runs in finally blocks and must never mask the
+   * primary error. On Windows rmSync can hit EBUSY/EPERM while handles are
+   * still open, so removal retries a bounded number of times.
+   */
   async dispose(): Promise<void> {
     await run("git", ["-C", this.repoRoot, "worktree", "remove", "--force", this.wtPath]).catch(
       () => undefined,
     );
-    rmSync(this.wtPath, { recursive: true, force: true });
+    // Prune stale admin entries when the remove above failed.
+    await run("git", ["-C", this.repoRoot, "worktree", "prune"]).catch(() => undefined);
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        rmSync(this.baseDir, { recursive: true, force: true });
+        return;
+      } catch {
+        await disposeDelayMs(25 * (attempt + 1));
+      }
+    }
+    // Final failure tolerated: a leaked temp dir is preferable to masking
+    // the error that dispose was called to clean up after.
   }
 }

@@ -84,3 +84,75 @@ describe("weak suspicion handling (O1)", () => {
     expect(d.confidence).toBeLessThanOrEqual(0.5);
   });
 });
+
+describe("verdict strength contract (hardening)", () => {
+  const softOnlySuite = () =>
+    new OracleSuite().register(
+      new InvariantOracle("soft-hint", () => true, {
+        strength: "soft",
+        confidence: 0.4,
+      }),
+    );
+
+  it("soft-only matches never claim reproduction", () => {
+    const v = softOnlySuite().evaluate(result(true));
+    expect(v.reproduced).toBe(false);
+    expect(v.weakSuspicion).toBe(true);
+    expect(v.confidence).toBe(0.4);
+    expect(v.matched.map((m) => m.id)).toEqual(["soft-hint"]);
+  });
+
+  it("soft-only pair violations never claim reproduction", () => {
+    const suite = softOnlySuite().addRelation(
+      metamorphicRelation("soft-relation", () => false, {
+        strength: "soft",
+        confidence: 0.3,
+      }),
+    );
+    const v = suite.evaluatePair(result(false), result(false));
+    expect(v.reproduced).toBe(false);
+    expect(v.weakSuspicion).toBe(true);
+    expect(v.matched.map((m) => m.id).sort()).toEqual(["soft-hint", "soft-relation"]);
+  });
+
+  it("hard matches still reproduce and are not flagged weak", () => {
+    const suite = softOnlySuite().register(
+      new InvariantOracle("hard-crash", () => true, { confidence: 1 }),
+    );
+    const v = suite.evaluate(result(true));
+    expect(v.reproduced).toBe(true);
+    expect(v.weakSuspicion).toBe(false);
+    expect(v.confidence).toBe(1);
+  });
+
+  it("no-match verdicts are neither reproduced nor weak suspicion", () => {
+    const v = new OracleSuite()
+      .register(new InvariantOracle("never", () => false))
+      .evaluate(result(false));
+    expect(v.reproduced).toBe(false);
+    expect(v.weakSuspicion).toBe(false);
+  });
+
+  it("evaluateStrict ignores soft oracles entirely", () => {
+    const weak = softOnlySuite().evaluateStrict(result(true));
+    expect(weak.reproduced).toBe(false);
+    expect(weak.weakSuspicion).toBe(false);
+    expect(weak.matched).toHaveLength(0);
+
+    const strict = softOnlySuite()
+      .register(new InvariantOracle("hard-crash", () => true))
+      .evaluateStrict(result(true));
+    expect(strict.reproduced).toBe(true);
+    expect(strict.matched.map((m) => m.id)).toEqual(["hard-crash"]);
+  });
+
+  it("evaluatePairStrict ignores soft relations", () => {
+    const suite = new OracleSuite()
+      .register(new InvariantOracle("never-hard", () => false))
+      .addRelation(metamorphicRelation("soft-relation", () => false, { strength: "soft" }));
+    expect(suite.evaluatePair(result(false), result(false)).weakSuspicion).toBe(true);
+    const strict = suite.evaluatePairStrict(result(false), result(false));
+    expect(strict.reproduced).toBe(false);
+    expect(strict.matched).toHaveLength(0);
+  });
+});

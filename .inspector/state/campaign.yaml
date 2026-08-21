@@ -183,9 +183,37 @@ known_debt:
     policies.
 
 hardening:
-  active: false
-  saved_implementation_waypoint: null
-  scope: null
+  active: true
+  campaign: HARDENING_1
+  status: ACTIVE
+  started_at: "2026-08-21"
+  base_commit: bff389034b0610f05237b0eff75f8fc2fc4fbf30
+  saved_implementation_waypoint: >-
+    IMPLEMENTATION campaign COMPLETE at bff3890 (M0-M7 done, M8
+    DEFERRED_ENVIRONMENT); no resume waypoint needed.
+  focus:
+    - reliability
+    - recovery
+    - correctness
+    - oracle-quality
+    - repair-safety
+    - concurrency
+    - adapter-robustness
+    - security
+    - soak
+  current_phase: WAVE_2_CORE_ARTIFACT_EXPLORE_ADAPTERS
+  defects:
+    - >-
+      31 defects confirmed and closed in wave 1 (H-01..H-31; 4 CRITICAL,
+      11 HIGH): see .inspector/state/HARDENING-CHECKPOINT.md ledger.
+      Wave 2 targets core/store-sqlite, artifact-store, explore, and
+      platform adapters.
+  last_verified_commit: bff389034b0610f05237b0eff75f8fc2fc4fbf30
+  last_full_gate: >-
+    baseline full gate PASS at bff3890 (lint/typecheck/unit63/integration47);
+    post-wave-1 tsc 0 errors, lint 0 errors, unit 188/188 PASS
+  blockers: []
+  deferred_debt: []
 
 stop_conditions:
   - unavailable_required_secret_or_login

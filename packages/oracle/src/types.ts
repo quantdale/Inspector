@@ -30,6 +30,11 @@ export interface OracleVerdict {
   /** Max confidence among matched oracles (0 when nothing matched). */
   confidence: number;
   matched: OracleDescriptor[];
+  /**
+   * True when only soft-strength oracles matched: the evidence is weak
+   * suspicion, never proof, and must not authorize repair on its own.
+   */
+  weakSuspicion?: boolean;
 }
 
 /**

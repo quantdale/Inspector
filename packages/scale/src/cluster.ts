@@ -54,7 +54,7 @@ export class FindingClusterer {
       .replace(/\d+/g, "#")
       .replace(/[^a-z#.]+/g, " ")
       .trim();
-    const shape = `${finding.oracleIds.sort().join("|")}:${normalized}`;
+    const shape = `${[...finding.oracleIds].sort().join("|")}:${normalized}`;
     return createHash("sha256").update(shape).digest("hex").slice(0, 16);
   }
 }

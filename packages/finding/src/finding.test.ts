@@ -9,6 +9,9 @@ import {
   FlakyDriver,
   OracleEngine,
   type Action,
+  type OracleSignal,
+  type ReplayDriver,
+  type ReplayResult,
 } from "./index.js";
 
 let dir: string | null = null;
@@ -132,6 +135,140 @@ describe("finding engine (M2)", () => {
     const engine = new FindingEngine();
     const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
     expect(() => engine.transition(f, "MINIMIZED")).toThrow(/invalid finding transition/);
+  });
+});
+
+class HungDriver implements ReplayDriver {
+  async replay(): Promise<ReplayResult> {
+    return new Promise<ReplayResult>(() => {});
+  }
+}
+
+describe("hardening: reproduction integrity", () => {
+  it("rejects a zero-attempt policy instead of confirming with NaN confidence", async () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    await expect(
+      engine.reproduce(f, defectActions, new FakeStateMachineDriver(), {
+        attempts: 0,
+        minSuccesses: 0,
+      }),
+    ).rejects.toThrow(/policy/i);
+    expect(f.status).toBe("CANDIDATE");
+  });
+
+  it("rejects minSuccesses above attempts and non-positive/fractional policies", async () => {
+    const engine = new FindingEngine();
+    for (const policy of [
+      { attempts: 2, minSuccesses: 3 },
+      { attempts: 2, minSuccesses: 0 },
+      { attempts: -1, minSuccesses: 1 },
+      { attempts: 1.5, minSuccesses: 1 },
+    ]) {
+      const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+      await expect(
+        engine.reproduce(f, defectActions, new FakeStateMachineDriver(), policy),
+      ).rejects.toThrow(/policy/i);
+      expect(f.status).toBe("CANDIDATE");
+    }
+  });
+
+  it("confidence stays finite and within [0,1] for every settled policy", async () => {
+    const engine = new FindingEngine();
+    const flaky = new FlakyDriver(new FakeStateMachineDriver(), true);
+    for (const policy of [
+      { attempts: 1, minSuccesses: 1 },
+      { attempts: 4, minSuccesses: 4 },
+      { attempts: 4, minSuccesses: 2 },
+    ]) {
+      const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+      const { finding } = await engine.reproduce(f, defectActions, flaky, policy);
+      expect(Number.isFinite(finding.confidence)).toBe(true);
+      expect(finding.confidence).toBeGreaterThanOrEqual(0);
+      expect(finding.confidence).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("bounds hung drivers with perAttemptTimeoutMs and counts the attempt", async () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    const startedAt = Date.now();
+    const { stats, finding } = await engine.reproduce(
+      f,
+      defectActions,
+      new HungDriver(),
+      { attempts: 2, minSuccesses: 1, perAttemptTimeoutMs: 25 },
+    );
+    expect(Date.now() - startedAt).toBeLessThan(2000);
+    expect(stats.successes).toBe(0);
+    expect(stats.errors).toBe(2);
+    expect(stats.lastError ?? "").toMatch(/timed out/i);
+    expect(finding.status).toBe("REJECTED");
+  });
+
+  it("keeps REPRODUCING -> CANDIDATE open as the recovery path", () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    engine.transition(f, "REPRODUCING");
+    expect(() => engine.transition(f, "CANDIDATE")).not.toThrow();
+    expect(f.status).toBe("CANDIDATE");
+  });
+
+  it("records optional reason/actor metadata on transitions", () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    engine.transition(f, "NEEDS_HUMAN_ORACLE");
+    engine.transition(f, "CONFIRMED", {
+      reason: "human oracle confirmed the defect",
+      actor: "analyst-7",
+    });
+    expect(f.lastTransition).toMatchObject({
+      from: "NEEDS_HUMAN_ORACLE",
+      to: "CONFIRMED",
+      reason: "human oracle confirmed the defect",
+      actor: "analyst-7",
+    });
+  });
+
+  it("transitions without metadata remain backward compatible", () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    engine.transition(f, "REJECTED");
+    expect(f.lastTransition?.from).toBe("CANDIDATE");
+    expect(f.lastTransition?.to).toBe("REJECTED");
+  });
+
+  it("derives the regression adapter from finding metadata, falling back to adapter-fake", () => {
+    const engine = new FindingEngine();
+    const web = engine.ingest(
+      { kind: "DEFECT_SUBMIT_INVALID" },
+      { adapter: "adapter-web" },
+    );
+    expect(
+      engine.exportRegression(web, defectActions, "DEFECT_SUBMIT_INVALID").adapter,
+    ).toBe("adapter-web");
+    const plain = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    expect(
+      engine.exportRegression(plain, defectActions, "DEFECT_SUBMIT_INVALID").adapter,
+    ).toBe("adapter-fake");
+  });
+
+  it("populates oracleEvidence and merges artifactRefs into the bundle", async () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    f.artifactRefs.push("artifact://shots/1.png");
+    const signals: OracleSignal[] = [
+      { kind: "DEFECT_SUBMIT_INVALID", detail: "submit BAD" },
+    ];
+    const bundle = engine.buildBundle(f, defectActions, defectActions, {
+      signals,
+      artifactRefs: ["artifact://logs/run.log"],
+    });
+    expect(bundle.oracleEvidence).toEqual(signals);
+    expect([...bundle.artifactRefs].sort()).toEqual([
+      "artifact://logs/run.log",
+      "artifact://shots/1.png",
+    ]);
   });
 });
 

@@ -73,6 +73,16 @@ export const observationSchema = {
   additionalProperties: false,
 } as const;
 
+export const observeRequestSchema = {
+  $id: "https://inspector.local/schema/observe-request-0.1.json",
+  type: "object",
+  required: ["observe"],
+  properties: {
+    observe: { type: "array", items: { type: "string", minLength: 1 } },
+    options: { type: "object" },
+  },
+} as const;
+
 export const capabilityDocSchema = {
   $id: "https://inspector.local/schema/capability-0.1.json",
   type: "object",
@@ -145,6 +155,7 @@ export const envelopeSchema = {
 interface CompiledValidators {
   action: ValidateFunction;
   observation: ValidateFunction;
+  observeRequest: ValidateFunction;
   capabilityDoc: ValidateFunction;
   adapterEvent: ValidateFunction;
   envelope: ValidateFunction;
@@ -153,6 +164,7 @@ interface CompiledValidators {
 const compiled: CompiledValidators = {
   action: ajv.compile(actionSchema),
   observation: ajv.compile(observationSchema),
+  observeRequest: ajv.compile(observeRequestSchema),
   capabilityDoc: ajv.compile(capabilityDocSchema),
   adapterEvent: ajv.compile(adapterEventSchema),
   envelope: ajv.compile(envelopeSchema),
@@ -178,6 +190,10 @@ export function validateAction(data: unknown): ValidationResult {
 
 export function validateObservation(data: unknown): ValidationResult {
   return run(compiled.observation, data);
+}
+
+export function validateObserveRequest(data: unknown): ValidationResult {
+  return run(compiled.observeRequest, data);
 }
 
 export function validateCapabilityDoc(data: unknown): ValidationResult {

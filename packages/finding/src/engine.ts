@@ -1,9 +1,21 @@
-import type { Oracle, OracleSignal, ReplayResult, OracleSignalKind } from "./types.js";
+import type { Oracle, OracleSignal, ReplayResult, OracleSignalKind, SignatureExtractor } from "./types.js";
+
+/**
+ * Outcome error codes that represent a genuine target crash. A plain
+ * automation miss (e.g. ACTION_FAILED from a Playwright element lookup) is
+ * NOT an application defect and must never constitute reproduction by
+ * itself; genuine crashes surface as TARGET_FAILURE-class signals.
+ */
+const CRASH_CLASS_OUTCOME_CODES: ReadonlySet<string> = new Set(["TARGET_FAILURE"]);
 
 export class TargetFailureOracle implements Oracle {
   readonly id = "target-failure";
   detect(result: ReplayResult): boolean {
-    return result.outcomes.some((o) => o.status === "target-failure");
+    return result.outcomes.some(
+      (o) =>
+        o.status === "target-failure" &&
+        CRASH_CLASS_OUTCOME_CODES.has(o.error?.code ?? ""),
+    );
   }
 }
 
@@ -26,8 +38,27 @@ export class ExplicitSignalOracle implements Oracle {
   }
 }
 
+/**
+ * Default signature vocabulary: the sorted distinct oracle signal kinds of
+ * the replay result (null when the run produced no signal).
+ */
+export const defaultSignatureExtractor: SignatureExtractor = (result) => {
+  const kinds = [...new Set(result.signals.map((s) => s.kind))].sort();
+  return kinds.length > 0 ? kinds.join("|") : null;
+};
+
+export interface OracleEngineOptions {
+  signatureExtractor?: SignatureExtractor;
+}
+
 export class OracleEngine {
-  constructor(private readonly oracles: Oracle[]) {}
+  private readonly oracles: Oracle[];
+  private readonly signatureExtractor: SignatureExtractor;
+
+  constructor(oracles: Oracle[], opts: OracleEngineOptions = {}) {
+    this.oracles = oracles;
+    this.signatureExtractor = opts.signatureExtractor ?? defaultSignatureExtractor;
+  }
 
   static defaults(): OracleEngine {
     return new OracleEngine([
@@ -42,6 +73,22 @@ export class OracleEngine {
   evaluate(result: ReplayResult): { reproduced: boolean; signals: OracleSignal[] } {
     const matched = this.oracles.filter((o) => o.detect(result));
     return { reproduced: matched.length > 0, signals: result.signals };
+  }
+
+  /** The defect signature of a replay result under this engine's extractor. */
+  signatureOf(result: ReplayResult): string | null {
+    return this.signatureExtractor(result);
+  }
+
+  /**
+   * Oracle ids that can fire on a replay exhibiting this signal alone.
+   * Falls back to every registered oracle when none discriminates the signal
+   * shape, so findings never lose oracle coverage silently.
+   */
+  relevantOracleIds(signal: OracleSignal): string[] {
+    const probe: ReplayResult = { outcomes: [], signals: [signal], observations: [] };
+    const relevant = this.oracles.filter((o) => o.detect(probe)).map((o) => o.id);
+    return relevant.length > 0 ? relevant : this.ids;
   }
 
   get ids(): string[] {

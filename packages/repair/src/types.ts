@@ -35,6 +35,8 @@ export interface PatchAttempt {
   reason?: string;
   patchRationale?: string;
   filesTouched: string[];
+  /** Full proposed patch embedded for audit (accepted AND rejected attempts). */
+  patch?: Patch;
   at: string;
 }
 
@@ -43,12 +45,21 @@ export type RepairOutcome =
   | "NO_PATCH"
   | "VERIFICATION_FAILED"
   | "POLICY_BLOCKED"
-  | "NO_FAILING_REGRESSION";
+  | "NO_FAILING_REGRESSION"
+  | "PROBE_INVALID"
+  | "ERROR";
 
 export interface RepairRecord {
   findingId: string;
   revision: string | null;
+  /**
+   * Identity of the isolated worktree the repair ran in (per
+   * ARCHITECTURE.md "Repository isolation"). The worktree is disposed after
+   * the repair; durable copies live in the evidence directory.
+   */
   workspacePath: string;
+  /** Detached HEAD commit of that worktree, when a workspace was created. */
+  worktreeCommit?: string | null;
   outcome: RepairOutcome;
   attempts: PatchAttempt[];
   regressionArtifact?: string;

@@ -25,10 +25,16 @@ export class AdapterRegistry {
     return this.adapters.get(id);
   }
 
-  /** All adapters compatible with the current protocol version. */
-  discover(): AdapterRegistration[] {
+  /**
+   * All adapters compatible with the current protocol version. Adapters that
+   * failed conformance are excluded unless `includeFailed` is set — callers
+   * must opt in to known-broken implementations.
+   */
+  discover(opts: { includeFailed?: boolean } = {}): AdapterRegistration[] {
     return [...this.adapters.values()].filter(
-      (a) => a.protocolVersion === PROTOCOL_VERSION,
+      (a) =>
+        a.protocolVersion === PROTOCOL_VERSION &&
+        (opts.includeFailed || a.conformance !== "fail"),
     );
   }
 

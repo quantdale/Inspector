@@ -6,14 +6,26 @@ interface LedgerState {
   stopped: boolean;
 }
 
+const NUMERIC_FIELDS = [
+  "modelRequests",
+  "tokens",
+  "costUsd",
+  "actions",
+  "resets",
+  "artifactBytes",
+] as const;
+
 /**
  * Resource ledger (M7 S3). Tracks model requests/tokens/cost, actions,
  * resets, and artifact bytes per worker and globally. Budget checks are
  * deterministic: a charge is admitted iff the resulting total stays within
  * every configured bound.
+ *
+ * Hardening: charges run inside the state file's cross-process lock with a
+ * fresh disk read, so two ledger instances cannot both spend one budget;
+ * malformed usage amounts (negative or non-finite) are rejected loudly.
  */
 export class ResourceLedger {
-  private state: LedgerState;
   private readonly file: StateFile<LedgerState>;
 
   constructor(
@@ -22,46 +34,58 @@ export class ResourceLedger {
     private readonly workerBudgets: Record<string, Budget> = {},
   ) {
     this.file = new StateFile(stateDir, "ledger", () => ({ entries: [], stopped: false }));
-    this.state = this.file.load();
+    // Fail loud at construction if durable state is corrupt.
+    this.file.load();
   }
 
   /** Attempt to charge usage; returns false when a budget would be exceeded. */
   charge(entry: UsageEntry): boolean {
-    if (this.state.stopped) return false;
-    const nextGlobal = this.project(
-      this.add(this.sumOf(this.state.entries), entry),
-      this.globalBudget,
-    );
-    if (!nextGlobal.ok) return false;
-    const wb = entry.workerId ? this.workerBudgets[entry.workerId] : undefined;
-    if (wb) {
-      const workerTotals = this.sumOf(
-        this.state.entries.filter((e) => e.workerId === entry.workerId),
+    assertValidUsage(entry);
+    return this.file.update((state) => {
+      if (state.stopped) return false;
+      const nextGlobal = this.project(
+        this.add(this.sumOf(state.entries), entry),
+        this.globalBudget,
       );
-      const nextWorker = this.project(this.add(workerTotals, entry), wb);
-      if (!nextWorker.ok) return false;
-    }
-    this.state.entries.push(entry);
-    this.persist();
-    return true;
+      if (!nextGlobal.ok) return false;
+      const wb = entry.workerId ? this.workerBudgets[entry.workerId] : undefined;
+      if (wb) {
+        const workerTotals = this.sumOf(
+          state.entries.filter((e) => e.workerId === entry.workerId),
+        );
+        const nextWorker = this.project(this.add(workerTotals, entry), wb);
+        if (!nextWorker.ok) return false;
+      }
+      state.entries.push(entry);
+      return true;
+    });
   }
 
   totals(filter?: { workerId?: string }): Required<Pick<UsageEntry, "modelRequests" | "tokens" | "costUsd" | "actions" | "resets" | "artifactBytes">> {
-    return this.sumOf(this.filterEntries(filter));
+    const entries = this.file.load().entries;
+    return this.sumOf(this.filterEntries(entries, filter));
   }
 
   stop(): void {
-    this.state.stopped = true;
-    this.persist();
+    this.file.update((state) => {
+      state.stopped = true;
+    });
+  }
+
+  /** Operator path: clear a durable stop so a restarted campaign can charge again. */
+  resume(): void {
+    this.file.update((state) => {
+      state.stopped = false;
+    });
   }
 
   get isStopped(): boolean {
-    return this.state.stopped;
+    return this.file.load().stopped;
   }
 
-  private filterEntries(filter?: { workerId?: string }): UsageEntry[] {
-    if (!filter?.workerId) return this.state.entries;
-    return this.state.entries.filter((e) => e.workerId === filter.workerId);
+  private filterEntries(entries: UsageEntry[], filter?: { workerId?: string }): UsageEntry[] {
+    if (!filter?.workerId) return entries;
+    return entries.filter((e) => e.workerId === filter.workerId);
   }
 
   private sumOf(entries: UsageEntry[]) {
@@ -95,8 +119,14 @@ export class ResourceLedger {
     if (b.maxActions !== undefined && t.actions > b.maxActions) return { ok: false };
     return { ok: true };
   }
+}
 
-  private persist(): void {
-    this.file.save(this.state);
+/** Negative or non-finite amounts would silently corrupt accounting; reject them. */
+function assertValidUsage(entry: UsageEntry): void {
+  for (const field of NUMERIC_FIELDS) {
+    const value = entry[field];
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+      throw new TypeError(`invalid usage amount for '${field}': ${String(value)}`);
+    }
   }
 }

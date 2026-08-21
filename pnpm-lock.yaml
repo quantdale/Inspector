@@ -35,7 +35,11 @@ importers:
 
   packages/adapter-fake: {}
 
-  packages/adapter-sdk: {}
+  packages/adapter-sdk:
+    dependencies:
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/adapter-web:
     dependencies:
