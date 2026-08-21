@@ -92,6 +92,20 @@ export interface FindingRecord {
   artifactRefs: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Wave-1 finding extensions; null for rows written before the columns existed. */
+  signature: string | null;
+  minimizationJson: string | null;
+  lastTransitionJson: string | null;
+  adapter: string | null;
+}
+
+/** Raised when a second unresolved action tries to claim an idempotency key
+ * that is already held by a pending/unknown action. */
+export class DuplicateActionIdempotencyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DuplicateActionIdempotencyError";
+  }
 }
 
 export interface StepBundle {
@@ -99,6 +113,13 @@ export interface StepBundle {
   action: ActionRecord | null;
   observations: Array<ObservationRecord & { artifacts: Array<{ sha256: string; mime: string; size: number; path: string }> }>;
 }
+
+/** Maps snake_case findings columns onto the camelCase FindingRecord shape. */
+const FINDING_SELECT = `SELECT id, run_id AS runId, status, title, confidence, severity, revision,
+  oracle_ids AS oracleIds, reproduction_json AS reproductionJson, artifact_refs AS artifactRefs,
+  created_at AS createdAt, updated_at AS updatedAt, signature,
+  minimization_json AS minimizationJson, last_transition_json AS lastTransitionJson, adapter
+  FROM findings`;
 
 export class Store {
   constructor(private readonly db: Database) {}
@@ -211,9 +232,16 @@ export class Store {
 
       this.db
         .prepare(
-          `INSERT OR REPLACE INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
+          `INSERT INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
              status, requested_at, decided_at, error_code, error_json, state_after, step_id)
-           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             status = excluded.status,
+             decided_at = excluded.decided_at,
+             error_code = excluded.error_code,
+             error_json = excluded.error_json,
+             state_after = excluded.state_after,
+             step_id = excluded.step_id`,
         )
         .run(
           input.action.id,
@@ -259,7 +287,14 @@ export class Store {
     tx();
   }
 
-  /** Insert an action that has been requested but not yet decided (in-flight). */
+  /**
+   * Insert an action that has been requested but not yet decided (in-flight).
+   * Idempotent: re-inserting a known action id returns the existing row
+   * instead of crashing on the primary key, so an adapter error followed by a
+   * resubmission can never escape as SQLITE_CONSTRAINT. A *different* action
+   * claiming an idempotency key that is already held by a pending/unknown
+   * action raises DuplicateActionIdempotencyError.
+   */
   insertPendingAction(input: {
     id: string;
     runId: string;
@@ -269,24 +304,39 @@ export class Store {
     deadlineMs: number;
     idempotency: string;
     stepId?: string | null;
-  }): void {
-    this.db
-      .prepare(
-        `INSERT INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
-           status, requested_at, step_id)
-         VALUES(?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      )
-      .run(
-        input.id,
-        input.runId,
-        input.environmentId,
-        input.kind,
-        input.risk,
-        input.deadlineMs,
-        input.idempotency,
-        new Date().toISOString(),
-        input.stepId ?? null,
-      );
+  }): { inserted: boolean; existing: ActionRecord | null } {
+    const existing = this.getAction(input.id);
+    if (existing) return { inserted: false, existing };
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
+             status, requested_at, step_id)
+           VALUES(?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.runId,
+          input.environmentId,
+          input.kind,
+          input.risk,
+          input.deadlineMs,
+          input.idempotency,
+          new Date().toISOString(),
+          input.stepId ?? null,
+        );
+      return { inserted: true, existing: null };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes("idx_actions_pending_idempotency")
+      ) {
+        throw new DuplicateActionIdempotencyError(
+          `idempotency key '${input.idempotency}' is already held by an unresolved action in run ${input.runId}`,
+        );
+      }
+      throw err;
+    }
   }
 
   finalizeAction(
@@ -315,24 +365,59 @@ export class Store {
   /**
    * On restart, any action still in `pending` state means the adapter response
    * was never persisted (adapter loss / crash). Mark these `unknown` so the
-   * core re-observes/resets instead of blindly retrying.
+   * core re-observes/resets instead of blindly retrying. Only NEWLY lost
+   * actions are returned: actions already marked `unknown` by an earlier
+   * recovery pass stay untouched, so repeated resumes cannot multiply
+   * synthetic recovery observations.
    */
   markInFlightUnknown(runId: string): ActionRecord[] {
-    const pending = this.getInFlightActions(runId);
+    const newlyLost = this.db
+      .prepare(`SELECT * FROM actions WHERE run_id = ? AND status = 'pending' ORDER BY requested_at`)
+      .all(runId) as ActionRecord[];
     const tx = this.db.transaction((ids: string[]) => {
       const stmt = this.db.prepare(
         `UPDATE actions SET status = 'unknown', decided_at = ? WHERE id = ?`,
       );
       for (const id of ids) stmt.run(new Date().toISOString(), id);
     });
-    tx(pending.map((a) => a.id));
-    return pending;
+    tx(newlyLost.map((a) => a.id));
+    return newlyLost;
   }
 
   getInFlightActions(runId: string): ActionRecord[] {
     return this.db
       .prepare(`SELECT * FROM actions WHERE run_id = ? AND status IN ('pending', 'unknown') ORDER BY requested_at`)
       .all(runId) as ActionRecord[];
+  }
+
+  /** Number of actions ever admitted for a run, regardless of outcome. Used
+   * to re-derive the max_actions budget from durable state after a restart. */
+  countRunActions(runId: string): number {
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS c FROM actions WHERE run_id = ?`)
+      .get(runId) as { c: number };
+    return row.c;
+  }
+
+  /** True when an observation with this id is already persisted. */
+  observationExists(id: string): boolean {
+    return (
+      this.db.prepare(`SELECT 1 FROM observations WHERE id = ?`).get(id) !== undefined
+    );
+  }
+
+  setEnvironmentStatus(id: string, status: string): void {
+    this.db.prepare(`UPDATE environments SET status = ? WHERE id = ?`).run(status, id);
+  }
+
+  /** Record the adapter's self-reported identity on its run and environment
+   * rows once initialize has answered. */
+  recordAdapterIdentity(runId: string, envId: string, adapter: string): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare(`UPDATE runs SET adapter = ? WHERE id = ?`).run(adapter, runId);
+      this.db.prepare(`UPDATE environments SET adapter = ? WHERE id = ?`).run(adapter, envId);
+    });
+    tx();
   }
 
   writeCheckpoint(input: { id: string; runId: string; stepId?: string | null; payload: unknown }): CheckpointRecord {
@@ -347,8 +432,11 @@ export class Store {
   }
 
   getLatestCheckpoint(runId: string): CheckpointRecord | undefined {
+    // rowid order breaks ties between checkpoints written within the same
+    // millisecond; ordering by created_at alone could restore a stale
+    // stepSeq and violate UNIQUE(run_id, sequence) on the next commit.
     return this.db
-      .prepare(`SELECT * FROM checkpoints WHERE run_id = ? ORDER BY created_at DESC LIMIT 1`)
+      .prepare(`SELECT * FROM checkpoints WHERE run_id = ? ORDER BY rowid DESC LIMIT 1`)
       .get(runId) as CheckpointRecord | undefined;
   }
 
@@ -450,8 +538,9 @@ export class Store {
     this.db
       .prepare(
         `INSERT INTO findings(id, run_id, status, title, confidence, severity, revision,
-           oracle_ids, reproduction_json, artifact_refs, created_at, updated_at)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           oracle_ids, reproduction_json, artifact_refs, created_at, updated_at,
+           signature, minimization_json, last_transition_json, adapter)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            status = excluded.status,
            title = excluded.title,
@@ -461,6 +550,10 @@ export class Store {
            oracle_ids = excluded.oracle_ids,
            reproduction_json = excluded.reproduction_json,
            artifact_refs = excluded.artifact_refs,
+           signature = excluded.signature,
+           minimization_json = excluded.minimization_json,
+           last_transition_json = excluded.last_transition_json,
+           adapter = excluded.adapter,
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -476,16 +569,22 @@ export class Store {
         f.artifactRefs,
         f.createdAt,
         now,
+        f.signature,
+        f.minimizationJson,
+        f.lastTransitionJson,
+        f.adapter,
       );
   }
 
   getFinding(id: string): FindingRecord | undefined {
-    return this.db.prepare(`SELECT * FROM findings WHERE id = ?`).get(id) as FindingRecord | undefined;
+    return this.db
+      .prepare(`${FINDING_SELECT} WHERE id = ?`)
+      .get(id) as FindingRecord | undefined;
   }
 
   listFindings(limit = 100): FindingRecord[] {
     return this.db
-      .prepare(`SELECT * FROM findings ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`${FINDING_SELECT} ORDER BY updated_at DESC LIMIT ?`)
       .all(limit) as FindingRecord[];
   }
 }

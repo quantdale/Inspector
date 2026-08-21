@@ -42,10 +42,8 @@ export function scoreAction(c: CandidateAction, ctx: ScoringContext): number {
  let s = 0;
 
  const edgeTried = ctx.graph.edgeCount(ctx.currentState, c.actionKey) > 0;
- s += w.novelty * (edgeTried ? 0 : 1);
- s +=
-  w.unvisitedEdge *
-  (ctx.graph.edgeCount(ctx.currentState, c.actionKey) === 0 ? 1 : 0);
+ // Novelty and unvisited-edge are the same predicate; weight them once.
+ s += (w.novelty + w.unvisitedEdge) * (edgeTried ? 0 : 1);
  s += w.boundary * (c.isBoundary ? 1 : 0);
 
  const screenVisits = ctx.graph.screenCounts.get(ctx.currentScreen) ?? 0;

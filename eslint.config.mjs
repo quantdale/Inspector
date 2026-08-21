@@ -19,4 +19,17 @@ export default tseslint.config(
       "no-console": "off",
     },
   },
+  {
+    // Plain-Node script fixtures (e.g. stdio adapter fixtures) are not
+    // type-checked, so no-undef applies; declare the Node globals they use.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
 );

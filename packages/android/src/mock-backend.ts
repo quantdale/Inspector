@@ -81,6 +81,18 @@ function escapeXml(s: string): string {
 }
 
 /**
+ * Inverse of the adapter's device-shell single-quoting: strip the surrounding
+ * quotes and unescape the '\'' sequence so the mock stores the exact value
+ * that was submitted.
+ */
+function unquoteDeviceShellWord(s: string): string {
+  if (s.length >= 2 && s.startsWith("'") && s.endsWith("'")) {
+    return s.slice(1, -1).split("'\\''").join("'");
+  }
+  return s;
+}
+
+/**
  * In-process mock ADB backend simulating one device running SeedDroid.
  * Implements the same contract as a real `adb` CLI wrapper.
  */
@@ -116,7 +128,7 @@ export class MockAdbBackend implements AdbBackend {
     }
 
     if (cmd.startsWith("input text")) {
-      const value = cmd.slice("input text".length).trim();
+      const value = unquoteDeviceShellWord(cmd.slice("input text".length).trim());
       if (!app.focused || app.screen !== "login") {
         throw new Error(`ERROR: no focused field for input text '${value}'`);
       }

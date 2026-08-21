@@ -98,24 +98,47 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS idx_findings_run ON findings(run_id);
   `,
+  // Rebuild schema_version with a primary key: the original table had none,
+  // so every open inserted another row and reads relied on undefined order.
+  `
+  CREATE TABLE schema_version_rebuilt (version INTEGER NOT NULL PRIMARY KEY);
+  INSERT INTO schema_version_rebuilt(version) SELECT COALESCE(MAX(version), 0) FROM schema_version;
+  DROP TABLE schema_version;
+  ALTER TABLE schema_version_rebuilt RENAME TO schema_version;
+  `,
+  // Wave-1 finding extensions (signature/minimization/lastTransition/adapter)
+  // plus uniqueness of the idempotency key among unresolved actions.
+  `
+  ALTER TABLE findings ADD COLUMN signature TEXT;
+  ALTER TABLE findings ADD COLUMN minimization_json TEXT;
+  ALTER TABLE findings ADD COLUMN last_transition_json TEXT;
+  ALTER TABLE findings ADD COLUMN adapter TEXT;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_actions_pending_idempotency
+    ON actions(idempotency) WHERE status IN ('pending', 'unknown');
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Retry instead of failing immediately when a second process holds the
+  // write lock. (better-sqlite3 also defaults its `timeout` option to 5s;
+  // setting the pragma explicitly keeps the guarantee independent of how the
+  // Database was constructed.)
+  db.pragma("busy_timeout = 5000");
   const tx = db.transaction(() => {
     db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);`);
-    const row = db.prepare(`SELECT version FROM schema_version`).get() as
-      | { version: number }
-      | undefined;
-    const current = row?.version ?? 0;
+    const current =
+      (db.prepare(`SELECT version FROM schema_version`).get() as { version: number } | undefined)
+        ?.version ?? 0;
     for (let i = current; i < MIGRATIONS.length; i++) {
       db.exec(MIGRATIONS[i]!);
     }
-    db.prepare(
-      `INSERT INTO schema_version(version) VALUES(?)
-       ON CONFLICT DO UPDATE SET version = excluded.version`,
-    ).run(MIGRATIONS.length);
+    // Exactly one authoritative row. (An UPSERT here proved unreliable right
+    // after the same-transaction table rebuild above: SQLite inserted a new
+    // row instead of taking the conflict path, so state is reset explicitly.)
+    db.prepare(`DELETE FROM schema_version`).run();
+    db.prepare(`INSERT INTO schema_version(version) VALUES(?)`).run(MIGRATIONS.length);
   });
   tx();
 }

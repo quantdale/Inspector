@@ -9,8 +9,6 @@ import {
 import { AdapterCrashError, type AdapterHandler } from "@inspector/adapter-sdk";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
-import { ArtifactStore } from "@inspector/artifact-store";
 import { WebAdapterHandler, SEED_HTML } from "@inspector/adapter-web";
 
 export const ELECTRON_CAPABILITIES: CapabilityDoc = {
@@ -40,6 +38,8 @@ export interface ElectronFaults {
 export class ElectronAdapterHandler implements AdapterHandler {
   private readonly web: WebAdapterHandler;
   private readonly mainLog: string[] = [];
+  /** One-shot latch: the injected crash fault fires exactly once. */
+  private crashPending = false;
   private seq = 0;
 
   constructor(
@@ -47,18 +47,24 @@ export class ElectronAdapterHandler implements AdapterHandler {
     artifactBaseDir: string = join(tmpdir(), "inspector-electron-artifacts"),
     seedHtml: string = SEED_HTML,
   ) {
-    mkdtempSync(artifactBaseDir);
-    const artifacts = new ArtifactStore(artifactBaseDir);
-    void artifacts;
-    this.web = new WebAdapterHandler({}, join(tmpdir(), "inspector-electron-web"), seedHtml);
-    if (faults.crashApp) this.mainLog.push("ELECTRON_CRASH injected");
+    // The web handler derives its own unique per-instance artifact directory
+    // under this base (mkdtemp), so concurrent electron instances never share
+    // one artifact tree.
+    this.web = new WebAdapterHandler({}, artifactBaseDir, seedHtml);
+    if (faults.crashApp) {
+      this.crashPending = true;
+      this.mainLog.push("ELECTRON_CRASH injected");
+    }
   }
 
   async initialize(): Promise<CapabilityDoc> {
     return ELECTRON_CAPABILITIES;
   }
 
-  async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
+  async lifecycle(params: {
+    op: string;
+    options?: Record<string, unknown>;
+  }): Promise<{ ok: boolean }> {
     return this.web.lifecycle(params);
   }
 
@@ -77,7 +83,10 @@ export class ElectronAdapterHandler implements AdapterHandler {
   }
 
   async act(params: { action: Action }): Promise<ActionOutcome> {
-    if (this.mainLog.includes("ELECTRON_CRASH injected")) {
+    if (this.crashPending) {
+      // One-shot: consume the fault so only the FIRST act crashes; later acts
+      // reach the app again (observe was never blocked).
+      this.crashPending = false;
       throw new AdapterCrashError("adapter-crash: electron app quit (injected fault)");
     }
     return this.web.act(params);
@@ -89,5 +98,10 @@ export class ElectronAdapterHandler implements AdapterHandler {
 
   async cancel(): Promise<void> {
     await this.web.cancel();
+  }
+
+  /** Release the underlying browser/context/seed server (signal shutdown). */
+  async shutdown(): Promise<void> {
+    await this.web.shutdown();
   }
 }

@@ -1,4 +1,5 @@
 import type { Observation } from "@inspector/protocol";
+import { strongHash } from "./rng.js";
 
 export interface UiElement {
   tag: string;
@@ -18,21 +19,24 @@ export function uiTreeOf(obs: Observation): UiElement[] {
 
 /**
  * Coarse screen identity: the sorted set of currently *visible, enabled*
- * interactive elements. The seeded single-page app keeps the same URL across
- * screens, so screen identity must come from the visible control set.
+ * interactive elements, keyed by tag|id|name|role so an id-identified button
+ * and a name-identified input never collapse into one screen. The seeded
+ * single-page app keeps the same URL across screens, so screen identity must
+ * come from the visible control set.
  */
 export function screenFingerprint(obs: Observation): string {
   const els = uiTreeOf(obs)
     .filter((e) => !e.hidden && !e.disabled)
-    .map((e) => e.id || e.name || e.role)
+    .map((e) => `${e.tag}|${e.id ?? ""}|${e.name ?? ""}|${e.role ?? ""}`)
     .sort();
   return `scr|${els.join(",")}`;
 }
 
 /**
  * Fine state identity: the coarse screen plus the dynamic values of visible
- * fields/elements and the set of storage keys. Two observations with the same
- * fingerprint are treated as the same state for cycle/visitation accounting.
+ * fields/elements and a hash of the storage key/value pairs. Two observations
+ * with the same fingerprint are treated as the same state for cycle/visitation
+ * accounting; states that differ only in storage VALUES stay distinct.
  */
 export function stateFingerprint(obs: Observation): string {
   const summary = obs.summary as {
@@ -50,9 +54,12 @@ export function stateFingerprint(obs: Observation): string {
     .filter(Boolean)
     .sort()
     .join(",");
-  const storage = Object.keys(summary?.storage ?? {})
-    .sort()
-    .join(",");
+  const storage = strongHash(
+    Object.entries(summary?.storage ?? {})
+      .map(([k, v]) => `${k}=${v}`)
+      .sort()
+      .join(","),
+  );
   return `${screen}#${dyn}#st:${storage}`;
 }
 
@@ -112,7 +119,8 @@ export class StateGraph {
     if (e) {
       e.count += 1;
       e.lastSeenActionIndex = actionIndex;
-      e.leadsToState = toState;
+      // leadsToState keeps its FIRST target: later traversals may be transient
+      // (crashes, resets) and must not rewrite established graph structure.
     } else {
       this.edges.set(key, {
         fromState,

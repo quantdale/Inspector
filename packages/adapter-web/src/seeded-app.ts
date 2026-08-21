@@ -3,6 +3,8 @@ import { createServer, type Server } from "node:http";
 export interface SeedServerOptions {
   /** Override the served HTML (used by repair verification to serve patched sources). */
   html?: string;
+  /** Serve a self-redirect loop at /loop (torture scenarios). */
+  redirectLoop?: boolean;
 }
 
 export interface SeedServer {
@@ -10,32 +12,46 @@ export interface SeedServer {
   readonly url: string;
   /** Resolves when the server is accepting connections. */
   readonly ready: Promise<void>;
+  /** Bound address; always loopback. */
+  readonly localAddress: string;
   close(): void;
 }
 
 export function startSeedServer(opts: SeedServerOptions = {}): SeedServer {
   const body = opts.html ?? SEED_HTML;
   const server: Server = createServer((req, res) => {
+    if (opts.redirectLoop && req.url && req.url.startsWith("/loop")) {
+      res.writeHead(302, { location: "/loop" });
+      res.end();
+      return;
+    }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(body);
   });
-  // Bind an ephemeral port: reproduction/minimization opens many fresh
-  // environments in quick succession, and fixed-range random ports eventually
-  // collide (EADDRINUSE).
+  // Bind an ephemeral port on the loopback interface only: reproduction/
+  // minimization opens many fresh environments in quick succession (fixed-range
+  // random ports eventually collide), and a disposable target must never be
+  // reachable from other interfaces.
   let url = "";
+  let localAddress = "";
   const ready = new Promise<void>((resolve, reject) => {
     server.once("listening", () => {
       const addr = server.address();
-      const port = addr && typeof addr === "object" ? addr.port : 0;
-      url = `http://127.0.0.1:${port}/`;
+      if (addr && typeof addr === "object") {
+        localAddress = addr.address;
+        url = `http://127.0.0.1:${addr.port}/`;
+      }
       resolve();
     });
     server.once("error", reject);
   });
-  server.listen(0);
+  server.listen(0, "127.0.0.1");
   return {
     get url() {
       return url;
+    },
+    get localAddress() {
+      return localAddress;
     },
     ready,
     close: () => {

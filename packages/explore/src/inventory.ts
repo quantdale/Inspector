@@ -1,7 +1,7 @@
 import type { Action, CapabilityDoc } from "@inspector/protocol";
 import type { UiElement } from "./state.js";
 import { boundaryValues } from "./inputs.js";
-import { hashString } from "./rng.js";
+import { strongHash } from "./rng.js";
 
 export type ExploreActionKind =
   | "click"
@@ -34,11 +34,31 @@ export interface CandidateAction {
   metadata?: Record<string, unknown>;
 }
 
+/** Escape a value interpolated into a CSS attribute selector. */
+function escapeAttrValue(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
+
 function selectorFor(el: UiElement): string | undefined {
   if (el.id) return `#${el.id}`;
-  if (el.name) return `[aria-label="${el.name}"]`;
+  if (el.name) return `[aria-label="${escapeAttrValue(el.name)}"]`;
   return undefined;
 }
+
+/** Concrete keys pressed against text inputs (never a valueless press). */
+const PRESS_KEYS = [
+  "Enter",
+  "Tab",
+  "Escape",
+  "ArrowDown",
+  "ArrowUp",
+  "ArrowLeft",
+  "ArrowRight",
+] as const;
 
 export interface BuildInventoryOptions {
   allowFaults: boolean;
@@ -87,12 +107,12 @@ export function buildInventory(
         for (const v of values) {
           const boundary = v.length >= 64 || v === "CRASH" || v.includes("<");
           out.push({
-            id: `f_${el.id}_${hashString(v)}`,
+            id: `f_${el.id}_${strongHash(v)}`,
             kind: "fill",
             selector: sel,
             value: v,
             risk: "interact",
-            actionKey: `fill:${sel}:${hashString(v)}`,
+            actionKey: `fill:${sel}:${strongHash(v)}`,
             sourceElementId: el.id,
             isBoundary: boundary,
             priority: boundary ? 8 : 4,
@@ -100,15 +120,18 @@ export function buildInventory(
         }
       }
       if (actCaps.has("press") && el.tag === "input") {
-        out.push({
-          id: `p_${el.id}`,
-          kind: "press",
-          selector: sel,
-          risk: "interact",
-          actionKey: `press:${sel}`,
-          sourceElementId: el.id,
-          priority: 2,
-        });
+        for (const key of PRESS_KEYS) {
+          out.push({
+            id: `p_${el.id}_${key}`,
+            kind: "press",
+            selector: sel,
+            value: key,
+            risk: "interact",
+            actionKey: `press:${sel}:${key}`,
+            sourceElementId: el.id,
+            priority: 2,
+          });
+        }
       }
       if (actCaps.has("select") && el.tag === "select") {
         out.push({
@@ -177,5 +200,12 @@ export function buildInventory(
     }
   }
 
-  return out;
+  // Keep-first dedup: duplicated uiTree entries (the same id twice) must not
+  // produce duplicate candidates.
+  const seen = new Set<string>();
+  return out.filter((c) => {
+    if (seen.has(c.actionKey)) return false;
+    seen.add(c.actionKey);
+    return true;
+  });
 }

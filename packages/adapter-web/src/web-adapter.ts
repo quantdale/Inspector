@@ -6,7 +6,7 @@ import {
 } from "playwright";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import {
   PROTOCOL_VERSION,
   newId,
@@ -22,7 +22,13 @@ import {
   ArtifactStore,
   type ArtifactMetadata,
 } from "@inspector/artifact-store";
-import { type AdapterHandler, AdapterCrashError } from "@inspector/adapter-sdk";
+import {
+  type AdapterHandler,
+  AdapterCrashError,
+  redactRecord,
+  redactUrl,
+  redactUrlsInText,
+} from "@inspector/adapter-sdk";
 import { startSeedServer, type SeedServer } from "./seeded-app.js";
 
 export const WEB_CAPABILITIES: CapabilityDoc = {
@@ -51,7 +57,7 @@ export const WEB_CAPABILITIES: CapabilityDoc = {
       "wait",
     ],
     lifecycle: ["create", "reset", "close"],
-    faults: ["timeout", "crash"],
+    faults: ["crash"],
     coverage: [],
   },
 };
@@ -65,26 +71,27 @@ export interface WebAdapterOptions {
   artifactBaseDir?: string;
   /** Serve this HTML instead of the default seeded app (repair verification). */
   seedHtml?: string;
+  /**
+   * Settle window (ms) waited after an action resolves so a pageerror that
+   * lands just after completion still classifies as target-failure. The
+   * default is deliberately small; larger values trade latency for a wider
+   * detection window. Residual race: throws arriving after the window are
+   * missed by THIS action and surface on the next observation instead.
+   */
+  settleMs?: number;
+  /** Serve a self-redirect loop at /loop from the seeded server (torture). */
+  seedRedirectLoop?: boolean;
 }
 
-function redact(url: string): string {
-  try {
-    const u = new URL(url);
-    if (
-      u.searchParams.has("password") ||
-      u.searchParams.has("token") ||
-      u.searchParams.has("secret")
-    ) {
-      const clean = new URL(url);
-      for (const k of ["password", "token", "secret"]) {
-        if (clean.searchParams.has(k)) clean.searchParams.set(k, "***");
-      }
-      return clean.toString();
-    }
-    return url;
-  } catch {
-    return url;
-  }
+/**
+ * Playwright timeout for one action: keeps the historical headroom below the
+ * wire deadline for generous deadlines while clamping strictly UNDER the
+ * deadline for short ones (the old floor could meet or exceed it).
+ */
+export function actionTimeout(deadlineMs: number): number {
+  const desired = Math.max(1000, deadlineMs - 1500);
+  const ceiling = Math.max(deadlineMs - 250, 0);
+  return Math.max(Math.min(desired, ceiling), 50);
 }
 
 export class WebAdapterHandler implements AdapterHandler {
@@ -93,6 +100,12 @@ export class WebAdapterHandler implements AdapterHandler {
   private page: Page | undefined;
   private seed: SeedServer | undefined;
   private readonly artifacts: ArtifactStore;
+  /** Unique per-instance artifact directory (mkdtemp under the base). */
+  private readonly artifactDir: string;
+  private readonly settleMs: number;
+  private readonly seedRedirectLoop: boolean;
+  private runId = "run";
+  private environmentId = "env";
   private consoleErrors: Array<{ text: string; ts: number }> = [];
   private pageErrors: Array<{ message: string; stack?: string }> = [];
   private network: Array<Record<string, unknown>> = [];
@@ -103,59 +116,89 @@ export class WebAdapterHandler implements AdapterHandler {
     private readonly faults: WebFaults = {},
     artifactBaseDir: string = join(tmpdir(), "inspector-web-artifacts"),
     private readonly seedHtml?: string,
+    settleMs = 50,
+    seedRedirectLoop = false,
   ) {
-    mkdtempSync(artifactBaseDir); // ensure base exists
-    this.artifacts = new ArtifactStore(artifactBaseDir);
+    this.settleMs = Math.max(0, settleMs);
+    this.seedRedirectLoop = seedRedirectLoop;
+    mkdirSync(artifactBaseDir, { recursive: true });
+    // Use the RETURNED unique directory so concurrent instances never share
+    // one artifact tree (and trace temp files cannot collide across processes).
+    this.artifactDir = mkdtempSync(join(artifactBaseDir, "inst-"));
+    this.artifacts = new ArtifactStore(this.artifactDir);
   }
 
   async initialize(): Promise<CapabilityDoc> {
     return WEB_CAPABILITIES;
   }
 
-  async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
+  async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
     switch (params.op) {
       case "create": {
-        this.seed = startSeedServer({ html: this.seedHtml });
-        this.browser = await chromium.launch({ headless: true });
-        this.context = await this.browser.newContext({
-          viewport: { width: 1280, height: 800 },
-          locale: "en-US",
-          timezoneId: "UTC",
-        });
-        this.page = await this.context.newPage();
-        this.attachListeners();
-        // Keep the disposable target isolated: block any navigation/request to a
-        // non-localhost origin so a link click can never hijack the host browser.
-        await this.page.route("**/*", (route) => {
-          try {
-            const u = new URL(route.request().url());
-            if (
-              u.protocol === "http:" &&
-              (u.hostname === "127.0.0.1" || u.hostname === "localhost")
-            ) {
-              return route.continue();
+        // Refuse-or-replace: tear down any prior instance first so repeated
+        // creates never leak a browser, context, or seed server.
+        if (this.browser || this.context || this.page || this.seed) {
+          await this.shutdown();
+        }
+        this.applyAttribution(params.options);
+        try {
+          this.seed = startSeedServer({
+            html: this.seedHtml,
+            redirectLoop: this.seedRedirectLoop,
+          });
+          this.browser = await chromium.launch({ headless: true });
+          this.context = await this.browser.newContext({
+            viewport: { width: 1280, height: 800 },
+            locale: "en-US",
+            timezoneId: "UTC",
+          });
+          this.page = await this.context.newPage();
+          this.attachListeners();
+          // Keep the disposable target isolated: block any navigation/request to a
+          // non-localhost origin so a link click can never hijack the host browser.
+          await this.page.route("**/*", (route) => {
+            try {
+              const u = new URL(route.request().url());
+              if (
+                u.protocol === "http:" &&
+                (u.hostname === "127.0.0.1" || u.hostname === "localhost")
+              ) {
+                return route.continue();
+              }
+            } catch {
+              /* ignore malformed urls */
             }
-          } catch {
-            /* ignore malformed urls */
-          }
-          return route.abort();
-        });
-        await this.context.tracing.start({
-          screenshots: true,
-          snapshots: true,
-          sources: false,
-        });
-        await this.seed.ready;
-        await this.page.goto(this.seed.url);
-        return { ok: true };
+            return route.abort();
+          });
+          await this.context.tracing.start({
+            screenshots: true,
+            snapshots: true,
+            sources: false,
+          });
+          await this.seed.ready;
+          await this.page.goto(this.seed.url);
+          return { ok: true };
+        } catch (e) {
+          // Fail-safe: tear down whatever partial state was created before
+          // surfacing the failure to the caller.
+          await this.shutdown();
+          throw e;
+        }
       }
       case "reset": {
         if (this.page) {
-          await this.page.evaluate(() => localStorage.clear()).catch(() => {});
+          let cleared = true;
+          await this.page
+            .evaluate(() => localStorage.clear())
+            .catch(() => {
+              cleared = false;
+            });
           await this.page.reload({ waitUntil: "load" });
           await this.page
-            .waitForSelector("#loginBtn", { state: "visible" })
+            .waitForSelector("#loginBtn", { state: "visible", timeout: 5000 })
             .catch(() => {});
+          // Report storage-clear failure honestly instead of ok:true.
+          if (!cleared) return { ok: false };
         }
         return { ok: true };
       }
@@ -172,22 +215,28 @@ export class WebAdapterHandler implements AdapterHandler {
     if (!this.page) return;
     this.page.on("console", (msg) => {
       if (msg.type() === "error")
-        this.consoleErrors.push({ text: msg.text(), ts: Date.now() });
+        this.consoleErrors.push({
+          text: redactUrlsInText(msg.text()),
+          ts: Date.now(),
+        });
     });
     this.page.on("pageerror", (err) =>
-      this.pageErrors.push({ message: err.message, stack: err.stack }),
+      this.pageErrors.push({
+        message: redactUrlsInText(err.message),
+        stack: err.stack ? redactUrlsInText(err.stack) : undefined,
+      }),
     );
     this.page.on("request", (req) =>
       this.network.push({
         type: "request",
-        url: redact(req.url()),
+        url: redactUrl(req.url()),
         method: req.method(),
       }),
     );
     this.page.on("response", (res) =>
       this.network.push({
         type: "response",
-        url: redact(res.url()),
+        url: redactUrl(res.url()),
         status: res.status(),
       }),
     );
@@ -227,13 +276,16 @@ export class WebAdapterHandler implements AdapterHandler {
           id: el.id,
           hidden: el.offsetParent === null,
           disabled: !!el.disabled,
-          value: isField ? el.value : undefined,
+          // Password-type values are masked IN PAGE so they never cross the
+          // adapter boundary (SECURITY-MODEL: redact known secret values).
+          value:
+            isField && el.type === "password" ? "***" : isField ? el.value : undefined,
           text: isField ? undefined : textContent,
         };
       });
     }) as unknown as () => unknown);
     const screenshot = want.has("screenshot") ? await page.screenshot() : null;
-    const storage = await page
+    const rawStorage = (await page
       .evaluate((() => {
         const o: Record<string, string> = {};
         for (let i = 0; i < localStorage.length; i++) {
@@ -242,7 +294,9 @@ export class WebAdapterHandler implements AdapterHandler {
         }
         return o;
       }) as unknown as () => unknown)
-      .catch(() => ({}));
+      .catch(() => ({}))) as Record<string, string>;
+    // Sensitive storage keys are masked before the dump can persist.
+    const storage = redactRecord(rawStorage);
 
     const artifacts: Array<{
       sha256: string;
@@ -252,7 +306,7 @@ export class WebAdapterHandler implements AdapterHandler {
     }> = [];
     if (screenshot) {
       const shotMeta: ArtifactMetadata = this.artifacts.write({
-        runId: "run",
+        runId: this.runId,
         content: Buffer.from(screenshot),
         mime: "image/png",
         name: "screenshot.png",
@@ -286,8 +340,8 @@ export class WebAdapterHandler implements AdapterHandler {
     };
     const obs: Observation = {
       id: newId("obs"),
-      runId: "run",
-      environmentId: "env",
+      runId: this.runId,
+      environmentId: this.environmentId,
       sequence: this.seq++,
       source: "adapter-web",
       capturedAt: new Date().toISOString(),
@@ -302,7 +356,10 @@ export class WebAdapterHandler implements AdapterHandler {
 
   private async flushTrace(): Promise<ArtifactMetadata | undefined> {
     if (!this.context) return undefined;
-    const path = join(tmpdir(), `inspector-trace-${this.traceIndex++}.zip`);
+    // Trace zips are written inside this instance's unique artifact dir and
+    // removed after ingest: no inspector-trace-N.zip litter or cross-process
+    // index collisions in the os tmpdir.
+    const path = join(this.artifactDir, `trace-${this.traceIndex++}.zip`);
     try {
       await this.context.tracing.stop({ path });
       await this.context.tracing.start({
@@ -313,12 +370,18 @@ export class WebAdapterHandler implements AdapterHandler {
     } catch {
       return undefined;
     }
-    return this.artifacts.write({
-      runId: "run",
-      content: readFileSync(path),
-      mime: "application/zip",
-      name: "trace.zip",
-    });
+    try {
+      const meta = this.artifacts.write({
+        runId: this.runId,
+        content: readFileSync(path),
+        mime: "application/zip",
+        name: "trace.zip",
+      });
+      rmSync(path, { force: true });
+      return meta;
+    } catch {
+      return undefined;
+    }
   }
 
   async act(params: { action: Action }): Promise<ActionOutcome> {
@@ -338,7 +401,10 @@ export class WebAdapterHandler implements AdapterHandler {
     // Keep the Playwright timeout strictly below the wire deadline so the
     // adapter always reports an outcome instead of losing the race to the
     // client-side deadline (which would surface as an adapter error).
-    const timeout = Math.max(1000, action.deadlineMs - 1500);
+    const timeout = actionTimeout(action.deadlineMs);
+    // Errors that arrive during THIS action window (including between action
+    // resolution and classification) mark it as a target failure.
+    const errorsBefore = this.pageErrors.length;
     try {
       switch (action.kind) {
         case "click":
@@ -402,12 +468,14 @@ export class WebAdapterHandler implements AdapterHandler {
       }
       // A synchronous throw inside a click/fill handler is reported as a
       // pageerror, but the CDP notification can land just after the action
-      // promise resolves. Give it one bounded settle before concluding success.
-      if (this.pageErrors.length === 0) {
-        await page.waitForTimeout(50);
+      // promise resolves. Give it one bounded settle before concluding
+      // success; the window is configurable (settleMs) and deliberately not
+      // inflated — errors arriving later surface on the next observation.
+      if (this.pageErrors.length === errorsBefore) {
+        await page.waitForTimeout(this.settleMs);
       }
-      if (this.pageErrors.length > 0) {
-        const err = this.pageErrors[this.pageErrors.length - 1]!;
+      const lateError = this.pageErrors.slice(errorsBefore).at(-1);
+      if (lateError) {
         return {
           actionId: action.id,
           runId: action.runId,
@@ -415,7 +483,7 @@ export class WebAdapterHandler implements AdapterHandler {
           status: "target-failure",
           observedAt: new Date().toISOString(),
           stateAfter: page.url(),
-          error: { code: "TARGET_FAILURE", message: err.message },
+          error: { code: "TARGET_FAILURE", message: lateError.message },
         };
       }
       return {
@@ -434,9 +502,22 @@ export class WebAdapterHandler implements AdapterHandler {
       if (e instanceof ProtocolError) throw e;
       const message = e instanceof Error ? e.message : String(e);
       // A genuine application crash surfaces as a pageerror and is reported with
-      // code TARGET_FAILURE (handled above). A Playwright automation error
-      // (missing element, timeout) is an ACTION_FAILED, not an application
-      // defect, so the explorer must not treat it as a bug.
+      // code TARGET_FAILURE. This includes errors that arrived during the
+      // action window even when the automation call itself failed. A Playwright
+      // automation error (missing element, timeout) is an ACTION_FAILED, not an
+      // application defect, so the explorer must not treat it as a bug.
+      const duringAction = this.pageErrors.slice(errorsBefore).at(-1);
+      if (duringAction) {
+        return {
+          actionId: action.id,
+          runId: action.runId,
+          environmentId: action.environmentId,
+          status: "target-failure",
+          observedAt: new Date().toISOString(),
+          stateAfter: page.url(),
+          error: { code: "TARGET_FAILURE", message: duringAction.message },
+        };
+      }
       return {
         actionId: action.id,
         runId: action.runId,
@@ -457,7 +538,12 @@ export class WebAdapterHandler implements AdapterHandler {
     /* best-effort; Playwright actions are not interruptible mid-flight */
   }
 
-  private async shutdown(): Promise<void> {
+  /**
+   * Release every resource owned by this instance (tracing, context, browser,
+   * seed server). Idempotent; public so entrypoints can shut down gracefully
+   * on process signals.
+   */
+  async shutdown(): Promise<void> {
     try {
       if (this.context) await this.context.tracing.stop().catch(() => {});
     } catch {
@@ -478,5 +564,15 @@ export class WebAdapterHandler implements AdapterHandler {
     this.context = undefined;
     this.browser = undefined;
     this.seed = undefined;
+  }
+
+  /** Thread real run/environment attribution from lifecycle options. */
+  private applyAttribution(options?: Record<string, unknown>): void {
+    const runId = options?.runId;
+    const environmentId = options?.environmentId;
+    if (typeof runId === "string" && runId) this.runId = runId;
+    if (typeof environmentId === "string" && environmentId) {
+      this.environmentId = environmentId;
+    }
   }
 }

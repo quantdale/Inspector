@@ -14,12 +14,17 @@ function parseFaults(): WebFaults {
 const handler = new WebAdapterHandler(parseFaults());
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
-process.on("SIGTERM", () => {
+// Graceful signal shutdown: release the browser/context/seed server before
+// exiting instead of leaving orphaned Chromium processes behind.
+async function gracefulExit(): Promise<void> {
   server.close();
+  await handler.shutdown().catch(() => {});
   process.exit(0);
+}
+process.on("SIGTERM", () => {
+  void gracefulExit();
 });
 process.on("SIGINT", () => {
-  server.close();
-  process.exit(0);
+  void gracefulExit();
 });
 process.stdout.on("error", () => process.exit(0));

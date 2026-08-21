@@ -110,6 +110,16 @@ export class PolicyEngine {
     this.counters.actions += 1;
   }
 
+  /**
+   * Seed the action counter from durable state (committed action count for a
+   * run). A restart with a fresh engine must not reset max_actions, or
+   * crash-looping runs could evade the budget forever. Takes the maximum so
+   * an engine shared across runs stays monotonic.
+   */
+  seedActionCount(count: number): void {
+    this.counters.actions = Math.max(this.counters.actions, count);
+  }
+
   recordReset(): PolicyDecision {
     if (this.counters.resets + 1 > this.policy.budgets.max_environment_resets) {
       return { allowed: false, code: "BUDGET_EXHAUSTED", reason: "max_environment_resets exhausted" };

@@ -8,11 +8,15 @@ import {
   type Action,
   type HealthResponse,
 } from "@inspector/protocol";
-import { AdapterCrashError, type AdapterHandler } from "@inspector/adapter-sdk";
+import {
+  AdapterCrashError,
+  type AdapterHandler,
+  stripUrlCredentialsInText,
+} from "@inspector/adapter-sdk";
+import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
-import { ArtifactStore } from "@inspector/artifact-store";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import type { PtyBackend } from "./types.js";
 
 export const CLI_CAPABILITIES: CapabilityDoc = {
@@ -28,20 +32,43 @@ export const CLI_CAPABILITIES: CapabilityDoc = {
 };
 
 /**
+ * First entry of `after` whose occurrence count exceeds its count in `before`
+ * (count-based multiset diff). A pure set diff would classify a REPEATED
+ * identical miss as success, which corrupts reproduction/minimization.
+ */
+function freshError(before: string[], after: string[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const e of before) counts.set(e, (counts.get(e) ?? 0) + 1);
+  for (const e of after) {
+    const remaining = counts.get(e) ?? 0;
+    if (remaining === 0) return e;
+    counts.set(e, remaining - 1);
+  }
+  return undefined;
+}
+
+/**
  * CLI/PTY adapter (M6 subphase 1). Terminal interaction is modeled as line
  * entries (fill = submit a command line) over an injectable PTY backend.
  */
 export class CliAdapterHandler implements AdapterHandler {
   private sessionId: string | null = null;
   private readonly artifacts: ArtifactStore;
+  /** Unique per-instance artifact directory (mkdtemp under the base). */
+  private readonly artifactDir: string;
+  private runId = "run";
+  private environmentId = "env";
   private seq = 0;
 
   constructor(
     private readonly backend: PtyBackend,
     artifactBaseDir: string = join(tmpdir(), "inspector-cli-artifacts"),
   ) {
-    mkdtempSync(artifactBaseDir);
-    this.artifacts = new ArtifactStore(artifactBaseDir);
+    mkdirSync(artifactBaseDir, { recursive: true });
+    // Use the RETURNED unique directory so concurrent instances never share
+    // one artifact tree.
+    this.artifactDir = mkdtempSync(join(artifactBaseDir, "inst-"));
+    this.artifacts = new ArtifactStore(this.artifactDir);
     void this.artifacts;
   }
 
@@ -49,10 +76,11 @@ export class CliAdapterHandler implements AdapterHandler {
     return CLI_CAPABILITIES;
   }
 
-  async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
+  async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
     switch (params.op) {
       case "create":
       case "reset": {
+        this.applyAttribution(params.options);
         if (this.sessionId) await this.backend.kill(this.sessionId).catch(() => undefined);
         const session = await this.backend.spawn("seedcli");
         this.sessionId = session.id;
@@ -74,20 +102,22 @@ export class CliAdapterHandler implements AdapterHandler {
     const screen = await this.backend.readScreen(this.sessionId);
     const alive = await this.backend.isAlive(this.sessionId);
     const mode = !alive ? "mode-exited" : screen[0]?.startsWith("guest>") ? "mode-guest" : "mode-auth";
+    // Freeform screen text is left intact except for URL credential stripping
+    // (known debt: value-level secret redaction in freeform terminal output).
     const uiTree = [
-      { tag: "line", role: "text", id: mode, name: mode, text: screen[0] ?? "" },
-      ...screen.map((text, i) => ({
+      { tag: "line", role: "text", id: mode, name: mode, text: stripUrlCredentialsInText(screen[0] ?? "") },
+      ...screen.map((rawText, i) => ({
         tag: "line",
         role: "text",
         id: `line-${i}`,
         name: `line-${i}`,
-        text,
+        text: stripUrlCredentialsInText(rawText),
       })),
     ];
     return {
       id: newId("obs"),
-      runId: "run",
-      environmentId: "env",
+      runId: this.runId,
+      environmentId: this.environmentId,
       sequence: this.seq++,
       source: "adapter-cli-pty",
       capturedAt: new Date().toISOString(),
@@ -119,11 +149,10 @@ export class CliAdapterHandler implements AdapterHandler {
 
       const wasAlive = await this.backend.isAlive(sessionId);
       if (!wasAlive) {
-        return {
-          ...base,
-          status: "target-failure",
-          error: { code: "ACTION_FAILED", message: "session not alive" },
-        };
+        // Classify by WHY the session died so retries stay stable: an
+        // application crash remains TARGET_FAILURE instead of flip-flopping
+        // to a generic "session not alive" automation failure.
+        return { ...base, status: "target-failure", error: await this.deadSessionError(sessionId) };
       }
       const missesBefore = await this.missesOf(sessionId);
 
@@ -140,19 +169,11 @@ export class CliAdapterHandler implements AdapterHandler {
 
       const alive = await this.backend.isAlive(sessionId);
       if (!alive) {
-        const screen = await this.backend.readScreen(sessionId);
-        const reason =
-          screen.find((l) => l.startsWith("FATAL")) ??
-          this.sessionFor(sessionId)?.exitReason ??
-          "process exited";
-        return {
-          ...base,
-          status: "target-failure",
-          error: { code: "TARGET_FAILURE", message: String(reason) },
-        };
+        return { ...base, status: "target-failure", error: await this.deadSessionError(sessionId) };
       }
       const missesAfter = await this.missesOf(sessionId);
-      const freshMiss = missesAfter.find((m) => !missesBefore.includes(m));
+      // Count-based freshness: a repeated identical miss is still fresh.
+      const freshMiss = freshError(missesBefore, missesAfter);
       if (freshMiss) {
         return {
           ...base,
@@ -186,6 +207,38 @@ export class CliAdapterHandler implements AdapterHandler {
       misses?: (id: string) => Promise<string[]>;
     };
     return backend.misses ? backend.misses(sessionId) : [];
+  }
+
+  /**
+   * Explain a dead session for outcome classification. A FATAL screen line or
+   * an application exit reason is a genuine target defect (TARGET_FAILURE);
+   * normal exits ("quit") and external kills are automation failures.
+   */
+  private async deadSessionError(
+    sessionId: string,
+  ): Promise<{ code: "TARGET_FAILURE" | "ACTION_FAILED"; message: string }> {
+    try {
+      const screen = await this.backend.readScreen(sessionId);
+      const fatal = screen.find((l) => l.startsWith("FATAL"));
+      if (fatal) return { code: "TARGET_FAILURE", message: fatal };
+    } catch {
+      /* screen unavailable; fall through to exit reason */
+    }
+    const exitReason = this.sessionFor(sessionId)?.exitReason;
+    if (exitReason && exitReason !== "killed" && exitReason !== "quit") {
+      return { code: "TARGET_FAILURE", message: exitReason };
+    }
+    return { code: "ACTION_FAILED", message: "session not alive" };
+  }
+
+  /** Thread real run/environment attribution from lifecycle options. */
+  private applyAttribution(options?: Record<string, unknown>): void {
+    const runId = options?.runId;
+    const environmentId = options?.environmentId;
+    if (typeof runId === "string" && runId) this.runId = runId;
+    if (typeof environmentId === "string" && environmentId) {
+      this.environmentId = environmentId;
+    }
   }
 
   private sessionFor(sessionId: string): { exitReason?: string } | undefined {

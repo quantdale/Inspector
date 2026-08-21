@@ -8,11 +8,16 @@ import {
   type Action,
   type HealthResponse,
 } from "@inspector/protocol";
-import { AdapterCrashError, type AdapterHandler } from "@inspector/adapter-sdk";
+import {
+  AdapterCrashError,
+  type AdapterHandler,
+  isSensitiveKey,
+  REDACTED,
+} from "@inspector/adapter-sdk";
+import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
-import { ArtifactStore } from "@inspector/artifact-store";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import type { UiaBackend } from "./types.js";
 
 export const WINDOWS_CAPABILITIES: CapabilityDoc = {
@@ -28,20 +33,43 @@ export const WINDOWS_CAPABILITIES: CapabilityDoc = {
 };
 
 /**
+ * First entry of `after` whose occurrence count exceeds its count in `before`
+ * (count-based multiset diff). A pure set diff would classify a REPEATED
+ * identical crash as success, which corrupts reproduction/minimization.
+ */
+function freshError(before: string[], after: string[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const e of before) counts.set(e, (counts.get(e) ?? 0) + 1);
+  for (const e of after) {
+    const remaining = counts.get(e) ?? 0;
+    if (remaining === 0) return e;
+    counts.set(e, remaining - 1);
+  }
+  return undefined;
+}
+
+/**
  * Windows adapter (M6 subphase 3). Drives an injectable UI Automation
  * backend; all Windows-specific behavior is contained in this package.
  */
 export class WindowsAdapterHandler implements AdapterHandler {
   private created = false;
   private readonly artifacts: ArtifactStore;
+  /** Unique per-instance artifact directory (mkdtemp under the base). */
+  private readonly artifactDir: string;
+  private runId = "run";
+  private environmentId = "env";
   private seq = 0;
 
   constructor(
     private readonly backend: UiaBackend,
     artifactBaseDir: string = join(tmpdir(), "inspector-windows-artifacts"),
   ) {
-    mkdtempSync(artifactBaseDir);
-    this.artifacts = new ArtifactStore(artifactBaseDir);
+    mkdirSync(artifactBaseDir, { recursive: true });
+    // Use the RETURNED unique directory so concurrent instances never share
+    // one artifact tree.
+    this.artifactDir = mkdtempSync(join(artifactBaseDir, "inst-"));
+    this.artifacts = new ArtifactStore(this.artifactDir);
     void this.artifacts;
   }
 
@@ -49,10 +77,14 @@ export class WindowsAdapterHandler implements AdapterHandler {
     return WINDOWS_CAPABILITIES;
   }
 
-  async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
+  async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
     switch (params.op) {
       case "create":
+        // Probe the backend so create fails for a dead UIA client instead of
+        // reporting a successfully created environment that cannot be sensed.
+        await this.backend.tree();
         this.created = true;
+        this.applyAttribution(params.options);
         return { ok: true };
       case "reset":
         await this.backend.reset();
@@ -75,15 +107,20 @@ export class WindowsAdapterHandler implements AdapterHandler {
       role: n.type === "Button" ? "button" : n.type === "Edit" ? "input" : "text",
       name: n.text || n.id,
       id: n.id,
+      // KNOWN DEBT: the mock UIA model carries no geometry, so visibility
+      // cannot be derived here; every mapped control is reported visible.
       hidden: false,
       disabled: !n.enabled,
-      value: n.type === "Edit" ? n.text : undefined,
+      // Password-style controls (identified by automation id) are masked
+      // before their value can reach observations or model context.
+      value:
+        n.type === "Edit" ? (isSensitiveKey(n.id) ? REDACTED : n.text) : undefined,
       text: n.type === "Edit" ? undefined : n.text,
     }));
     return {
       id: newId("obs"),
-      runId: "run",
-      environmentId: "env",
+      runId: this.runId,
+      environmentId: this.environmentId,
       sequence: this.seq++,
       source: "adapter-windows-uia",
       capturedAt: new Date().toISOString(),
@@ -128,12 +165,13 @@ export class WindowsAdapterHandler implements AdapterHandler {
       }
 
       const after = await this.backend.errors();
-      const freshError = after.find((e) => !before.includes(e));
-      if (freshError) {
+      // Count-based freshness: a repeated identical error is still fresh.
+      const fresh = freshError(before, after);
+      if (fresh) {
         return {
           ...base,
           status: "target-failure",
-          error: { code: "TARGET_FAILURE", message: freshError },
+          error: { code: "TARGET_FAILURE", message: fresh },
         };
       }
       return { ...base, status: "success" };
@@ -150,10 +188,30 @@ export class WindowsAdapterHandler implements AdapterHandler {
   }
 
   async health(): Promise<HealthResponse> {
-    return { ok: this.created, uptimeMs: 0, now: new Date().toISOString() };
+    let ok = this.created;
+    if (ok) {
+      // Health must reflect reality: a backend that died after create makes
+      // the environment unusable even though `created` is still true.
+      try {
+        await this.backend.tree();
+      } catch {
+        ok = false;
+      }
+    }
+    return { ok, uptimeMs: 0, now: new Date().toISOString() };
   }
 
   async cancel(): Promise<void> {
     /* mock actions are instantaneous */
+  }
+
+  /** Thread real run/environment attribution from lifecycle options. */
+  private applyAttribution(options?: Record<string, unknown>): void {
+    const runId = options?.runId;
+    const environmentId = options?.environmentId;
+    if (typeof runId === "string" && runId) this.runId = runId;
+    if (typeof environmentId === "string" && environmentId) {
+      this.environmentId = environmentId;
+    }
   }
 }

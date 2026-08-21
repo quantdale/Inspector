@@ -201,17 +201,18 @@ hardening:
     - adapter-robustness
     - security
     - soak
-  current_phase: WAVE_2_CORE_ARTIFACT_EXPLORE_ADAPTERS
+  current_phase: SOAK_PROPERTY_DOGFOOD
   defects:
     - >-
-      31 defects confirmed and closed in wave 1 (H-01..H-31; 4 CRITICAL,
-      11 HIGH): see .inspector/state/HARDENING-CHECKPOINT.md ledger.
-      Wave 2 targets core/store-sqlite, artifact-store, explore, and
-      platform adapters.
-  last_verified_commit: bff389034b0610f05237b0eff75f8fc2fc4fbf30
+      64 defects confirmed and closed (H-01..H-64; wave 1: transport,
+      oracle/finding, repair, scale; wave 2: core/store-sqlite,
+      artifact-store, explore, platform adapters). 6 CRITICAL, ~20 HIGH.
+      See .inspector/state/HARDENING-CHECKPOINT.md ledger. Remaining
+      phases: soak, property/fuzz/mutation, dogfood proof, exit gate.
+  last_verified_commit: c8c528810d7f09addeb9f9a232fbfdb2cfb4a640
   last_full_gate: >-
-    baseline full gate PASS at bff3890 (lint/typecheck/unit63/integration47);
-    post-wave-1 tsc 0 errors, lint 0 errors, unit 188/188 PASS
+    baseline full gate PASS at bff3890; post-wave-2 tsc 0 errors, lint
+    0 errors, unit 348 passed / 3 skipped, adapter conformance green
   blockers: []
   deferred_debt: []
 

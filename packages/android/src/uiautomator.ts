@@ -39,6 +39,9 @@ export function parseUiautomatorDump(xml: string): AndroidUiElement[] {
     const id = resId.split(":id/")[1] ?? resId;
     const text = attrs.get("text") ?? "";
     const isField = cls.endsWith("EditText");
+    // Derive visibility from geometry: zero-area bounds mean the node is not
+    // rendered (uiautomator dumps omit most invisible nodes entirely).
+    const hidden = x2 <= x1 || y2 <= y1;
     out.push({
       tag: "node",
       role: cls.endsWith("Button")
@@ -48,7 +51,7 @@ export function parseUiautomatorDump(xml: string): AndroidUiElement[] {
           : "text",
       name: attrs.get("content-desc") || text || id,
       id,
-      hidden: false,
+      hidden,
       disabled: attrs.get("enabled") === "false",
       value: isField ? text : undefined,
       text: isField ? undefined : text,

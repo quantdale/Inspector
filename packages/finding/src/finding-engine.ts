@@ -362,6 +362,11 @@ export class FindingEngine {
       artifactRefs: JSON.stringify(finding.artifactRefs),
       createdAt: finding.createdAt,
       updatedAt: finding.updatedAt,
+      // Wave-1 fields must survive restarts, not live in memory only.
+      signature: finding.signature ?? null,
+      minimizationJson: finding.minimization ? JSON.stringify(finding.minimization) : null,
+      lastTransitionJson: finding.lastTransition ? JSON.stringify(finding.lastTransition) : null,
+      adapter: finding.adapter ?? null,
     };
     this.store.putFinding(record);
   }
