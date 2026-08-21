@@ -11,19 +11,19 @@
 
 | Phase | Focus | State |
 | --- | --- | --- |
-| 0 | Baseline gates | IN PROGRESS |
-| A | Crash / restart / durability torture | PENDING |
-| B | SQLite / state corruption / transactions | PENDING |
-| C | Exploration engine torture | PENDING |
-| D | Oracle false-positive / false-negative | PENDING |
-| E | Reproduction / minimization torture | PENDING |
-| F | Autonomous repair adversarial | PENDING |
-| G | Adapter torture (web/android/cli/electron/windows) | PENDING |
-| H | Scale / lease / scheduler concurrency | PENDING |
-| I | Security hardening | PENDING |
-| J | Long-run soak | PENDING |
-| K | Property / fuzz / mutation | PENDING |
-| Final | Dogfood proof + exit gate | PENDING |
+| 0 | Baseline gates | DONE (green at bff3890) |
+| A | Crash / restart / durability torture | DONE (H-32..H-43, H-48; soak restart cycles) |
+| B | SQLite / state corruption / transactions | DONE (H-33, H-35..H-36, H-40..H-41, H-43, H-45..H-47, H-66; corruption quarantine soak) |
+| C | Exploration engine torture | DONE (H-48..H-56; browserless torture fixtures) |
+| D | Oracle false-positive / false-negative | DONE (H-10..H-17; FP/FN fixture suite) |
+| E | Reproduction / minimization torture | DONE (H-11..H-12, H-15; minimization property suite) |
+| F | Autonomous repair adversarial | DONE (H-18..H-23, H-65; adversarial patch suites) |
+| G | Adapter torture (web/android/cli/electron/windows) | DONE (H-57..H-64; per-adapter torture suites) |
+| H | Scale / lease / scheduler concurrency | DONE (H-24..H-31; fencing storm + 37-restart soak) |
+| I | Security hardening | DONE (H-05, H-18..H-19, H-42, H-44, H-61, H-63; redaction + containment + validation) |
+| J | Long-run soak | DONE (7 soak tests; no leaks/corruption; numbers recorded) |
+| K | Property / fuzz / mutation | DONE (36+ property cases; 7 mutants, 5 killed pre-existing, 2 survivors closed) |
+| Final | Dogfood proof + exit gate | Dogfood DONE (6/6); exit gate IN PROGRESS |
 
 ## Baseline
 
@@ -114,6 +114,33 @@ tsc --noEmit exit 0; eslint 0 errors (5 pre-existing warnings); unit 188/188 PAS
 | H-64 | LOW | adapters batch | Seeded server bound all interfaces; electron fault poisoned subsequent acts; windows dead-backend honesty; cli classification flip-flop; unimplemented `timeout` fault advertised; hardcoded runId/env attribution | CLOSED |
 
 Wave-2 deferred debt (explicit, not silently dropped): post-hoc artifact-byte accounting; wall-clock/model-request/repair budgets still in-memory; web 50ms settle residual race (configurable); freeform logcat/screen text keeps query-string values; windows `hidden` always false (no UIA geometry); lexical (non-realpath) worktree containment vs hostile repo authorship; FileLock advisory takeover race; `.tmp-*` litter after hard crash until clear(); shared Finding→FindingRecord mapper duplication; RunController.reset() double-observe quirk.
+
+### Wave 3 (soak, property/fuzz/mutation, dogfood proof)
+
+| ID | Sev | Subsystem | Summary | Status |
+| --- | --- | --- | --- | --- |
+| H-65 | HIGH | repair | Masking-by-removal patches ACCEPTED: deleting the crashing element leaves the oracle silent, so a button-hider patch verified as RESOLVED. Found by the dogfood proof. | CLOSED — regression.ts retains pre-patch replay; engine.ts requires every unpatched-TARGET_FAILURE action to succeed post-patch else REJECTED ("masking suspected"); regression test in dogfood.integration.test.ts |
+| H-66 | MED | protocol (+4 callers) | `newId("act"/"find"/"ckpt")` emitted `undefined_`-prefixed ids (PREFIXES keyed by long forms; `keyof` collapse hid it from tsc). Corrupted persisted evidence ids across explore/finding/scale/core checkpoints. | CLOSED — alias entries for every call-site kind, narrowed `IdKind`, runtime guard throws on unknown kinds, protocol id-kind tests |
+
+Phase K mutation probes: 5/7 critical-logic mutants killed by existing suites; 2 survivors root-caused and closed with new tests — (a) worktree containment inner-collapse forms (`a/../b`) masked by the second defense layer → path-policy property suite; (b) web pageerror landing INSIDE a failing action's window had no coverage → web.window-classification.integration.test.ts (K1/K2).
+
+Phase J soak results (clock-injected, 32s wall / 51.7s aggregate): 160-item × 4-worker campaign through **37 durable restart injections** — exactly-once execution, zero lost work, 26 stale completions fenced, ledger consistent; budget exhaustion tail durable; 500 duplicate claims rejected; 3000 router fallback iterations; 24 corruption quarantines; 5000 artifact writes (dedup 2.93×, zero .tmp litter); 3200 steps over 40 SQLite reopen cycles (~906 bytes/step). RSS +10–16MB per suite (ceilings respected), handle counts flat, temp dirs restored to baseline. No product defects surfaced by soak.
+
+## Post-wave-3 verification
+
+Dogfood proof 6/6 green (~4.1 min): autonomous exploration discovered #boom itself → evidence bundle integrity → masking patch REJECTED with audit → valid patch ACCEPTED (regression-first + probe) → applyAcceptedPatch + original-reproducer replay clean → FindingRecord RESOLVED persisted; two additional pipelines ran concurrently without cross-contamination.
+
+---
+
+# HARDENING CAMPAIGN #1 COMPLETE
+
+- Completed: 2026-08-21. Final commit: the HARDENING_1 final state commit on `main` (pushed; no force-push).
+- Exit gate: **PASS** — `pnpm install --frozen-lockfile` OK; lint 0 errors (5 pre-existing warnings); typecheck exit 0; unit **387 passed / 3 skipped** (28 files); integration **101 passed** (19 files, ~262s wall): dogfood 6/6, soak 7/7, web hardening+torture 16/16, repair e2e 3/3, repair hardening 12/12, worktree hardening 8/8, explore E2E 2/2, explore hardening 36/36 (unit), all adapter conformance suites green.
+- Defect summary: **66 closed — 5 CRITICAL (H-01, H-02, H-18, H-24, H-57), 23 HIGH, 38 MEDIUM/LOW.** All Critical/High fixes have deterministic regression tests. Mutation probes: 5/7 critical-logic mutants killed by existing suites; both survivors closed with new tests.
+- Soak: no material leak or corruption (37 restart injections with exactly-once execution; RSS +10–16MB per suite against 200MB ceiling; handle counts flat; temp dirs restored; SQLite ~906 bytes/step; artifact dedup 2.93× with zero `.tmp` litter).
+- Environment limitations: M8 iOS remains DEFERRED_ENVIRONMENT (no macOS/Xcode); production bindings for PTY/UIA/ADB CLI/emulator remain mock-proven only.
+- Remaining debt: see `hardening.deferred_debt` in `.inspector/state/campaign.yaml`.
+- Next recommended campaign: **HARDENING_2** — production adapter bindings (real PTY/UIA/ADB/emulator), SQLite-backed leases replacing advisory file locks, oracle-evaluation persistence per docs/ORACLE-SYSTEM.md, resumable exploration graphs (spec 003 E7 gap), and semantic/value-level redaction.
 
 ## Post-wave-2 verification
 

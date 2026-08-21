@@ -21,6 +21,34 @@ describe("protocol version", () => {
   });
 });
 
+describe("id kinds", () => {
+  it("emits prefixed ids for every documented kind alias", () => {
+    expect(newId("run")).toMatch(/^run_/);
+    expect(newId("env")).toMatch(/^env_/);
+    expect(newId("step")).toMatch(/^step_/);
+    expect(newId("action")).toMatch(/^act_/);
+    expect(newId("act")).toMatch(/^act_/);
+    expect(newId("obs")).toMatch(/^obs_/);
+    expect(newId("artifact")).toMatch(/^art_/);
+    expect(newId("finding")).toMatch(/^find_/);
+    expect(newId("find")).toMatch(/^find_/);
+    expect(newId("checkpoint")).toMatch(/^ckpt_/);
+    expect(newId("ckpt")).toMatch(/^ckpt_/);
+  });
+
+  it("never emits an undefined prefix (regression: act/find/ckpt aliases)", () => {
+    for (const kind of ["act", "find", "ckpt"] as const) {
+      const id = newId(kind);
+      expect(id.startsWith("undefined_")).toBe(false);
+      expect(id.startsWith(`${kind}_`)).toBe(true);
+    }
+  });
+
+  it("throws a typed error on an unknown kind instead of a malformed id", () => {
+    expect(() => newId("bogus" as never)).toThrow(/unknown id kind/);
+  });
+});
+
 describe("action schema", () => {
   const valid = () => ({
     id: newId("action"),

@@ -1,28 +1,29 @@
 # Project Status
 
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Campaign
 
 - Mode: **IMPLEMENTATION**
 - Campaign status: **COMPLETE**
 - Working branch: `main`
-- Hardening campaign: **NOT ACTIVE** (separately invoked)
+- Hardening campaign: **HARDENING_1 COMPLETE** (2026-08-21; 66 defects closed — 5 CRITICAL, 23 HIGH, 38 MEDIUM/LOW; ledger in `.inspector/state/HARDENING-CHECKPOINT.md`)
 
 ## Active work
 
-None — the implementation campaign M0–M7 is complete. M8 (iOS) is `DEFERRED_ENVIRONMENT` (no macOS/Xcode/simulator runtime; adapter interfaces and remote-worker contract fully specified; resumption requirements recorded in `specs/008-ios/SPEC.md`).
+None — the implementation campaign M0–M7 is complete. M8 (iOS) is `DEFERRED_ENVIRONMENT` (no macOS/Xcode/simulator runtime; adapter interfaces and remote-worker contract fully specified; resumption requirements recorded in `specs/008-ios/SPEC.md`). HARDENING_1 is complete with zero unresolved Critical/High defects.
 
-## Verified gates (M7, final)
+## Verified gates (HARDENING_1 final)
 
 | Gate | Result |
 | --- | --- |
-| lint (0 errors) | PASS |
-| typecheck (exit 0) | PASS |
-| test (63 unit tests) | PASS |
-| test:integration (47 integration tests, 12 files) | PASS |
+| pnpm install --frozen-lockfile | PASS |
+| lint | PASS (0 errors, 5 warnings) |
+| typecheck | PASS (exit 0) |
+| test (unit) | PASS — 387 passed / 3 skipped, 28 files |
+| test:integration | PASS — 101 tests, 19 files (~262s), incl. dogfood proof 6/6 and soak 7/7 |
 
-M7 exit gate evidence: a bounded two-worker unattended campaign survives controller restart without duplicating completed work, preserves durable evidence/state in atomic state files, enforces deterministic global/per-worker budgets, clusters duplicate findings with provenance, and exposes an MCP-compatible read-only facade.
+The hardening exit gate evidence: crash/restart torture, SQLite corruption quarantine, exploration/oracle/reproduction/repair adversarial suites, adapter torture for all five platforms, lease/concurrency fencing storms, security boundary tests (path containment, redaction, payload validation), a clean long-run soak, mutation probes on critical logic, and an end-to-end dogfood proof (explore → confirm → reject masking patch → accept valid patch → apply → replay → persist RESOLVED).
 
 ## Known blockers
 

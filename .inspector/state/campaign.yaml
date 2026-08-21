@@ -183,10 +183,11 @@ known_debt:
     policies.
 
 hardening:
-  active: true
+  active: false
   campaign: HARDENING_1
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-21"
+  completed_at: "2026-08-21"
   base_commit: bff389034b0610f05237b0eff75f8fc2fc4fbf30
   saved_implementation_waypoint: >-
     IMPLEMENTATION campaign COMPLETE at bff3890 (M0-M7 done, M8
@@ -201,20 +202,62 @@ hardening:
     - adapter-robustness
     - security
     - soak
-  current_phase: SOAK_PROPERTY_DOGFOOD
+  completed_phases:
+    - BASELINE
+    - A-crash-restart-durability
+    - B-sqlite-corruption-transactions
+    - C-exploration-torture
+    - D-oracle-false-positive-negative
+    - E-reproduction-minimization
+    - F-repair-adversarial
+    - G-adapter-torture
+    - H-scale-lease-concurrency
+    - I-security-boundaries
+    - J-long-run-soak
+    - K-property-fuzz-mutation
+    - DOGFOOD-PROOF
+    - EXIT-GATE
+  current_phase: COMPLETE
   defects:
     - >-
-      64 defects confirmed and closed (H-01..H-64; wave 1: transport,
-      oracle/finding, repair, scale; wave 2: core/store-sqlite,
-      artifact-store, explore, platform adapters). 6 CRITICAL, ~20 HIGH.
-      See .inspector/state/HARDENING-CHECKPOINT.md ledger. Remaining
-      phases: soak, property/fuzz/mutation, dogfood proof, exit gate.
-  last_verified_commit: c8c528810d7f09addeb9f9a232fbfdb2cfb4a640
+      66 defects confirmed and CLOSED (H-01..H-66): 5 CRITICAL, 23 HIGH,
+      38 MEDIUM/LOW, across waves 1-3 (transport/oracle/finding/repair/
+      scale; core/store/artifact/explore/adapters; soak+property+mutation+
+      dogfood). Every Critical/High fix carries deterministic regression
+      coverage. Full ledger with evidence in
+      .inspector/state/HARDENING-CHECKPOINT.md. Zero unresolved
+      Critical/High defects remain.
+  last_verified_commit: HEAD (HARDENING_1 final commit; gate run on this exact tree)
   last_full_gate: >-
-    baseline full gate PASS at bff3890; post-wave-2 tsc 0 errors, lint
-    0 errors, unit 348 passed / 3 skipped, adapter conformance green
+    FINAL EXIT GATE PASS: pnpm install --frozen-lockfile OK; lint 0
+    errors (5 pre-existing warnings); typecheck exit 0; unit 387 passed
+    / 3 skipped (28 files); test:integration 101 passed (19 files,
+    ~262s wall) including dogfood proof 6/6, soak 7/7, web
+    torture/hardening 16/16, repair e2e 3/3, explore E2E 2/2, and all
+    adapter conformance suites.
   blockers: []
-  deferred_debt: []
+  deferred_debt:
+    - >-
+      Wall-clock/model-request/repair budgets remain in-memory;
+      artifact-byte accounting is post-hoc (core/policy).
+    - >-
+      Freeform logcat/PTY screen text keeps query-string values;
+      windows uiTree `hidden` always false (no UIA geometry);
+      redaction is key/URL-scoped, not semantic.
+    - >-
+      Worktree containment is lexical (resolve+prefix), not
+      realpath-based vs hostile repo authorship; FileLock takeover has
+      a documented sub-ms advisory race (SQLite leases are the
+      production fix).
+    - >-
+      Web adapter settle-window residual race (pageerror after settle
+      reads success) is pinned/documented; `.tmp-*` artifact litter
+      persists after a hard crash until clear().
+    - >-
+      docs/ORACLE-SYSTEM.md evaluation records still not persisted
+      (no oracle_evaluations table); exploration graph not resumable
+      (spec 003 E7 checkpointing gap); scale findings are harness-level
+      candidates, not live detections.
 
 stop_conditions:
   - unavailable_required_secret_or_login

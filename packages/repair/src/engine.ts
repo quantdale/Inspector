@@ -206,13 +206,34 @@ export class RepairEngine {
           const replayResult = await driver.replay(minimizedActions);
           const stillFails = this.opts.oracleSuite.evaluate(replayResult).reproduced;
 
+          // Masking-by-removal defense: every action that crashed the
+          // unpatched target with a genuine application failure (TARGET_FAILURE)
+          // must now SUCCEED. A patch that stops the reproducer from firing by
+          // disabling the behavior instead of repairing it (e.g. deleting the
+          // failing control) leaves those actions failing with an automation
+          // error — rejected exactly like a still-firing reproducer.
+          const crashProne = new Set(
+            check.prePatch.outcomes
+              .filter(
+                (o) =>
+                  o.status === "target-failure" &&
+                  o.error?.code === "TARGET_FAILURE",
+              )
+              .map((o) => o.actionId),
+          );
+          const flowLost = replayResult.outcomes.some(
+            (o) => crashProne.has(o.actionId) && o.status === "target-failure",
+          );
+
           // ...and the benign flow must survive (masking detection).
           const probeBroken = !(await this.probeSurvives(workspace));
 
-          if (stillFails || probeBroken) {
+          if (stillFails || flowLost || probeBroken) {
             const reason = stillFails
               ? "reproducer still fires after patch"
-              : "masking probe failed: benign flow broken (patch masks or breaks)";
+              : flowLost
+                ? "masking suspected: a previously crashing action still fails after patch (behavior disabled instead of repaired)"
+                : "masking probe failed: benign flow broken (patch masks or breaks)";
             attempts.push(
               this.attempt(
                 index,

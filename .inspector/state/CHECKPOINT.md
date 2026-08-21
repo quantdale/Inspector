@@ -40,3 +40,13 @@ Final gates at M7 checkpoint: **lint (0 errors), typecheck (exit 0), test (63 un
 
 - Hardening campaigns are separately invoked (`docs/HARDENING-CAMPAIGN.md`).
 - M8 resumption requires a macOS worker with Xcode/iOS Simulator; entry point is an `IosSimulatorBackend` behind the established injectable-backend pattern plus `runCommonConformance`.
+
+## HARDENING CAMPAIGN #1 COMPLETE (2026-08-21)
+
+- Campaign: **HARDENING_1 — COMPLETE**. Implementation campaign state untouched (`IMPLEMENTATION` / `COMPLETE`). Full ledger: `.inspector/state/HARDENING-CHECKPOINT.md`.
+- Result: **66 defects confirmed and closed** (5 CRITICAL, 23 HIGH, 38 MEDIUM/LOW) across reliability, recovery, correctness, oracle quality, repair safety, concurrency, adapter robustness, security boundaries, and long-run stability. Zero unresolved Critical/High defects.
+- Final gates at the hardening final commit: lint 0 errors (5 warnings); typecheck exit 0; unit **387 passed / 3 skipped** (28 files); integration **101 passed** (19 files, ~262s wall) — including the dogfood proof (6/6), soak (7/7), web torture/hardening (16/16), repair e2e (3/3), explore E2E (2/2), and all adapter conformance suites. Unit suite grew 63 → 387 over the campaign.
+- Dogfood proof: Inspector explored its own seeded web app autonomously, discovered the `#boom` defect itself, confirmed it with intact evidence bundles, REJECTED a masking patch (which exposed and fixed H-65: masking-by-removal had been accepted), accepted a valid patch with regression-first proof, applied and replayed it clean on a fixture checkout, persisted RESOLVED state, and ran two more pipelines concurrently without cross-contamination.
+- Soak: no material leak or corruption — exactly-once execution across 37 durable restart injections, fenced stale completions, stable RSS/handles/temp dirs, bounded SQLite/artifact growth.
+- M8 remains DEFERRED_ENVIRONMENT (no macOS/Xcode runtime became available).
+- Remaining debt and next recommended campaign (HARDENING_2: production adapter bindings, SQLite-backed leases, oracle-evaluation persistence, resumable exploration graphs) are recorded in `.inspector/state/campaign.yaml` (`hardening.deferred_debt`) and the hardening checkpoint.

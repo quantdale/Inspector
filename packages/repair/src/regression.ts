@@ -1,5 +1,10 @@
 import { join } from "node:path";
-import type { Action, ReplayDriver, RegressionScenario } from "@inspector/finding";
+import type {
+  Action,
+  ReplayDriver,
+  ReplayResult,
+  RegressionScenario,
+} from "@inspector/finding";
 import type { OracleSuite } from "@inspector/oracle";
 import type { RepairWorkspace } from "./worktree.js";
 
@@ -8,6 +13,11 @@ export interface RegressionCheck {
   artifactPath: string;
   /** True when the regression FAILED (oracle fired) before any patch. */
   failedPrePatch: boolean;
+  /**
+   * The full pre-patch replay, retained so verification can tell a repaired
+   * flow from a disabled one (masking-by-removal defense).
+   */
+  prePatch: ReplayResult;
 }
 
 /**
@@ -45,7 +55,7 @@ export class RegressionGenerator {
     const result = await driver.replay(minimizedActions);
     const failedPrePatch = this.opts.oracleSuite.evaluate(result).reproduced;
 
-    return { scenario, artifactPath, failedPrePatch };
+    return { scenario, artifactPath, failedPrePatch, prePatch: result };
   }
 
   /**

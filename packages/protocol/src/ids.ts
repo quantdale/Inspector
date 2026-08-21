@@ -14,17 +14,26 @@ export function assertId(value: unknown, what = "id"): asserts value is string {
   }
 }
 
-const PREFIXES: Record<string, string> = {
+const PREFIXES = {
   run: "run",
   env: "env",
   step: "step",
   action: "act",
+  act: "act",
   obs: "obs",
   artifact: "art",
   finding: "find",
-};
+  find: "find",
+  checkpoint: "ckpt",
+  ckpt: "ckpt",
+} as const;
 
-export function newId(kind?: keyof typeof PREFIXES): string {
+export type IdKind = keyof typeof PREFIXES;
+
+export function newId(kind?: IdKind): string {
+  if (kind !== undefined && !Object.hasOwn(PREFIXES, kind)) {
+    throw new Error(`unknown id kind: ${String(kind)}`);
+  }
   const raw = randomUUID().replace(/-/g, "");
   const prefix = kind ? `${PREFIXES[kind]}_` : "";
   return `${prefix}${raw}`;
