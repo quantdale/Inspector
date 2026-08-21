@@ -10,9 +10,9 @@
 
 ## Last trusted implementation state
 
-M4 oracle expansion and autonomous repair is COMPLETE. `@inspector/oracle` provides the composable OracleSuite (invariant/persistence/structural candidate oracles + metamorphic relations) with strength/confidence metadata and auditable verdicts, plus weak-suspicion handling: uncorroborated llm/vision/heuristic signals are held at NEEDS_HUMAN_ORACLE regardless of self-reported confidence. `@inspector/repair` provides exact-revision git worktree isolation (dirty-repo refusal, rollback, dispose), hint-ranked byte-bounded source context, regression-first repair (failing scenario materialized and proven pre-patch), a bounded PatchAgent contract with deterministic ScriptedPatchAgent, verification by exact replay + benign-flow masking probe + post-patch regression gate, and RESOLVED only when all gates pass — rejected patches rolled back and preserved in the audit trail.
+M5 Android adapter is COMPLETE. `@inspector/android` implements the full IAP adapter contract against an injectable `AdbBackend` (production wrapper binds the adb CLI; `MockAdbBackend` simulates a dedicated device), with uiautomator XML parsing into the common semantic element model, semantic tap/text-entry/keyevent actions, screenshot/logcat sensors, package install/uninstall/reset lifecycle, injected device-loss faults, and the SeedDroid fixture app whose hidden defects mirror the web seeded app. Genuine app crashes classify as TARGET_FAILURE, automation misses as ACTION_FAILED — identical outcome semantics to the web adapter, with zero Android logic in core packages.
 
-M4 exit gate satisfied: a seeded defect completes the full autonomous DISCOVERED -> CONFIRMED -> PATCHING -> VERIFYING -> RESOLVED loop without manual debugging; bad patches are automatically rejected/rolled back; weak-suspicion findings are policy-blocked from repair; the primary checkout stays untouched. All four gates green (lint 0 errors; typecheck exit 0; 57 unit tests; 30 integration tests across 7 files).
+M5 exit gate satisfied: conformance passes over a spawned JSON-RPC subprocess; reset produces deterministic fixture state; the unchanged FindingEngine + AndroidReplayDriver confirm two seeded Android defects through the standard reproduction policy. All four gates green.
 
 ## Active waypoint
 
@@ -21,20 +21,21 @@ M4 exit gate satisfied: a seeded defect completes the full autonomous DISCOVERED
 - Milestone: M2 Finding, evidence, reproduction, minimization — **COMPLETE**
 - Milestone: M3 Autonomous exploration — **COMPLETE**
 - Milestone: M4 Oracle expansion and autonomous repair — **COMPLETE**
-- Spec M4: `specs/004-oracle-repair/SPEC.md` (status COMPLETE)
-- Task graph M4: `specs/004-oracle-repair/TASKS.md` (O0–O1, P0–P5 all checked)
+- Milestone: M5 Android adapter — **COMPLETE**
+- Spec M5: `specs/005-android/SPEC.md` (status COMPLETE)
+- Task graph M5: `specs/005-android/TASKS.md` (A0–A6 all checked)
 
 ## Next milestone
 
-- Milestone: **M5 Android adapter**
-- Spec: `specs/005-android/SPEC.md`
-- First waypoint: M5.A0 adb-lifecycle
+- Milestone: **M6 Cross-platform adapters (CLI, Electron, Windows)**
+- Spec: `specs/006-cross-platform/SPEC.md`
+- First waypoint: M6.C0 cli-pty-adapter
 
 ## Exact next action
 
-Begin M5: create `specs/005-android/TASKS.md`, implement `@inspector/android` — ADB environment lifecycle against an injectable/mock ADB backend, UI Automator helper producing a semantic UI tree, screenshots and semantic actions, emulator state fixtures/snapshots, and a seeded Android target app. Conformance must run without real hardware/emulator. Run the M5 exit gate.
+Begin M6: create `specs/006-cross-platform/TASKS.md`; implement the CLI/PTY adapter against an injectable PTY backend, the Electron adapter reusing web semantics via an injectable renderer backend, and the Windows adapter via an injectable UI Automation backend — each passing the common conformance contract, producing evidence in the same schema, with no platform branching in core finding semantics. Run the M6 exit gate.
 
-Continue autonomously; do not stop at the M4/M5 boundary.
+Continue autonomously; do not stop at the M5/M6 boundary.
 
 ## Known blockers
 
@@ -44,10 +45,11 @@ None.
 
 - Replay oracle still counts ACTION_FAILED target-failures as reproduction in the legacy TargetFailureOracle path; partially mitigated by OracleSuite.
 - Web exploration E2E takes ~4–6 min wall clock; acceptable but flagged for later perf work.
+- Real ADB CLI wrapper and emulator provisioning remain production hardening items; the injectable contract is proven by MockAdbBackend per spec blocker policy.
 
 ## Do not do yet
 
-- Do not start iOS adapter work before M6/M7 completion (M8 is environment-deferred).
+- Do not start iOS adapter work before M7 completion (M8 is environment-deferred).
 - Do not start broad hardening/audit campaigns.
 - Do not add a cloud control plane or dashboard.
 - Do not bypass policy/capability semantics to make the demo easier.

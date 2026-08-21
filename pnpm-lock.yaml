@@ -43,6 +43,21 @@ importers:
         specifier: ^1.49.1
         version: 1.62.1
 
+  packages/android:
+    dependencies:
+      '@inspector/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/artifact-store: {}
 
   packages/cli: {}

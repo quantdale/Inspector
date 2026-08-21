@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@inspector/protocol": ["../protocol/src/index.ts"],
+      "@inspector/store-sqlite": ["../store-sqlite/src/index.ts"],
+      "@inspector/artifact-store": ["../artifact-store/src/index.ts"],
+      "@inspector/adapter-sdk": ["../adapter-sdk/src/index.ts"],
+      "@inspector/adapter-fake": ["../adapter-fake/src/index.ts"],
+      "@inspector/adapter-web": ["../adapter-web/src/index.ts"],
+      "@inspector/core": ["../core/src/index.ts"],
+      "@inspector/cli": ["../cli/src/index.ts"],
+      "@inspector/finding": ["../finding/src/index.ts"],
+      "@inspector/oracle": ["../oracle/src/index.ts"],
+      "@inspector/repair": ["../repair/src/index.ts"],
+      "@inspector/android": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}
