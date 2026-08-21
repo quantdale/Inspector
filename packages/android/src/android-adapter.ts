@@ -119,7 +119,7 @@ export class AndroidAdapterHandler implements AdapterHandler {
     let uiTree: Array<Record<string, unknown>> = [];
     let observeError: { source: string; message: string } | undefined;
     try {
-      const dump = await this.backend.shell(serial, "uiautomator dump /dev/tty");
+      const dump = await this.dumpXml(serial);
       if (!dump.trim()) {
         throw new Error("uiautomator dump failed: empty output");
       }
@@ -297,10 +297,20 @@ export class AndroidAdapterHandler implements AdapterHandler {
   private async resolveTarget(selector: string): Promise<{ center: { x: number; y: number } }> {
     if (!this.serial) throw protocolError("VALIDATION", "environment not created");
     const id = selector.replace(/^#/, "");
-    const dump = await this.backend.shell(this.serial, "uiautomator dump /dev/tty");
+    const dump = await this.dumpXml(this.serial);
     const el = parseUiautomatorDump(dump).find((e) => e.id === id && !e.hidden && !e.disabled);
     if (!el) throw new Error(`element not found or not visible: ${selector}`);
     return el;
+  }
+
+  /**
+   * UI hierarchy XML: prefer the backend's dedicated dump channel (real
+   * backends dump to /sdcard/window_dump.xml and pull it); fall back to the
+   * legacy `uiautomator dump /dev/tty` shell form for minimal stubs.
+   */
+  private async dumpXml(serial: string): Promise<string> {
+    if (this.backend.dumpUi) return this.backend.dumpUi(serial);
+    return this.backend.shell(serial, "uiautomator dump /dev/tty");
   }
 
   private async simulateCrash(): Promise<never> {

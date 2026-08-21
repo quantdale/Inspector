@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { AdapterClient, runCommonConformance } from "@inspector/adapter-sdk";
 import type { Action } from "@inspector/protocol";
+import { WINDOWS_BACKEND_ENV } from "./selection.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bin = join(here, "bin.ts");
@@ -20,7 +21,7 @@ async function startWindows(): Promise<AdapterClient> {
   return AdapterClient.spawn({
     command: process.execPath,
     args: ["--import", "tsx", bin],
-    env: { ...process.env },
+    env: { ...process.env, [WINDOWS_BACKEND_ENV]: "mock" },
   });
 }
 

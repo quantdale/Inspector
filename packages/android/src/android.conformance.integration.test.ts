@@ -22,7 +22,9 @@ async function startAndroid(): Promise<AdapterClient> {
   return AdapterClient.spawn({
     command: process.execPath,
     args: ["--import", "tsx", bin],
-    env: { ...process.env },
+    // Conformance proves the adapter contract against the deterministic mock;
+    // the real ADB backend has its own gated integration suite.
+    env: { ...process.env, INSPECTOR_ANDROID_BACKEND: "mock" },
   });
 }
 

@@ -1,16 +1,18 @@
 import { WindowsAdapterHandler } from "./windows-adapter.js";
-import { MockUiaBackend } from "./mock-uia.js";
+import { selectWindowsBackend } from "./selection.js";
+import type { RealUiaBackend } from "./real-uia.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
 
-const handler = new WindowsAdapterHandler(new MockUiaBackend());
+const selection = await selectWindowsBackend();
+const handler = new WindowsAdapterHandler(selection.backend);
+const realBackend = selection.kind === "real" ? (selection.backend as RealUiaBackend) : null;
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
-process.on("SIGTERM", () => {
+const shutdown = (): void => {
+  realBackend?.dispose();
   server.close();
   process.exit(0);
-});
-process.on("SIGINT", () => {
-  server.close();
-  process.exit(0);
-});
+};
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 process.stdout.on("error", () => process.exit(0));

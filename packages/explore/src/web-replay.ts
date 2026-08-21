@@ -12,6 +12,9 @@ export interface WebReplayOptions {
   artifactBaseDir?: string;
   /** Serve this HTML instead of the default seeded app (repair verification). */
   seedHtml?: string;
+  /** Reproduce against an external localhost target instead of the seeded
+   * app; forwarded as a lifecycle-create option to the spawned adapter. */
+  targetUrl?: string;
 }
 
 /**
@@ -31,7 +34,11 @@ export class WebReplayDriver {
     const outcomes: ActionOutcome[] = [];
     const signals: OracleSignal[] = [];
     try {
-      await handler.lifecycle({ op: "create" });
+      await handler.lifecycle(
+        this.opts.targetUrl !== undefined
+          ? { op: "create", options: { targetUrl: this.opts.targetUrl } }
+          : { op: "create" },
+      );
       for (const a of actions) {
         const outcome = await handler.act({ action: a });
         outcomes.push(outcome);

@@ -1,6 +1,9 @@
 export * from "./types.js";
 export * from "./mock-uia.js";
 export * from "./windows-adapter.js";
+export * from "./uia-bridge.js";
+export * from "./real-uia.js";
+export * from "./selection.js";
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";

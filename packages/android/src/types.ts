@@ -23,6 +23,12 @@ export interface AdbBackend {
    * (TARGET_FAILURE) separately from automation misses (ACTION_FAILED).
    */
   appErrors(serial: string): Promise<string[]>;
+  /**
+   * Produce a uiautomator XML dump of the current window. Real backends dump
+   * to /sdcard/window_dump.xml and pull it; the mock renders its simulated
+   * hierarchy. Optional so hand-rolled test stubs only need shell().
+   */
+  dumpUi?(serial: string): Promise<string>;
 }
 
 export interface AndroidFaults {

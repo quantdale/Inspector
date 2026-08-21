@@ -81,6 +81,44 @@ export interface WebAdapterOptions {
   settleMs?: number;
   /** Serve a self-redirect loop at /loop from the seeded server (torture). */
   seedRedirectLoop?: boolean;
+  /**
+   * Drive an EXTERNAL local web app instead of the embedded seeded app.
+   * Must be an http/https URL on localhost/127.0.0.1 (RC1 security posture);
+   * remote origins are rejected. When set, the origin allowlist narrows to
+   * EXACTLY this origin (scheme+host+port) and reset reloads this URL.
+   */
+  targetUrl?: string;
+}
+
+/** Validate and normalize a targetUrl into { url, origin }; throw on violation. */
+export function resolveTargetUrl(
+  raw: unknown,
+): { url: string; origin: string } | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw protocolError("VALIDATION", "targetUrl must be a non-empty string");
+  }
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw protocolError("VALIDATION", `targetUrl is not a valid URL: ${raw}`);
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") {
+    throw protocolError(
+      "VALIDATION",
+      `targetUrl must be http or https, got: ${u.protocol}`,
+    );
+  }
+  if (u.hostname !== "127.0.0.1" && u.hostname !== "localhost") {
+    // SECURITY: RC1 dogfood targets are served locally; never allow remote
+    // origins through the adapter's navigation/request policy.
+    throw protocolError(
+      "CAPABILITY_DENIED",
+      `targetUrl must be a localhost origin for RC1, got: ${u.hostname}`,
+    );
+  }
+  return { url: u.toString(), origin: u.origin };
 }
 
 /**
@@ -104,6 +142,12 @@ export class WebAdapterHandler implements AdapterHandler {
   private readonly artifactDir: string;
   private readonly settleMs: number;
   private readonly seedRedirectLoop: boolean;
+  /** Instance-level default external target (constructor option). */
+  private readonly defaultTargetUrl?: string;
+  /** Active external target for the current create; undefined = seeded app. */
+  private targetUrl: string | undefined;
+  /** Exact allowed origin (scheme+host+port) when an external target is set. */
+  private targetOrigin: string | undefined;
   private runId = "run";
   private environmentId = "env";
   private consoleErrors: Array<{ text: string; ts: number }> = [];
@@ -118,9 +162,16 @@ export class WebAdapterHandler implements AdapterHandler {
     private readonly seedHtml?: string,
     settleMs = 50,
     seedRedirectLoop = false,
+    targetUrl?: string,
   ) {
     this.settleMs = Math.max(0, settleMs);
     this.seedRedirectLoop = seedRedirectLoop;
+    // Validate the constructor-level default eagerly so misconfiguration
+    // surfaces at construction, not mid-campaign.
+    if (targetUrl !== undefined) {
+      const resolved = resolveTargetUrl(targetUrl);
+      this.defaultTargetUrl = resolved?.url;
+    }
     mkdirSync(artifactBaseDir, { recursive: true });
     // Use the RETURNED unique directory so concurrent instances never share
     // one artifact tree (and trace temp files cannot collide across processes).
@@ -141,11 +192,21 @@ export class WebAdapterHandler implements AdapterHandler {
           await this.shutdown();
         }
         this.applyAttribution(params.options);
+        // Per-create targetUrl overrides the constructor-level default.
+        const rawTarget =
+          params.options?.targetUrl !== undefined
+            ? params.options.targetUrl
+            : this.defaultTargetUrl;
+        const resolved = resolveTargetUrl(rawTarget);
+        this.targetUrl = resolved?.url;
+        this.targetOrigin = resolved?.origin;
         try {
-          this.seed = startSeedServer({
-            html: this.seedHtml,
-            redirectLoop: this.seedRedirectLoop,
-          });
+          if (!resolved) {
+            this.seed = startSeedServer({
+              html: this.seedHtml,
+              redirectLoop: this.seedRedirectLoop,
+            });
+          }
           this.browser = await chromium.launch({ headless: true });
           this.context = await this.browser.newContext({
             viewport: { width: 1280, height: 800 },
@@ -154,14 +215,18 @@ export class WebAdapterHandler implements AdapterHandler {
           });
           this.page = await this.context.newPage();
           this.attachListeners();
-          // Keep the disposable target isolated: block any navigation/request to a
-          // non-localhost origin so a link click can never hijack the host browser.
+          // Keep the disposable target isolated. With an external target the
+          // allowlist narrows to EXACTLY that origin (scheme+host+port);
+          // otherwise any http origin on loopback is permitted as before.
+          const exactOrigin = this.targetOrigin;
           await this.page.route("**/*", (route) => {
             try {
               const u = new URL(route.request().url());
               if (
                 u.protocol === "http:" &&
-                (u.hostname === "127.0.0.1" || u.hostname === "localhost")
+                (exactOrigin !== undefined
+                  ? u.origin === exactOrigin
+                  : u.hostname === "127.0.0.1" || u.hostname === "localhost")
               ) {
                 return route.continue();
               }
@@ -175,8 +240,12 @@ export class WebAdapterHandler implements AdapterHandler {
             snapshots: true,
             sources: false,
           });
-          await this.seed.ready;
-          await this.page.goto(this.seed.url);
+          if (resolved) {
+            await this.page.goto(resolved.url, { waitUntil: "load" });
+          } else {
+            await this.seed!.ready;
+            await this.page.goto(this.seed!.url);
+          }
           return { ok: true };
         } catch (e) {
           // Fail-safe: tear down whatever partial state was created before
@@ -186,7 +255,29 @@ export class WebAdapterHandler implements AdapterHandler {
         }
       }
       case "reset": {
-        if (this.page) {
+        if (this.page && this.targetUrl) {
+          // External target: clear cookies + storage for the origin, then do a
+          // fresh load of the target URL. Report failure honestly if the
+          // target became unreachable or storage could not be cleared.
+          let cleared = true;
+          await this.context?.clearCookies().catch(() => {
+            cleared = false;
+          });
+          await this.page
+            .evaluate(() => {
+              localStorage.clear();
+              sessionStorage.clear();
+            })
+            .catch(() => {
+              cleared = false;
+            });
+          try {
+            await this.page.goto(this.targetUrl, { waitUntil: "load" });
+          } catch {
+            return { ok: false };
+          }
+          if (!cleared) return { ok: false };
+        } else if (this.page) {
           let cleared = true;
           await this.page
             .evaluate(() => localStorage.clear())
@@ -246,6 +337,8 @@ export class WebAdapterHandler implements AdapterHandler {
     try {
       const u = new URL(target);
       if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+      // With an external target, only that exact origin may be navigated to.
+      if (this.targetOrigin !== undefined) return u.origin === this.targetOrigin;
       return u.hostname === "127.0.0.1" || u.hostname === "localhost";
     } catch {
       return false;
@@ -564,6 +657,8 @@ export class WebAdapterHandler implements AdapterHandler {
     this.context = undefined;
     this.browser = undefined;
     this.seed = undefined;
+    this.targetUrl = undefined;
+    this.targetOrigin = undefined;
   }
 
   /** Thread real run/environment attribution from lifecycle options. */

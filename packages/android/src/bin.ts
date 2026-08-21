@@ -1,8 +1,8 @@
 import { AndroidAdapterHandler } from "./android-adapter.js";
-import { MockAdbBackend } from "./mock-backend.js";
+import { createAdbBackendFromEnv } from "./real-backend.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
 
-const backend = new MockAdbBackend();
+const { backend } = await createAdbBackendFromEnv();
 const handler = new AndroidAdapterHandler(backend);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 

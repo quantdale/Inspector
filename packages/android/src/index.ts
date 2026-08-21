@@ -1,5 +1,7 @@
 export * from "./types.js";
+export * from "./adb-errors.js";
 export * from "./mock-backend.js";
+export * from "./real-backend.js";
 export * from "./uiautomator.js";
 export * from "./android-adapter.js";
 export * from "./replay.js";

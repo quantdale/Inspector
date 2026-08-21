@@ -33,6 +33,7 @@ import { mulberry32, type Rng } from "./rng.js";
 import { FaultController } from "./faults.js";
 import { NoopPlanner, type Planner, type PlannerContext } from "./planner.js";
 import { DEFAULT_SEQUENCE_LENGTHS } from "./inputs.js";
+import { WebReplayDriver } from "./web-replay.js";
 
 export interface ExploreConfig {
   seed: number;
@@ -52,6 +53,11 @@ export interface ExploreConfig {
   weights?: Partial<ScoringWeights>;
   skipReproduction?: boolean;
   observeFields?: string[];
+  /** External localhost target the campaign explored. Forwarded to the
+   * default WebReplayDriver so reproduction runs against the SAME app the
+   * anomaly was found on. If `replayDriverFactory` is provided, the factory
+   * MUST forward `config.targetUrl` to its driver itself. */
+  targetUrl?: string;
 }
 
 /**
@@ -573,7 +579,7 @@ export class ExploreController {
     if (
       this.config.skipReproduction ||
       !this.findingEngine ||
-      !this.replayDriverFactory
+      !this.resolveReplayDriverFactory()
     ) {
       base.warnings = this.warnings.slice();
       return base;
@@ -623,13 +629,26 @@ export class ExploreController {
   }
 
   /**
+   * Reproduction driver source: the injected factory when present, otherwise
+   * a default WebReplayDriver pointed at the explored external target. A
+   * custom factory must forward `config.targetUrl` itself.
+   */
+  private resolveReplayDriverFactory(): (() => ReplayDriver) | undefined {
+    if (this.replayDriverFactory) return this.replayDriverFactory;
+    if (this.config.targetUrl !== undefined) {
+      return () => new WebReplayDriver({ targetUrl: this.config.targetUrl });
+    }
+    return undefined;
+  }
+
+  /**
    * Reproduce, minimize, and export one anomaly. Throws propagate to the
    * caller's per-anomaly containment; every durable state change is persisted
    * incrementally through the injected store as soon as it exists.
    */
   private async processAnomaly(a: DiscoveredAnomaly, base: ExploreResult): Promise<void> {
     const engine = this.findingEngine!;
-    const driver = this.replayDriverFactory!();
+    const driver = this.resolveReplayDriverFactory()!();
     const signal: OracleSignal = {
       kind: a.kind as OracleSignalKind,
       detail: a.message,

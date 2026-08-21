@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@lydell/node-pty": "^1.1.0",
     "@inspector/protocol": "workspace:*",
     "@inspector/adapter-sdk": "workspace:*",
     "@inspector/artifact-store": "workspace:*"

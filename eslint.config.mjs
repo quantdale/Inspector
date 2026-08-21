@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/*.config.ts", "coverage/**"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/*.config.ts",
+      "coverage/**",
+      // Vendored dogfood-target checkouts and RC working artifacts are not
+      // Inspector source; never lint them.
+      ".inspector/**",
+      "dogfood/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

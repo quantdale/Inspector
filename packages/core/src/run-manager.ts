@@ -17,6 +17,9 @@ export interface StartRunOptions {
   adapterEnv?: NodeJS.ProcessEnv;
   policy?: Policy;
   artifactBaseDir?: string;
+  /** Optional lifecycle-create options forwarded verbatim to the adapter
+   * (e.g. `{ targetUrl }` for the web adapter's external-target mode). */
+  createOptions?: Record<string, unknown>;
 }
 
 export type SubmitResult =
@@ -298,7 +301,13 @@ export class RunManager {
         env: opts.adapterEnv,
       });
       const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
-      await adapter.request("lifecycle", { op: "create" }, 30000);
+      await adapter.request(
+        "lifecycle",
+        opts.createOptions
+          ? { op: "create", options: opts.createOptions }
+          : { op: "create" },
+        30000,
+      );
       // Honest identity: the adapter's own initialize answer replaces the
       // command-derived provisional label in the durable records.
       this.store.recordAdapterIdentity(runId, envId, caps.adapter);

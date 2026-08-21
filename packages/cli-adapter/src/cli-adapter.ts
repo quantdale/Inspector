@@ -63,6 +63,7 @@ export class CliAdapterHandler implements AdapterHandler {
   constructor(
     private readonly backend: PtyBackend,
     artifactBaseDir: string = join(tmpdir(), "inspector-cli-artifacts"),
+    private readonly program: string = "seedcli",
   ) {
     mkdirSync(artifactBaseDir, { recursive: true });
     // Use the RETURNED unique directory so concurrent instances never share
@@ -82,7 +83,7 @@ export class CliAdapterHandler implements AdapterHandler {
       case "reset": {
         this.applyAttribution(params.options);
         if (this.sessionId) await this.backend.kill(this.sessionId).catch(() => undefined);
-        const session = await this.backend.spawn("seedcli");
+        const session = await this.backend.spawn(this.program);
         this.sessionId = session.id;
         return { ok: true };
       }
