@@ -1,0 +1,45 @@
+# Dogfood target TEMPLATE: Android system app on a booted AVD
+# Copy to <id>.yaml and fill in when an AVD pipeline exists.
+id: android-settings-template
+platform: android
+
+source:
+  origin: Android system image app com.android.settings on an emulator AVD.
+  license: Android Open Source Project (Apache-2.0); runs inside the emulator image.
+  note: Template only — boot procedure lives with the android adapter, not here.
+
+acquisition:
+  method: none — provided by the AVD system image. The adapter owns emulator
+    creation/boot (see the android adapter docs); this manifest only references it.
+
+launch:
+  command: managed by the android adapter's boot procedure; then
+    adb shell am start -n com.android.settings/.Settings
+  working_dir: n/a
+
+readiness_check:
+  type: uia-condition   # accessibility tree via uiautomator/UiAutomator2 dump
+  expect: window with package com.android.settings showing the settings list
+    (e.g. "Network & internet" row present in the accessibility tree).
+
+interaction_surface:
+  - scrollable settings list (semantic rows)
+  - toggle switches (e.g. airplane mode — avoid toggles with device-wide side effects)
+  - nested preference screens with back navigation
+
+reset_strategy: adb shell pm clear com.android.settings is too destructive for a
+  system app; instead navigate back to the root list or force-stop:
+  adb shell am force-stop com.android.settings, then relaunch.
+
+teardown: leave the emulator running (owned by the adapter); force-stop the app.
+
+recommended_hunt_budget:
+  max_actions: 120
+  max_minutes: 20
+
+authorized_for_repair: false
+
+notes: >
+  Do not toggle airplane mode, Wi-Fi, or other connectivity settings during hunts —
+  they can sever the adb/emulator connection itself. Prefer inert screens
+  (About phone, Display) for exploration.

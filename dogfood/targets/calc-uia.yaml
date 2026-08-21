@@ -1,0 +1,42 @@
+# Dogfood target: Windows Calculator (Windows UIA)
+id: calc-uia
+platform: windows-uia
+
+source:
+  origin: local Windows installation — C:\Windows\System32\calc.exe (verified present
+    on this machine; resolves to the modern Calculator app).
+  license: Bundled Windows component; local use only, no redistribution.
+
+acquisition:
+  method: none — preinstalled. Verify with Test-Path C:\Windows\System32\calc.exe.
+
+launch:
+  command: start calc   # or invoke C:\Windows\System32\calc.exe directly
+  working_dir: n/a
+
+readiness_check:
+  type: uia-condition
+  expect: top-level window with Name matching /Calculator/i; the UIA tree exposes
+    named buttons ("Seven", "Plus", "Equals", ...) under the number pad group,
+    and the results Name property carries the current display value.
+
+interaction_surface:
+  - fully labeled UIA buttons — semantic targeting, no coordinates needed
+  - results readback via the display element's Name/value
+  - memory functions and history pane (richer sessions)
+  persistence: none across restarts (history is session-scoped).
+
+reset_strategy: kill the calculator process and relaunch; display resets to 0.
+
+teardown: WM_CLOSE or kill; confirm process exit.
+
+recommended_hunt_budget:
+  max_actions: 60
+  max_minutes: 10
+
+authorized_for_repair: false
+
+notes: >
+  Best first Windows-UIA dogfood target: deterministic semantics make oracle checks
+  trivial (2 + 2 = 4). Use it to validate the adapter's UIA walker before pointing
+  hunts at mspaint's canvas-heavy surface.

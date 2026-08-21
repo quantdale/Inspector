@@ -1,0 +1,106 @@
+schema_version: 1
+campaign: DOGFOOD_RC1
+status: ACTIVE
+mode: RELEASE-CANDIDATE-DOGFOOD
+initialized_at: "2026-08-21"
+working_branch: main
+started_from_commit: 8df01898fd569cbc7d6b866d5330f19a7608a587
+clean_clone: "%TEMP%/inspector-rc1-clean"  # pristine clean-clone; do not delete until Wave E
+
+objective: >-
+  Prove Inspector RC1 works for a fresh user on real production backends:
+  unscripted dogfood hunts on independently developed real targets,
+  independent finding audit, repairs on authorized targets only, docs
+  finalization, and a clean-install proof.
+
+waves:
+  A_inventory_audit:
+    status: COMPLETE
+    artifacts:
+      - .inspector/rc-work/INVENTORY.md
+      - .inspector/rc-work/CLEAN-CLONE-AUDIT.md
+      - .inspector/rc-work/baseline.log
+    summary: >-
+      Baseline gates green at 8df0189 (lint/typecheck/unit 387/integration
+      102). Production backends probed: Playwright+Chromium YES, node-pty YES,
+      UIA YES, ADB toolchain YES (emulator boots fresh; stale adb entries lie),
+      Electron fetchable-not-installed, notepad ABSENT (use calc/mspaint),
+      github source tarballs BLOCKED (npm registry works).
+
+  B_bindings_debt:
+    status: COMPLETE
+    deliverables:
+      - adapter-web: targetUrl option (create options + WEB_TARGET_URL env),
+        localhost-only origin policy narrowed to configured origin, honest
+        external reset semantics; 13 unit + 25 integration green
+      - explore/core: ExploreConfig.targetUrl + WebReplayDriver.targetUrl so
+        reproduction replays hit the SAME external app; core StartRunOptions.createOptions
+      - cli-adapter: NodePtyBackend via @lydell/node-pty behind
+        INSPECTOR_PTY=real|mock|auto; real round-trip integration green
+      - windows-adapter: RealUiaBackend via PowerShell JSON bridge behind
+        INSPECTOR_WINDOWS_BACKEND=real|mock|auto; Paint exercised end-to-end
+        (tree, invoke, value roundtrip, IsOffscreen); stale-element handling
+      - android: RealAdbBackend behind INSPECTOR_ANDROID_BACKEND=real|mock|auto;
+        liveness-verified devices (stale-entry trap), quoted input text,
+        uiautomator dump w/ retries, screencap PNG validation, logcat;
+        booted Nitro_API_36 headless (~42s) and drove com.android.settings
+        end-to-end (~65s total) on this machine
+      - cli: args parser (named errors), --version/--help, doctor with 9
+        capability probes honoring --workspace, hunt command (web --url +
+        deterministic fake walker through full finding pipeline), findings
+        list/show, runs resume, friendly errors
+      - scale: SQLite-backed lease store (lease-store.ts) alongside FileLock
+        path; hardening suite green
+      - finding/repair: oracle evaluation provenance recorded on verdicts;
+        strict repair gates carry provenance; regression tests added
+      - dogfood/: manifests for todomvc-react@1.0.4 (MIT, in-memory state),
+        todomvc-backbone (official TodoMVC examples/backbone, MIT, localStorage),
+        vim scratch profile, calc/mspaint UIA, android settings template;
+        stdlib serve-static.mjs; both web targets empirically served+verified
+
+  C_hunts:
+    status: PENDING
+    scope: unscripted autonomous hunts per onboarded real target
+  D_audit:
+    status: PENDING
+    scope: independent finding audit, metrics, false-positive analysis
+  E_finalize:
+    status: PENDING
+    scope: docs finalization, RC1 report, clean-install proof, final gates
+
+targets:
+  - id: web-todomvc-react
+    platform: web
+    status: ONBOARDED
+    source: npm todomvc-react@1.0.4 (MIT) — independently developed
+    caveat: persistence is in-memory only; reload wipes todos (do not treat reload-persistence as defect)
+  - id: web-todomvc-backbone
+    platform: web
+    status: ONBOARDED
+    source: npm todomvc@0.1.1 examples/backbone (MIT) — localStorage persistence
+  - id: cli-vim-pty
+    platform: cli
+    status: ONBOARDED
+    source: vim bundled with Git for Windows — interactive TUI over real PTY
+  - id: windows-calc-uia
+    platform: windows-uia
+    status: ONBOARDED
+    source: C:\Windows\System32\calc.exe via real UIA backend (recommended first UIA target)
+  - id: windows-mspaint-uia
+    platform: windows-uia
+    status: ONBOARDED
+    source: Store-packaged mspaint via real UIA backend; slow cold start; modal dialogs hang WM_CLOSE
+  - id: android-settings-avd
+    platform: android
+    status: ONBOARDED
+    source: com.android.settings on freshly booted Nitro_API_36 AVD (headless)
+  - id: inspector-seeded-control
+    platform: web
+    status: ONBOARDED
+    source: Inspector seeded app — CONTROL measurement only, excluded from novel-defect claims
+
+constraints:
+  - repairs only on authorized targets (all external targets authorized_for_repair: false)
+  - no push/publish without explicit authorization from invoking workflow
+  - keep %TEMP%/inspector-rc1-clean intact through Wave E
+  - never blur mock-backend validation into production-backend validation

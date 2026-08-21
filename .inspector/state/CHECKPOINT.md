@@ -50,3 +50,28 @@ Final gates at M7 checkpoint: **lint (0 errors), typecheck (exit 0), test (63 un
 - Soak: no material leak or corruption — exactly-once execution across 37 durable restart injections, fenced stale completions, stable RSS/handles/temp dirs, bounded SQLite/artifact growth.
 - M8 remains DEFERRED_ENVIRONMENT (no macOS/Xcode runtime became available).
 - Remaining debt and next recommended campaign (HARDENING_2: production adapter bindings, SQLite-backed leases, oracle-evaluation persistence, resumable exploration graphs) are recorded in `.inspector/state/campaign.yaml` (`hardening.deferred_debt`) and the hardening checkpoint.
+
+## RC DOGFOOD CAMPAIGN — Wave A (2026-08-21)
+
+Fresh-engineer simulation artifacts under `.inspector/rc-work/`:
+
+- `INVENTORY.md` — empirically probed production-backend matrix (Playwright/PTY/Electron/ADB/UIA/network egress) with gaps and action items.
+- `CLEAN-CLONE-AUDIT.md` — clean-clone first-contact audit (`%TEMP%/inspector-rc1-clean`, left in place for later phases). Documented happy path (install → doctor → fake run → runs list) works in ~2 min; findings: web adapter undocumented/stale docs, `--help` exits 1, no `--version`, `--url` silently half-honored, integration gate has zero timeout headroom (12 subprocess-startup timeouts under concurrent load; main-repo baseline 102/102 green).
+- `baseline.log` — main-repo baseline: lint/typecheck/unit 387/integration 102 all green.
+
+Next recommended waves (per RC plan): B — production bindings + debt closure; C — unscripted dogfood hunts; D — independent finding audit; E — docs finalization + RC1 report.
+
+## RC DOGFOOD CAMPAIGN — Wave B COMPLETE (2026-08-21)
+
+Production bindings landed behind `real|mock|auto` selection (mock always available; real auto-probed):
+
+- **web**: arbitrary localhost `targetUrl` targets (adapter-web create option + env), origin policy narrowed to configured origin, honest external reset; explore/core forward `targetUrl` so reproduction replays hit the SAME app; core gained `StartRunOptions.createOptions`.
+- **cli-adapter**: real PTY (`@lydell/node-pty`) round-trip proven on this machine.
+- **windows-adapter**: real UIA via PowerShell JSON bridge; Paint driven end-to-end (tree/invoke/value/IsOffscreen); stale-element + process-reap semantics.
+- **android**: real ADB backend with liveness-verified devices, quoted input, dump retries, PNG screencap validation; booted Nitro_API_36 headless (~42s) and drove com.android.settings end-to-end (~65s).
+- **cli**: `hunt` (unscripted web hunts via `--url`, deterministic fake walker through the full finding pipeline), `findings list/show`, `runs resume`, capability-probing `doctor` (9 probes, honors `--workspace`), named arg errors, `--version/--help`.
+- **scale**: SQLite-backed lease store alongside FileLock; hardening suite green.
+- **finding/repair**: oracle evaluation provenance recorded on verdicts; strict repair gates carry provenance.
+- **dogfood/**: target manifests + stdlib static server; two independently developed real web targets acquired from npm and empirically served (todomvc-react@1.0.4 MIT; official TodoMVC backbone example w/ localStorage).
+
+Durable state: `.inspector/state/DOGFOOD-RC1.yaml` (wave ledger) + `dogfood:` block in campaign.yaml. Next: Wave C unscripted hunts per target.

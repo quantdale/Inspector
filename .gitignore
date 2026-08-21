@@ -28,3 +28,6 @@ videos/
 Thumbs.db
 .vscode/
 .idea/
+
+# RC1 dogfood hunt bulk artifacts (curated summaries are committed instead)
+.inspector/rc-work/hunts/

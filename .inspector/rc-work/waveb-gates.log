@@ -1,0 +1,46 @@
+=== WAVE B GATES START 2026-08-21T21:59:38+08:00 ===
+
+> inspector@0.1.0 lint C:\Users\Michael Roy\Documents\Inspector
+> eslint .
+
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\dom-shims.d.ts
+  3:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  4:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  5:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\index.ts
+  4:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/triple-slash-reference')
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\web-adapter.ts
+  359:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 5 problems (0 errors, 5 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
+LINT_OK
+
+> inspector@0.1.0 typecheck C:\Users\Michael Roy\Documents\Inspector
+> tsc --noEmit -p tsconfig.json
+
+TYPECHECK_OK
+
+ Test Files  32 passed (32)
+      Tests  415 passed | 3 skipped (418)
+   Start at  21:59:51
+   Duration  16.26s (transform 3.90s, setup 0ms, collect 16.61s, tests 36.61s, environment 12ms, prepare 8.44s)
+
+ FAIL  packages/adapter-web/src/web.window-classification.integration.test.ts > web hardening: pageerror action-window attribution > K1: pageerror arriving DURING a failing action classifies TARGET_FAILURE
+ FAIL  packages/adapter-web/src/web.window-classification.integration.test.ts > web hardening: pageerror action-window attribution > K2: a pageerror from BEFORE the action window stays ACTION_FAILED
+Error: Hook timed out in 10000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ Test Files  2 failed | 23 passed (25)
+      Tests  4 failed | 116 passed (120)
+   Start at  22:00:08
+   Duration  318.14s (transform 3.78s, setup 0ms, collect 33.22s, tests 1573.79s, environment 11ms, prepare 8.67s)
+
+ ELIFECYCLE  Command failed with exit code 1.
+INTEGRATION_OK
+=== WAVE B GATES END exit=0 ===

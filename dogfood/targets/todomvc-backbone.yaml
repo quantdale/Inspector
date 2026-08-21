@@ -1,0 +1,53 @@
+# Dogfood target: TodoMVC (Backbone.js) — official TodoMVC example
+id: todomvc-backbone
+platform: web
+
+source:
+  origin: https://github.com/tastejs/todomvc (published to npm as the `todomvc` package)
+  package: todomvc@0.1.1
+  license: MIT (license.md: "Everything in this repo is MIT License unless otherwise specified", copyright Addy Osmani, Sindre Sorhus, Pascal Hartig, Stephen Sawchuk). Bundled vendor libs are MIT/BSD per their bower_components directories.
+  note: Independently developed community project; not an Inspector fixture.
+
+acquisition:
+  method: npm tarball from registry.npmjs.org
+  commands:
+    - curl -sO https://registry.npmjs.org/todomvc/-/todomvc-0.1.1.tgz
+    - tar xzf todomvc-0.1.1.tgz package/examples/backbone package/license.md
+    - cp -r package/examples/backbone <target-root>/app
+    - cp package/license.md <target-root>/LICENSE.md
+  acquired_at: .inspector/rc-work/targets/todomvc-backbone/ (gitignored scratch)
+
+serve:
+  command: node dogfood/bin/serve-static.mjs --port 8124 --dir .inspector/rc-work/targets/todomvc-backbone/app
+  working_dir: repo root
+  url: http://127.0.0.1:8124/
+
+readiness_check:
+  type: http-content
+  request: GET http://127.0.0.1:8124/
+  expect: HTTP 200, HTML containing `data-framework="backbonejs"` and `<section id="todoapp">`
+  assets: all scripts/styles/images served locally from bower_components/ — no runtime network needed.
+
+interaction_surface:
+  - new-todo text input (#new-todo), Enter to add
+  - toggle complete checkboxes, toggle-all, destroy buttons
+  - double-click a todo for inline edit
+  - hash-based routing filters (#/, #/active, #/completed)
+  - Clear completed button
+  persistence: localStorage key `todos-backbonejs` — state survives page reloads.
+
+reset_strategy: clear localStorage for the origin (fresh browser context or CDP/localStorage.clear()) and reload; the app has no server-side state.
+
+teardown: kill the serve-static.mjs process (SIGTERM); nothing else persists.
+
+recommended_hunt_budget:
+  max_actions: 150
+  max_minutes: 20
+
+authorized_for_repair: false
+
+notes: >
+  Verified empirically on this machine: static server returned 200 for index.html,
+  backbone.js (60997 B), backbone.localStorage.js (6821 B), app.js, and bg.png with
+  correct MIME types. Classic, well-understood DOM semantics make findings easy to
+  reproduce deterministically.

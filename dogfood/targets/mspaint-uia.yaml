@@ -1,0 +1,49 @@
+# Dogfood target: Microsoft Paint (Windows UIA)
+id: mspaint-uia
+platform: windows-uia
+
+source:
+  origin: local Windows installation — C:\Users\Michael Roy\AppData\Local\Microsoft\WindowsApps\mspaint.exe
+    (Store-packaged Paint; verified present on this machine).
+  license: Bundled Windows component; local use only, no redistribution.
+  note: Rich canvas application with ribbon controls — good UIA tree depth.
+
+acquisition:
+  method: none — preinstalled. Verify with PowerShell
+    `Get-Command mspaint | Select-Object -ExpandProperty Source`.
+    NOTE: notepad is ABSENT on this machine — do not substitute it.
+
+launch:
+  command: start mspaint   # or invoke the WindowsApps path directly
+  working_dir: n/a
+
+readiness_check:
+  type: uia-condition
+  expect: top-level window with Name matching /Paint/i and ClassName containing
+    "ApplicationFrameWindow" (or Win32 window class depending on packaging);
+    the ribbon element tree is discoverable via UI Automation.
+
+interaction_surface:
+  - ribbon tool selection (pencil, brushes, shapes, fill)
+  - canvas mouse-drag drawing (pointer-level actions through the adapter)
+  - File > Save dialog (native common dialogs)
+  - color palette selection
+  persistence: file-based only via explicit Save; hunts should save into the
+    sandbox dir if persistence assertions are needed.
+
+reset_strategy: kill the mspaint process; relaunch fresh. Discard any files written
+  into the sandbox directory between hunts.
+
+teardown: close the window gracefully (WM_CLOSE) or kill the process; confirm the
+  process has exited before declaring teardown complete.
+
+recommended_hunt_budget:
+  max_actions: 100
+  max_minutes: 15
+
+authorized_for_repair: false
+
+notes: >
+  Store-packaged apps may take several seconds to cold-start; poll the UIA tree with
+  a deadline rather than sleeping a fixed interval. Save dialogs are modal — a hunt
+  that opens one must dismiss it or teardown will hang on WM_CLOSE.

@@ -259,6 +259,40 @@ hardening:
       (spec 003 E7 checkpointing gap); scale findings are harness-level
       candidates, not live detections.
 
+dogfood:
+  campaign: DOGFOOD_RC1
+  status: ACTIVE
+  phase: BINDINGS_COMPLETE
+  rc_target: RC1
+  started_from_commit: 8df01898fd569cbc7d6b866d5330f19a7608a587
+  started_at: "2026-08-21"
+  detail_file: .inspector/state/DOGFOOD-RC1.yaml
+  targets:
+    - web-todomvc-react
+    - web-todomvc-backbone
+    - cli-vim-pty
+    - windows-calc-uia
+    - windows-mspaint-uia
+    - android-settings-avd
+    - inspector-seeded-control
+  findings:
+    confirmed_novel: 0
+    actionable_quality: 0
+    low_value: 0
+    false_positive: 0
+    duplicate: 0
+    expected_behavior: 0
+    environment_failure: 0
+  bindings_delivered:
+    - >-
+      web arbitrary localhost targets: adapter-web targetUrl option +
+      explore WebReplayDriver/ExploreConfig forwarding + core startRun
+      createOptions channel
+    - real PTY backend via @lydell/node-pty (packages/cli-adapter)
+    - real Windows UIA backend via PowerShell bridge (packages/windows-adapter)
+    - real ADB backend incl. emulator boot/liveness verification (packages/android)
+    - CLI hunt/findings/runs-resume/doctor capability surface (packages/cli)
+
 stop_conditions:
   - unavailable_required_secret_or_login
   - irreversible_external_action_without_authority

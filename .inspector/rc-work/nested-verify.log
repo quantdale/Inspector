@@ -1,0 +1,43 @@
+=== NESTED-SLICE VERIFY START 2026-08-21T21:41:35+08:00 ===
+
+stderr | packages/scale/src/scale.hardening.test.ts > D5: per-item failure containment and cleanup > work done before a crash stays durable: findings persist even when the item fails
+[scale] item item-1 failed: crash after ingest
+[scale] item item-2 failed: crash after ingest
+[scale] item item-3 failed: crash after ingest
+[scale] item item-4 failed: crash after ingest
+
+ ✓ packages/scale/src/scale.hardening.test.ts (22 tests) 4095ms
+   ✓ D1: cross-instance state must be serialized through a durable lock > a second campaign instance over one stateDir never re-executes completed items 1217ms
+   ✓ D4: stop stays durable but resume unbricks the campaign > remote stop persists across restart until an operator resumes 644ms
+   ✓ D5: per-item failure containment and cleanup > an adapter throw is contained: durable failure record, lease released, run continues 507ms
+   ✓ D5: per-item failure containment and cleanup > work done before a crash stays durable: findings persist even when the item fails 552ms
+ ✓ packages/repair/src/worktree.hardening.test.ts (8 tests) 9740ms
+   ✓ RepairWorkspace hardening > D1: writeFile rejects traversal outside the worktree and nothing lands outside 1128ms
+   ✓ RepairWorkspace hardening > D1: readFile rejects traversal outside the worktree 2744ms
+   ✓ RepairWorkspace hardening > D1: rejects absolute, drive-letter, UNC and .git targets; main repo untouched 2174ms
+   ✓ RepairWorkspace hardening > D1: legitimate relative paths still round-trip (no overblocking) 1423ms
+   ✓ RepairWorkspace hardening > D5: dispose removes the whole temp base dir (no orphaned directories) 681ms
+   ✓ RepairWorkspace hardening > reports the detached HEAD commit of the worktree 1297ms
+
+ Test Files  10 passed (10)
+      Tests  106 passed (106)
+   Start at  21:41:39
+   Duration  13.40s (transform 6.70s, setup 0ms, collect 12.54s, tests 15.21s, environment 12ms, prepare 9.64s)
+
+--- INTEGRATION ---
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 C:/Users/Michael Roy/Documents/Inspector
+
+ ✓ packages/cli-adapter/src/node-pty-backend.integration.test.ts (2 tests) 1942ms
+   ✓ NodePtyBackend (real PTY) > spawns a real process and round-trips write/readScreen/isAlive/kill 1934ms
+ ✓ packages/cli-adapter/src/cli.conformance.integration.test.ts (2 tests) 4163ms
+   ✓ cli adapter conformance (M6 C1) > passes the common conformance contract 2987ms
+   ✓ cli adapter conformance (M6 C1) > counter overflow defect aborts the process at the boundary 1173ms
+
+ Test Files  2 passed (2)
+      Tests  4 passed (4)
+   Start at  21:41:56
+   Duration  7.75s (transform 615ms, setup 0ms, collect 2.10s, tests 6.10s, environment 1ms, prepare 1.51s)
+
+=== NESTED-SLICE VERIFY END exit=0 ===

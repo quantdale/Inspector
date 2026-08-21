@@ -1,0 +1,56 @@
+# Dogfood target: vim (interactive TUI, present on this machine via Git Bash)
+id: vim-scratch
+platform: cli
+
+source:
+  origin: local installation — /usr/bin/vim (VIM - Vi IMproved 9.2, Git Bash distribution)
+  license: Vim License (charityware); binary already present locally, nothing acquired.
+  note: Used as a CLI/TUI hunt target exercising PTY-backed interaction.
+
+acquisition:
+  method: none — preinstalled. Verify with `vim --version`.
+
+launch:
+  command: >
+    vim -u NONE -N <sandbox>/scratch.txt
+    (-u NONE skips user config for determinism; drop the flag to exercise defaults)
+  working_dir: .inspector/rc-work/targets/vim-sandbox/
+  session_profile:
+    setup:
+      - mkdir -p .inspector/rc-work/targets/vim-sandbox
+      - printf 'alpha\n' > scratch.txt
+    steps:
+      - launch vim on scratch.txt (normal mode)
+      - keystrokes `Go` enter insert mode on a new last line
+      - type text, e.g. "charlie"
+      - Escape back to normal mode
+      - `:wq` + Enter to save and quit
+    verify:
+      - process exits within timeout
+      - file contents changed: scratch.txt now contains the typed line
+        (verified empirically with an Ex-mode scripted run: file went from
+        "alpha" to "alpha\ncharlie")
+
+readiness_check:
+  type: pty-condition
+  expect: PTY attached; terminal shows the vim welcome/normal-mode screen and the
+    status line contains the buffer name "scratch.txt".
+
+reset_strategy: delete scratch.txt and recreate it from the seed content ("alpha\n")
+  before each hunt.
+
+teardown: ensure the vim process is terminated (`:qa!` keystrokes or SIGKILL) and no
+  swap file (.scratch.txt.swp) remains in the sandbox dir.
+
+recommended_hunt_budget:
+  max_actions: 80
+  max_minutes: 10
+
+authorized_for_repair: false
+
+notes: >
+  A future PTY-backed hunt drives this by writing raw keystrokes to the PTY master
+  and reading the screen (or using a terminal-emulation layer such as xterm.js
+  parsing) for assertions. Insert-mode typing must account for vim's mode state —
+  every insertion sequence needs a leading `i`/`a`/`o` and a trailing Escape.
+  Timings matter: wait for redraw after mode changes before asserting screen state.

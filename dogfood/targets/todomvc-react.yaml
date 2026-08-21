@@ -1,0 +1,53 @@
+# Dogfood target: TodoMVC (React) — independently published npm package
+id: todomvc-react
+platform: web
+
+source:
+  origin: https://github.com/cellular/todomvc-react (published to npm as `todomvc-react`)
+  package: todomvc-react@1.0.4
+  license: MIT (LICENSE file shipped in the tarball; author Felix Gnass)
+  note: Independently developed React 16 implementation of TodoMVC with a prebuilt
+    dist/ bundle; not an Inspector fixture.
+
+acquisition:
+  method: npm tarball from registry.npmjs.org
+  commands:
+    - curl -sO https://registry.npmjs.org/todomvc-react/-/todomvc-react-1.0.4.tgz
+    - tar xzf todomvc-react-1.0.4.tgz
+    - cp -r package/dist/* <target-root>/
+    - cp package/LICENSE <target-root>/LICENSE
+  acquired_at: .inspector/rc-work/targets/todomvc-react/ (gitignored scratch)
+
+serve:
+  command: node dogfood/bin/serve-static.mjs --port 8123 --dir .inspector/rc-work/targets/todomvc-react
+  working_dir: repo root
+  url: http://127.0.0.1:8123/
+
+readiness_check:
+  type: http-content
+  request: GET http://127.0.0.1:8123/
+  expect: HTTP 200, HTML containing `<div id="root" class="todoapp">` and script `/todomvc.js`
+  assets: single self-contained bundle todomvc.js (113889 B, React included) + todomvc.css — fully offline.
+
+interaction_surface:
+  - controlled text input with Enter-to-add and blur behavior
+  - async React state updates (item list, counts, filter transitions)
+  - toggle/destroy/edit interactions, double-click inline editing
+  - routing filters (all/active/completed)
+  persistence: NONE — component state is in-memory only; a reload wipes todos.
+    Hunt agents must not treat reload-persistence as a feature here.
+
+reset_strategy: reload the page (state is in-memory); optionally clear localStorage anyway for hygiene.
+
+teardown: kill the serve-static.mjs process (SIGTERM).
+
+recommended_hunt_budget:
+  max_actions: 120
+  max_minutes: 15
+
+authorized_for_repair: false
+
+notes: >
+  Verified empirically: GET / returns 200 text/html with root element; /todomvc.js,
+  /todomvc.css serve 200 with correct MIME. Chosen over candidates like
+  react-shopping-cart (a component library, not a servable SPA demo).
