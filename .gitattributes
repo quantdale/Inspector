@@ -1,0 +1,9 @@
+# Normalize line endings for text files. The repository uses LF internally;
+# git converts on checkout per the developer's platform.
+* text=auto eol=lf
+
+*.png binary
+*.zip binary
+*.jpg binary
+*.jpeg binary
+*.gif binary

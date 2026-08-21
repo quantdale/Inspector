@@ -1,5 +1,42 @@
 import { createServer, type Server } from "node:http";
-import { randomInt } from "node:crypto";
+
+export interface SeedServer {
+  /** Base URL of the seeded target; valid once `ready` resolves. */
+  readonly url: string;
+  /** Resolves when the server is accepting connections. */
+  readonly ready: Promise<void>;
+  close(): void;
+}
+
+export function startSeedServer(): SeedServer {
+  const server: Server = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(SEED_HTML);
+  });
+  // Bind an ephemeral port: reproduction/minimization opens many fresh
+  // environments in quick succession, and fixed-range random ports eventually
+  // collide (EADDRINUSE).
+  let url = "";
+  const ready = new Promise<void>((resolve, reject) => {
+    server.once("listening", () => {
+      const addr = server.address();
+      const port = addr && typeof addr === "object" ? addr.port : 0;
+      url = `http://127.0.0.1:${port}/`;
+      resolve();
+    });
+    server.once("error", reject);
+  });
+  server.listen(0);
+  return {
+    get url() {
+      return url;
+    },
+    ready,
+    close: () => {
+      server.close();
+    },
+  };
+}
 
 export const SEED_HTML = `<!doctype html>
 <html lang="en">
@@ -25,16 +62,25 @@ export const SEED_HTML = `<!doctype html>
     let count = 0;
     $("loginBtn").addEventListener("click", () => {
       const u = $("username").value, p = $("password").value;
-      if (u === "admin" && p === "admin") {
+      // Hidden defect: a boundary username value crashes validation.
+      if (u.length >= 64 || u === "CRASH") {
+        throw new Error("HiddenValidationCrash");
+      }
+      if (u && p) {
         $("login").hidden = true;
         $("dashboard").hidden = false;
-        $("welcome").textContent = "Welcome " + u;
+        $("welcome").textContent = "Welcome " + (u || "");
       } else {
         $("loginMsg").textContent = "invalid credentials";
       }
     });
     $("increment").addEventListener("click", () => {
       count += 1;
+      // Hidden defect: the counter overflows at a boundary and corrupts state.
+      if (count >= 8) {
+        $("count").textContent = "NaN";
+        throw new Error("IncrementOverflowCrash");
+      }
       $("count").textContent = String(count);
     });
     $("save").addEventListener("click", () => {
@@ -53,22 +99,3 @@ export const SEED_HTML = `<!doctype html>
 </body>
 </html>`;
 
-export interface SeedServer {
-  url: string;
-  close(): void;
-}
-
-export function startSeedServer(): SeedServer {
-  const port = 8100 + randomInt(0, 400);
-  const server: Server = createServer((req, res) => {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(SEED_HTML);
-  });
-  server.listen(port);
-  return {
-    url: `http://127.0.0.1:${port}/`,
-    close: () => {
-      server.close();
-    },
-  };
-}

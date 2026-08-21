@@ -75,6 +75,10 @@ describe("web adapter conformance (M1)", () => {
   it("6: page/application crash is a target-failure, not an adapter crash", async () => {
     client = await startWeb();
     await client.request("lifecycle", { op: "create" }, 30000);
+    // The boom button lives on the dashboard; log in first.
+    await client.request("act", { action: act("w4", "fill", { selector: "#username", value: "admin" }) }, 15000);
+    await client.request("act", { action: act("w5", "fill", { selector: "#password", value: "admin" }) }, 15000);
+    await client.request("act", { action: act("w6a", "click", { selector: "#loginBtn" }) }, 15000);
     const outcome = (await client.request("act", { action: act("w6", "click", { selector: "#boom" }) }, 15000)) as {
       status: string;
       error?: { code: string };

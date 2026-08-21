@@ -8,6 +8,7 @@ export type IapErrorCode =
   | "CANCELLED"
   | "ADAPTER_CRASH"
   | "TARGET_FAILURE"
+  | "ACTION_FAILED"
   | "VALIDATION"
   | "UNKNOWN";
 
@@ -31,6 +32,10 @@ export class ProtocolError extends Error {
   }
 }
 
-export function protocolError(code: IapErrorCode, message: string, detail?: unknown): ProtocolError {
+export function protocolError(
+  code: IapErrorCode,
+  message: string,
+  detail?: unknown,
+): ProtocolError {
   return new ProtocolError({ code, message, detail });
 }

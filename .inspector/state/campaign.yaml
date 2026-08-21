@@ -3,7 +3,7 @@ project: Inspector
 campaign:
   mode: IMPLEMENTATION
   status: ACTIVE
-  current_milestone: M3
+  current_milestone: M4
   objective: >-
     Autonomously execute the Inspector roadmap M0-M7 on the single 'main'
     branch; hardening remains a separately invoked campaign.
@@ -22,24 +22,25 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M3
-  milestone_name: Autonomous exploration
-  spec: specs/003-autonomous-exploration/SPEC.md
-  tasks: specs/003-autonomous-exploration/TASKS.md
-  task_group: E0
-  waypoint: M3.E0.state-model
+  milestone_id: M4
+  milestone_name: Oracle expansion and autonomous repair
+  spec: specs/004-oracle-repair/SPEC.md
+  tasks: specs/004-oracle-repair/TASKS.md
+  task_group: O0
+  waypoint: M4.O0.oracle-sdk
   waypoint_status: READY
   next_action: >-
-    M2 is complete. Begin M3 (Autonomous exploration): implement the
-    exploration loop, state-delta observation, curious action selection,
-    coverage/state-diversity heuristics, exploration budget, and reproducible
-    trace linkage to findings. Run the M3 exit gate.
+    M3 is complete. Begin M4 (Oracle expansion and autonomous repair):
+    implement the oracle SDK, weak-signal handling, repair workspace with git
+    worktree isolation, source context, regression-first repair, patch agent
+    contract, verification, and resolution. Run the M4 exit gate.
 
 progress:
   completed_milestones:
     - M0
     - M1
     - M2
+    - M3
   completed_task_groups:
     - F0
     - F1
@@ -86,16 +87,31 @@ progress:
     - M2.R4.minimization
     - M2.R5.bundle
     - M2.R6.regression
+    - M3.E0.state-model
+    - M3.E1.action-inventory
+    - M3.E2.exploration-scoring
+    - M3.E3.adversarial-inputs
+    - M3.E4.fault-injection
+    - M3.E5.planner-fallback
+    - M3.E7.campaign-controller
   deferred_milestones: []
 
 verification:
-  last_verified_commit: e638155
-  last_gate: M2
+  last_verified_commit: HEAD (M3 checkpoint commit)
+  last_gate: M3
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 
 blockers: []
-known_debt: []
+known_debt:
+  - >-
+    Replay oracle is loose: TargetFailureOracle counts any target-failure
+    outcome (including ACTION_FAILED automation misses) as reproduction, so
+    minimization can over-reduce paths that end in a hidden-element miss.
+    Tighten with M4 weighted/structural oracles.
+  - >-
+    Web exploration E2E takes ~4-6 min wall clock (fresh Chromium per replay);
+    acceptable for the gate but a candidate for later perf work.
 
 hardening:
   active: false
@@ -113,4 +129,4 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: M4
+next_milestone_after_completion: M5

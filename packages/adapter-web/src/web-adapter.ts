@@ -1,4 +1,9 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "playwright";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -13,16 +18,38 @@ import {
   type Action,
   type HealthResponse,
 } from "@inspector/protocol";
-import { ArtifactStore, type ArtifactMetadata } from "@inspector/artifact-store";
-import { AdapterHandler, AdapterCrashError } from "@inspector/adapter-sdk";
+import {
+  ArtifactStore,
+  type ArtifactMetadata,
+} from "@inspector/artifact-store";
+import { type AdapterHandler, AdapterCrashError } from "@inspector/adapter-sdk";
 import { startSeedServer, type SeedServer } from "./seeded-app.js";
 
 export const WEB_CAPABILITIES: CapabilityDoc = {
   protocolVersion: PROTOCOL_VERSION,
   adapter: "web-playwright",
   capabilities: {
-    observe: ["url", "title", "uiTree", "screenshot", "console", "network", "storage", "trace"],
-    act: ["click", "fill", "press", "select", "navigate", "back", "forward", "reload", "wait"],
+    observe: [
+      "url",
+      "title",
+      "uiTree",
+      "screenshot",
+      "console",
+      "network",
+      "storage",
+      "trace",
+    ],
+    act: [
+      "click",
+      "fill",
+      "press",
+      "select",
+      "navigate",
+      "back",
+      "forward",
+      "reload",
+      "wait",
+    ],
     lifecycle: ["create", "reset", "close"],
     faults: ["timeout", "crash"],
     coverage: [],
@@ -36,7 +63,11 @@ export interface WebFaults {
 function redact(url: string): string {
   try {
     const u = new URL(url);
-    if (u.searchParams.has("password") || u.searchParams.has("token") || u.searchParams.has("secret")) {
+    if (
+      u.searchParams.has("password") ||
+      u.searchParams.has("token") ||
+      u.searchParams.has("secret")
+    ) {
       const clean = new URL(url);
       for (const k of ["password", "token", "secret"]) {
         if (clean.searchParams.has(k)) clean.searchParams.set(k, "***");
@@ -85,7 +116,28 @@ export class WebAdapterHandler implements AdapterHandler {
         });
         this.page = await this.context.newPage();
         this.attachListeners();
-        await this.context.tracing.start({ screenshots: true, snapshots: true, sources: false });
+        // Keep the disposable target isolated: block any navigation/request to a
+        // non-localhost origin so a link click can never hijack the host browser.
+        await this.page.route("**/*", (route) => {
+          try {
+            const u = new URL(route.request().url());
+            if (
+              u.protocol === "http:" &&
+              (u.hostname === "127.0.0.1" || u.hostname === "localhost")
+            ) {
+              return route.continue();
+            }
+          } catch {
+            /* ignore malformed urls */
+          }
+          return route.abort();
+        });
+        await this.context.tracing.start({
+          screenshots: true,
+          snapshots: true,
+          sources: false,
+        });
+        await this.seed.ready;
         await this.page.goto(this.seed.url);
         return { ok: true };
       }
@@ -93,7 +145,9 @@ export class WebAdapterHandler implements AdapterHandler {
         if (this.page) {
           await this.page.evaluate(() => localStorage.clear()).catch(() => {});
           await this.page.reload({ waitUntil: "load" });
-          await this.page.waitForSelector("#loginBtn", { state: "visible" }).catch(() => {});
+          await this.page
+            .waitForSelector("#loginBtn", { state: "visible" })
+            .catch(() => {});
         }
         return { ok: true };
       }
@@ -109,14 +163,25 @@ export class WebAdapterHandler implements AdapterHandler {
   private attachListeners(): void {
     if (!this.page) return;
     this.page.on("console", (msg) => {
-      if (msg.type() === "error") this.consoleErrors.push({ text: msg.text(), ts: Date.now() });
+      if (msg.type() === "error")
+        this.consoleErrors.push({ text: msg.text(), ts: Date.now() });
     });
-    this.page.on("pageerror", (err) => this.pageErrors.push({ message: err.message, stack: err.stack }));
+    this.page.on("pageerror", (err) =>
+      this.pageErrors.push({ message: err.message, stack: err.stack }),
+    );
     this.page.on("request", (req) =>
-      this.network.push({ type: "request", url: redact(req.url()), method: req.method() }),
+      this.network.push({
+        type: "request",
+        url: redact(req.url()),
+        method: req.method(),
+      }),
     );
     this.page.on("response", (res) =>
-      this.network.push({ type: "response", url: redact(res.url()), status: res.status() }),
+      this.network.push({
+        type: "response",
+        url: redact(res.url()),
+        status: res.status(),
+      }),
     );
   }
 
@@ -130,51 +195,76 @@ export class WebAdapterHandler implements AdapterHandler {
     }
   }
 
-  async observe(): Promise<Observation> {
+  async observe(params: { observe?: string[] } = {}): Promise<Observation> {
     if (!this.page) throw new Error("environment not created");
     const page = this.page;
+    const want = new Set(params.observe ?? []);
     const url = page.url();
     const title = await page.title();
-    const uiTree = await page.evaluate(
-      (() => {
-        const els = Array.from(
-          document.querySelectorAll("a,button,input,select,textarea,[role=button]"),
-        ) as Array<any>;
-        return els.map((el) => ({
-          tag: el.tagName.toLowerCase(),
-          role: el.getAttribute("role") ?? el.tagName.toLowerCase(),
-          name: el.getAttribute("aria-label") ?? (el.textContent ?? "").trim(),
+    const uiTree = await page.evaluate((() => {
+      const els = Array.from(
+        document.querySelectorAll(
+          "a,button,input,select,textarea,[role=button]",
+        ),
+      ) as Array<any>;
+      return els.map((el) => {
+        const tag = el.tagName.toLowerCase();
+        const isField =
+          tag === "input" || tag === "textarea" || tag === "select";
+        const textContent = (el.textContent ?? "").trim().slice(0, 240);
+        return {
+          tag,
+          role: el.getAttribute("role") ?? tag,
+          name: el.getAttribute("aria-label") ?? textContent,
           id: el.id,
           hidden: el.offsetParent === null,
-        }));
-      }) as unknown as () => unknown,
-    );
-    const screenshot = await page.screenshot();
+          disabled: !!el.disabled,
+          value: isField ? el.value : undefined,
+          text: isField ? undefined : textContent,
+        };
+      });
+    }) as unknown as () => unknown);
+    const screenshot = want.has("screenshot") ? await page.screenshot() : null;
     const storage = await page
-      .evaluate(
-        (() => {
-          const o: Record<string, string> = {};
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k) o[k] = localStorage.getItem(k) ?? "";
-          }
-          return o;
-        }) as unknown as () => unknown,
-      )
+      .evaluate((() => {
+        const o: Record<string, string> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k) o[k] = localStorage.getItem(k) ?? "";
+        }
+        return o;
+      }) as unknown as () => unknown)
       .catch(() => ({}));
 
-    const artifacts: Array<{ sha256: string; mime: string; size: number; path: string }> = [];
-    const shotMeta: ArtifactMetadata = this.artifacts.write({
-      runId: "run",
-      content: Buffer.from(screenshot),
-      mime: "image/png",
-      name: "screenshot.png",
-    });
-    artifacts.push({ sha256: shotMeta.sha256, mime: shotMeta.mime, size: shotMeta.size, path: shotMeta.path });
+    const artifacts: Array<{
+      sha256: string;
+      mime: string;
+      size: number;
+      path: string;
+    }> = [];
+    if (screenshot) {
+      const shotMeta: ArtifactMetadata = this.artifacts.write({
+        runId: "run",
+        content: Buffer.from(screenshot),
+        mime: "image/png",
+        name: "screenshot.png",
+      });
+      artifacts.push({
+        sha256: shotMeta.sha256,
+        mime: shotMeta.mime,
+        size: shotMeta.size,
+        path: shotMeta.path,
+      });
+    }
 
-    const traceMeta = await this.flushTrace();
+    const traceMeta = want.has("trace") ? await this.flushTrace() : undefined;
     if (traceMeta) {
-      artifacts.push({ sha256: traceMeta.sha256, mime: traceMeta.mime, size: traceMeta.size, path: traceMeta.path });
+      artifacts.push({
+        sha256: traceMeta.sha256,
+        mime: traceMeta.mime,
+        size: traceMeta.size,
+        path: traceMeta.path,
+      });
     }
 
     const summary = {
@@ -207,24 +297,40 @@ export class WebAdapterHandler implements AdapterHandler {
     const path = join(tmpdir(), `inspector-trace-${this.traceIndex++}.zip`);
     try {
       await this.context.tracing.stop({ path });
-      await this.context.tracing.start({ screenshots: true, snapshots: true, sources: false });
+      await this.context.tracing.start({
+        screenshots: true,
+        snapshots: true,
+        sources: false,
+      });
     } catch {
       return undefined;
     }
-    return this.artifacts.write({ runId: "run", content: readFileSync(path), mime: "application/zip", name: "trace.zip" });
+    return this.artifacts.write({
+      runId: "run",
+      content: readFileSync(path),
+      mime: "application/zip",
+      name: "trace.zip",
+    });
   }
 
   async act(params: { action: Action }): Promise<ActionOutcome> {
     const action = params.action;
     if (this.faults.crashBrowser) {
       await this.browser?.close().catch(() => {});
-      throw new AdapterCrashError("adapter-crash: browser crashed (injected fault)");
+      throw new AdapterCrashError(
+        "adapter-crash: browser crashed (injected fault)",
+      );
     }
-    if (!this.page) throw protocolError("VALIDATION", "environment not created");
+    if (!this.page)
+      throw protocolError("VALIDATION", "environment not created");
     const page = this.page;
     const sel = String(action.input?.selector ?? action.input?.target ?? "");
-    const value = action.input?.value !== undefined ? String(action.input.value) : "";
-    const timeout = action.deadlineMs;
+    const value =
+      action.input?.value === undefined ? "" : String(action.input.value);
+    // Keep the Playwright timeout strictly below the wire deadline so the
+    // adapter always reports an outcome instead of losing the race to the
+    // client-side deadline (which would surface as an adapter error).
+    const timeout = Math.max(1000, action.deadlineMs - 1500);
     try {
       switch (action.kind) {
         case "click":
@@ -241,7 +347,10 @@ export class WebAdapterHandler implements AdapterHandler {
           break;
         case "navigate": {
           if (!this.allowedOrigin(value)) {
-            throw protocolError("CAPABILITY_DENIED", `navigation to forbidden origin: ${value}`);
+            throw protocolError(
+              "CAPABILITY_DENIED",
+              `navigation to forbidden origin: ${value}`,
+            );
           }
           await page.goto(value, { timeout });
           break;
@@ -258,8 +367,36 @@ export class WebAdapterHandler implements AdapterHandler {
         case "wait":
           await page.waitForTimeout(Number(action.input?.ms ?? 500));
           break;
+        case "fault": {
+          const fault = String(action.input?.fault ?? "");
+          const allowed = WEB_CAPABILITIES.capabilities.faults ?? [];
+          if (!allowed.includes(fault)) {
+            throw protocolError(
+              "CAPABILITY_DENIED",
+              `fault not permitted: ${fault}`,
+            );
+          }
+          if (fault === "crash") {
+            await this.browser?.close().catch(() => {});
+            throw new AdapterCrashError("adapter-crash: injected fault");
+          } else if (fault === "reload") {
+            await page.reload({ timeout });
+          } else if (fault === "storageReset") {
+            await page.evaluate(() => localStorage.clear()).catch(() => {});
+          }
+          break;
+        }
         default:
-          throw protocolError("VALIDATION", `unknown web action: ${action.kind}`);
+          throw protocolError(
+            "VALIDATION",
+            `unknown web action: ${action.kind}`,
+          );
+      }
+      // A synchronous throw inside a click/fill handler is reported as a
+      // pageerror, but the CDP notification can land just after the action
+      // promise resolves. Give it one bounded settle before concluding success.
+      if (this.pageErrors.length === 0) {
+        await page.waitForTimeout(50);
       }
       if (this.pageErrors.length > 0) {
         const err = this.pageErrors[this.pageErrors.length - 1]!;
@@ -282,9 +419,16 @@ export class WebAdapterHandler implements AdapterHandler {
         stateAfter: page.url(),
       };
     } catch (e) {
-      if (this.faults.crashBrowser) throw new AdapterCrashError("adapter-crash: browser crashed (injected fault)");
+      if (this.faults.crashBrowser)
+        throw new AdapterCrashError(
+          "adapter-crash: browser crashed (injected fault)",
+        );
       if (e instanceof ProtocolError) throw e;
       const message = e instanceof Error ? e.message : String(e);
+      // A genuine application crash surfaces as a pageerror and is reported with
+      // code TARGET_FAILURE (handled above). A Playwright automation error
+      // (missing element, timeout) is an ACTION_FAILED, not an application
+      // defect, so the explorer must not treat it as a bug.
       return {
         actionId: action.id,
         runId: action.runId,
@@ -292,7 +436,7 @@ export class WebAdapterHandler implements AdapterHandler {
         status: "target-failure",
         observedAt: new Date().toISOString(),
         stateAfter: page.url(),
-        error: { code: "TARGET_FAILURE", message },
+        error: { code: "ACTION_FAILED", message },
       };
     }
   }

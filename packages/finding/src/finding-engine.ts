@@ -101,16 +101,27 @@ export class FindingEngine {
     return { finding, stats, lastSignals };
   }
 
-  async minimize(finding: Finding, actions: Action[], driver: ReplayDriver): Promise<Action[]> {
+  async minimize(
+    finding: Finding,
+    actions: Action[],
+    driver: ReplayDriver,
+    opts: { maxReplays?: number } = {},
+  ): Promise<Action[]> {
+    // Each probe replays against a fresh environment, so minimization is
+    // bounded: when the replay budget is exhausted the best sequence found so
+    // far is returned (still a reproducer).
+    let replaysLeft = opts.maxReplays ?? 20;
     let current = actions.slice();
     let changed = true;
-    while (changed) {
+    while (changed && replaysLeft > 0) {
       changed = false;
       const granularity = Math.max(1, Math.floor(current.length / 2));
       for (let i = 0; i < current.length; i += granularity) {
+        if (replaysLeft <= 0) break;
         const candidate = current.filter((_, idx) => idx < i || idx >= i + granularity);
         if (candidate.length === 0) continue;
         const result = await driver.replay(candidate);
+        replaysLeft -= 1;
         if (this.oracle.evaluate(result).reproduced) {
           current = candidate;
           changed = true;

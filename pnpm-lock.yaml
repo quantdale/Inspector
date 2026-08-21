@@ -49,6 +49,24 @@ importers:
 
   packages/core: {}
 
+  packages/explore:
+    dependencies:
+      '@inspector/adapter-fake':
+        specifier: workspace:*
+        version: link:../adapter-fake
+      '@inspector/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@inspector/core':
+        specifier: workspace:*
+        version: link:../core
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/finding:
     dependencies:
       '@inspector/adapter-fake':

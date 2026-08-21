@@ -10,39 +10,45 @@
 
 ## Last trusted implementation state
 
-M0.F6.run-manager completed. The core run manager (`@inspector/core`) integrates policy, durable store, artifact store, and the adapter client. `RunManager.startRun` spawns the fake adapter over stdio, negotiates capabilities, and returns a `RunController`. `submitAction` enforces policy first (forbidden actions never reach the adapter), persists a pending action, requests the outcome, and transactionally commits the step; crashes/timeouts leave the action pending for recovery. `resumeRun` reopens durable state, marks in-flight actions `unknown`, and re-observes instead of blindly resubmitting. Acceptance tests 1–5, 7, 8 pass (happy-path ordered events, policy rejection, deterministic budget exhaustion, unknown-outcome no-duplicate restart, crash classification, artifact hash round-trip).
+M3 autonomous exploration is COMPLETE. `@inspector/explore` provides the state/action graph with semantic fingerprints, capability-bounded action inventory, curiosity scoring (novelty/unvisited-edge/boundary/rarity/cycle-penalty), deterministic boundary + sequence input generation, capability-gated fault injection, inventory-bound planner fallback, and the `ExploreController` campaign loop (action/wall/reset/finding budgets, plateau resets, anomaly detection wired into every step, adapter-error recovery via reset + hazard blacklist, post-run reproduce → minimize → confirm against fresh environments).
 
-Verified implementation gates: **F0, F1, F2, F3, F4, F5, F6** (lint/typecheck/test/test:integration green; 42 tests across 6 files).
+M3 exit gate satisfied: a bounded autonomous hunt discovers and confirms 3 distinct hidden seeded web defects (login validation crash, boom crash, increment overflow) that are not encoded as scripted tests, each reproduced on fresh Chromium instances with minimized reproducers and evidence bundles; identical seeds produce identical anomaly classKey sets. `pnpm test:integration` 27/27 green.
+
+Verified implementation gates at M3 checkpoint: **lint (0 errors), typecheck (exit 0), test (51 unit), test:integration (27 integration)** all green.
 
 ## Active waypoint
 
 - Milestone: M0 Foundation kernel — **COMPLETE**
 - Milestone: M1 Web sensing and acting — **COMPLETE**
 - Milestone: M2 Finding, evidence, reproduction, minimization — **COMPLETE**
-- Spec M2: `specs/002-finding-reproduction/SPEC.md` (status COMPLETE)
-- Task graph M2: `specs/002-finding-reproduction/TASKS.md` (R0–R6 all checked)
-
-M2 exit gate (seeded defects produce confirmed, minimized, replayable evidence bundles with low/controlled false positives) is satisfied: `@inspector/finding` provides a durable finding lifecycle (status machine + store persistence), hard oracles (target-failure, page-error, explicit DEFECT_* signals), clean replay drivers, reproduction policy (CONFIRMED/FLAKY/REJECTED), delta-debugging minimization, evidence bundle, and regression export. 8 M2 unit tests pass.
+- Milestone: M3 Autonomous exploration — **COMPLETE**
+- Spec M3: `specs/003-autonomous-exploration/SPEC.md` (status COMPLETE)
+- Task graph M3: `specs/003-autonomous-exploration/TASKS.md` (E0–E5, E7 checked; E6 deferred by design — no source instrumentation for black-box web target)
 
 ## Next milestone
 
-- Milestone: **M3 Autonomous exploration**
-- Spec: `specs/003-autonomous-exploration/SPEC.md`
-- First waypoint: M3.F0 autonomous-exploration-prep
+- Milestone: **M4 Oracle expansion and autonomous repair**
+- Spec: `specs/004-oracle-repair/SPEC.md`
+- First waypoint: M4.O0 oracle-sdk
 
 ## Exact next action
 
-Begin M3: implement the exploration loop, state-delta observation, curious action selection, coverage/state-diversity heuristics, exploration budget, and reproducible trace linkage to findings. Run the M3 exit gate.
+Begin M4: create `specs/004-oracle-repair/TASKS.md`, implement `@inspector/oracle` (composable invariant/metamorphic/structural oracles with strength/confidence) and `@inspector/repair` (exact-revision git worktree isolation, evidence-before-patch invariant, regression-first repair, verify-by-replay, rejected-patch rollback), then run the M4 exit gate (one seeded defect completes DISCOVERED → CONFIRMED → PATCHING → VERIFYING → RESOLVED without manual debugging).
 
-Continue autonomously; do not stop at the M2/M3 boundary.
+Continue autonomously; do not stop at the M3/M4 boundary.
 
 ## Known blockers
 
 None.
 
+## Known debt (recorded in campaign.yaml)
+
+- Replay oracle is loose (`TargetFailureOracle` counts ACTION_FAILED target-failures as reproduction); tighten during M4 oracle work.
+- Web exploration E2E takes ~4–6 min wall clock; acceptable but flagged for later perf work.
+
 ## Do not do yet
 
-- Do not begin Playwright adapter work before M0 completion.
+- Do not start Android/iOS/CLI/Electron/Windows adapter work before M4 completion.
 - Do not start broad hardening/audit campaigns.
 - Do not add a cloud control plane or dashboard.
 - Do not bypass policy/capability semantics to make the demo easier.
