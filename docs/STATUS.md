@@ -5,35 +5,28 @@ Last updated: 2026-08-20
 ## Campaign
 
 - Mode: **IMPLEMENTATION**
-- Campaign status: **ACTIVE**
+- Campaign status: **COMPLETE**
 - Working branch: `main`
-- Hardening campaign: **NOT ACTIVE**
-
-## Baseline
-
-The architecture/documentation foundation was merged to `main` in PR #1 at commit `ac74afbcc3824acee457a5cc5b26956ea5c98562`. All implementation work since has been committed directly to `main`.
+- Hardening campaign: **NOT ACTIVE** (separately invoked)
 
 ## Active work
 
-- Milestone: `M7 — Scale, integrations, and unattended operations` — **ACTIVE**
-- Specification: `specs/007-scale-integrations/SPEC.md`
-- Task graph: `specs/007-scale-integrations/TASKS.md` (to be created at M7 start)
-- Next milestone after M7: `M8 — iOS` (environment-deferred)
+None — the implementation campaign M0–M7 is complete. M8 (iOS) is `DEFERRED_ENVIRONMENT` (no macOS/Xcode/simulator runtime; adapter interfaces and remote-worker contract fully specified; resumption requirements recorded in `specs/008-ios/SPEC.md`).
 
-## Verified gates (M6)
+## Verified gates (M7, final)
 
 | Gate | Result |
 | --- | --- |
 | lint (0 errors) | PASS |
 | typecheck (exit 0) | PASS |
-| test (57 unit tests) | PASS |
-| test:integration (44 integration tests, 11 files) | PASS |
+| test (63 unit tests) | PASS |
+| test:integration (47 integration tests, 12 files) | PASS |
 
-M6 exit gate evidence: CLI/PTY, Electron, and Windows adapters all pass the common conformance contract (`runCommonConformance` in adapter-sdk) over spawned JSON-RPC subprocesses; each platform's seeded defect surfaces with correct TARGET_FAILURE/ACTION_FAILED classification; no platform branching in core finding semantics.
+M7 exit gate evidence: a bounded two-worker unattended campaign survives controller restart without duplicating completed work, preserves durable evidence/state in atomic state files, enforces deterministic global/per-worker budgets, clusters duplicate findings with provenance, and exposes an MCP-compatible read-only facade.
 
 ## Known blockers
 
-None currently known.
+None.
 
 ## Progress summary
 
@@ -46,7 +39,7 @@ None currently known.
 | M4 Oracle/repair | COMPLETE |
 | M5 Android | COMPLETE |
 | M6 Cross-platform adapters | COMPLETE |
-| M7 Scale/integrations | ACTIVE |
-| M8 iOS | PENDING / environment-dependent |
+| M7 Scale/integrations | COMPLETE |
+| M8 iOS | DEFERRED_ENVIRONMENT |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

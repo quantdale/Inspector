@@ -2,7 +2,7 @@
 
 ## Status
 
-PENDING / ENVIRONMENT-DEPENDENT
+DEFERRED_ENVIRONMENT
 
 ## Objective
 
@@ -50,3 +50,15 @@ Seeded iOS simulator defect completes the common exploration/finding/reproductio
 ## Environment deferral rule
 
 If macOS/Xcode access is unavailable, do not fake completion. Set milestone state `DEFERRED_ENVIRONMENT`, record exact requirements in checkpoint, and preserve interfaces so a future macOS worker can resume this spec directly.
+
+## Deferral record (2026-08-20)
+
+Status: `DEFERRED_ENVIRONMENT` per roadmap M8 clause ("If no macOS environment exists, M8 may be recorded DEFERRED_ENVIRONMENT after its adapter interfaces and remote-worker contract are fully specified").
+
+Reason: the implementation environment is Windows 11 with no macOS host, no Xcode toolchain, and no iOS simulator runtime available. The adapter interfaces and remote-worker contract required by this spec are fully specified by the existing architecture: the IAP handler contract (`@inspector/adapter-sdk` AdapterHandler), the common conformance runner (`runCommonConformance`), and the injectable-backend pattern proven on Android (AdbBackend), CLI (PtyBackend), and Windows (UiaBackend). An `IosSimulatorBackend` following the same injectable shape is the designated resumption entry point.
+
+Resumption requirements:
+1. macOS worker with Xcode + iOS Simulator runtime;
+2. implement `IosSimulatorBackend` (simctl/xcrinstrm wrapper) behind the injectable backend interface;
+3. port the SeedBank fixture semantics to an iOS simulator target;
+4. run `runCommonConformance` plus a finding-pipeline proof identical to M5's.

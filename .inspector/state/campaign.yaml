@@ -2,8 +2,8 @@ schema_version: 1
 project: Inspector
 campaign:
   mode: IMPLEMENTATION
-  status: ACTIVE
-  current_milestone: M4
+  status: COMPLETE
+  current_milestone: M8
   objective: >-
     Autonomously execute the Inspector roadmap M0-M7 on the single 'main'
     branch; hardening remains a separately invoked campaign.
@@ -22,18 +22,17 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M7
-  milestone_name: Scale, integrations, and unattended operations
-  spec: specs/007-scale-integrations/SPEC.md
-  tasks: specs/007-scale-integrations/TASKS.md
-  task_group: S0
-  waypoint: M7.S0.worker-orchestration
-  waypoint_status: READY
+  milestone_id: M8
+  milestone_name: iOS simulator adapter
+  spec: specs/008-ios/SPEC.md
+  tasks: specs/008-ios/SPEC.md
+  task_group: DEFERRED
+  waypoint: M8.deferred-environment
+  waypoint_status: DEFERRED_ENVIRONMENT
   next_action: >-
-    M6 is complete. Begin M7 (Scale, integrations, unattended operations):
-    implement isolated parallel workers with leases, deterministic scheduling,
-    finding dedup/clustering, model router + cost accounting, MCP facade,
-    checkpoint/recovery, and plugin/adapter discovery. Run the M7 exit gate.
+    M0-M7 are COMPLETE. M8 is DEFERRED_ENVIRONMENT (no macOS/Xcode/iOS
+    simulator runtime available; adapter interfaces and remote-worker contract
+    fully specified). Implementation campaign is COMPLETE.
 
 progress:
   completed_milestones:
@@ -44,6 +43,7 @@ progress:
     - M4
     - M5
     - M6
+    - M7
   completed_task_groups:
     - F0
     - F1
@@ -67,6 +67,40 @@ progress:
     - R4
     - R5
     - R6
+    - E0
+    - E1
+    - E2
+    - E3
+    - E4
+    - E5
+    - E7
+    - O0
+    - O1
+    - P0
+    - P1
+    - P2
+    - P3
+    - P4
+    - P5
+    - A0
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - C0
+    - C1
+    - C2
+    - C3
+    - S0
+    - S2
+    - S3
+    - S4
+    - S5
+    - S6
+    - S7
+    - S8
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -97,8 +131,6 @@ progress:
     - M3.E4.fault-injection
     - M3.E5.planner-fallback
     - M3.E7.campaign-controller
-    - M4.P4.verification
-    - M4.P5.resolution
     - M4.O0.oracle-sdk
     - M4.O1.weak-signal-handling
     - M4.P0.repair-workspace
@@ -107,8 +139,6 @@ progress:
     - M4.P3.patch-agent-contract
     - M4.P4.verification
     - M4.P5.resolution
-    - M5.A5.fault-injection
-    - M5.A6.core-pipeline-proof
     - M5.A0.environment-worker
     - M5.A1.app-lifecycle
     - M5.A2.sensors
@@ -120,11 +150,20 @@ progress:
     - M6.C1.cli-pty-adapter
     - M6.C2.electron-adapter
     - M6.C3.windows-adapter
-  deferred_milestones: []
+    - M7.S0.worker-isolation
+    - M7.S2.model-routing
+    - M7.S3.resource-accounting
+    - M7.S4.finding-clustering
+    - M7.S5.campaign-execution
+    - M7.S6.integration-facade
+    - M7.S7.plugin-discovery
+    - M7.S8.multi-worker-campaign
+  deferred_milestones:
+    - M8
 
 verification:
-  last_verified_commit: HEAD (M6 checkpoint commit)
-  last_gate: M6
+  last_verified_commit: HEAD (M7 checkpoint commit)
+  last_gate: M7
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 
@@ -138,6 +177,10 @@ known_debt:
   - >-
     Web exploration E2E takes ~4-6 min wall clock (fresh Chromium per replay);
     acceptable for the gate but a candidate for later perf work.
+  - >-
+    Production bindings for PTY/UIA/Electron-runtime/ADB CLI/emulator remain
+    hardening items; injectable contracts proven by mocks per spec blocker
+    policies.
 
 hardening:
   active: false
@@ -155,4 +198,4 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: M8
+next_milestone_after_completion: null

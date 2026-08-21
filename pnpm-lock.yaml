@@ -157,6 +157,21 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/scale:
+    dependencies:
+      '@inspector/core':
+        specifier: workspace:*
+        version: link:../core
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@inspector/store-sqlite':
+        specifier: workspace:*
+        version: link:../store-sqlite
+
   packages/store-sqlite:
     dependencies:
       better-sqlite3:
