@@ -1,0 +1,6 @@
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  06:58:19
+   Duration  30.65s (transform 3.41s, setup 0ms, collect 6.72s, tests 20.74s, environment 0ms, prepare 807ms)
+

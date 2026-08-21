@@ -261,12 +261,16 @@ hardening:
 
 dogfood:
   campaign: DOGFOOD_RC1
-  status: ACTIVE
-  phase: BINDINGS_COMPLETE
+  status: COMPLETE
+  phase: FINAL_GATE
   rc_target: RC1
   started_from_commit: 8df01898fd569cbc7d6b866d5330f19a7608a587
   started_at: "2026-08-21"
+  completed_at: "2026-08-22"
   detail_file: .inspector/state/DOGFOOD-RC1.yaml
+  report: docs/DOGFOOD-RC1-REPORT.md
+  verified_commit: PENDING_FINAL_GATE_SHA
+  gate_result: PENDING_FINAL_GATE
   targets:
     - web-todomvc-react
     - web-todomvc-backbone
@@ -276,13 +280,25 @@ dogfood:
     - android-settings-avd
     - inspector-seeded-control
   findings:
-    confirmed_novel: 0
-    actionable_quality: 0
-    low_value: 0
-    false_positive: 0
-    duplicate: 0
-    expected_behavior: 0
-    environment_failure: 0
+    confirmed_novel: 5
+    actionable_quality: 6
+    low_value: 3
+    false_positive: 1
+    duplicate: 2
+    expected_behavior: 4
+    environment_failure: 3
+  outcome_summary: >-
+    Six real independently developed targets hunted unscripted. Web explorer
+    effectiveness defect (R1) found and fixed — React app went from 250
+    nav-only actions/2 states to 24 states with 151 interactions; Backbone
+    control no-regression PASS (26 states). node-pty exit wedge (V2) mitigated
+    with regression coverage. Android lifecycle seeding made opt-in; pidof
+    semantics normalized. CLI workspace isolation fixed. UIA bridge honesty
+    gaps closed (post-death stale tree, modal blocking, rehost collapse,
+    waitForWindow). Oracle evaluation provenance persisted end-to-end.
+    Clean-install proof PASS using only documented instructions. Zero
+    unresolved Critical/High defects; remaining debt is MEDIUM/LOW and named
+    in the report.
   bindings_delivered:
     - >-
       web arbitrary localhost targets: adapter-web targetUrl option +

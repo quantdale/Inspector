@@ -112,6 +112,12 @@ async function resumeRunCommand(
       ctx.out(`run not found: ${id}`);
       return { code: 1 };
     }
+    // Resume re-attaches a fresh adapter to continue an interrupted run;
+    // a run that already reached a terminal state has nothing to resume.
+    if (record.status === "closed" || record.status === "failed" || record.status === "crashed") {
+      ctx.out(`run ${id} already ${record.status}; there is nothing to resume`);
+      return { code: 1 };
+    }
     const spec = spawnForStoredAdapter(record.adapter);
     if (!spec) {
       ctx.out(

@@ -73,7 +73,7 @@ optional backends, and troubleshooting.
 
 ```bash
 git clone <repo-url> inspector && cd inspector
-pnpm install
+pnpm install --frozen-lockfile
 
 # Probe platform capabilities and workspace health
 pnpm cli doctor

@@ -63,12 +63,13 @@ the corresponding platform adapter (PTY, UIA tree, accessibility tree).
 Both come from npm tarballs on registry.npmjs.org (no GitHub access needed):
 
 ```sh
-mkdir -p /tmp/cand && cd /tmp/cand
+TARGETS=.inspector/rc-work/targets   # or any scratch dir outside the repo
+mkdir -p /tmp/cand "$TARGETS/todomvc-backbone" && cd /tmp/cand
 curl -sO https://registry.npmjs.org/todomvc-react/-/todomvc-react-1.0.4.tgz
-tar xzf todomvc-react-1.0.4.tgz && cp -r package/dist/* "$TARGETS/todomvc-react/"
+tar xzf todomvc-react-1.0.4.tgz && cp -r package/dist/* "$OLDPWD/$TARGETS/todomvc-react/"
 curl -sO https://registry.npmjs.org/todomvc/-/todomvc-0.1.1.tgz
 tar xzf todomvc-0.1.1.tgz package/examples/backbone package/license.md
-cp -r package/examples/backbone "$TARGETS/todomvc-backbone/app"
+cp -r package/examples/backbone "$OLDPWD/$TARGETS/todomvc-backbone/app"
 ```
 
 Once fetched, both run fully offline (all assets served locally).

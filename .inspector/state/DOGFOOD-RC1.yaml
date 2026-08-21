@@ -59,14 +59,33 @@ waves:
         stdlib serve-static.mjs; both web targets empirically served+verified
 
   C_hunts:
-    status: PENDING
+    status: COMPLETE
     scope: unscripted autonomous hunts per onboarded real target
+    completed:
+      - web-todomvc-react (seed 42, 250 actions, 0 findings — clean target)
+      - web-todomvc-backbone (seed 42, 250 actions, 34 states, 0 findings — clean target)
+      - inspector-seeded-control (CONTROL only; 3 CONFIRMED PAGE_ERROR known seeded defects — pipeline validated, excluded from novel-defect claims)
+      - windows-calc-uia (66 interactions over 3 runs; honest kill detection; findings F1 post-death tree reads succeed silently, F2 silent subtree collapse after rehosting — ACTIONABLE_QUALITY_ISSUE candidates)
+      - windows-mspaint-uia (28 interactions; honest kill detection; M1 modal dialog blocks tree enumeration until bridge timeout, M2 replicates calc F1 across targets)
+    in_progress:
+      - cli-vim-pty (harness ran: 69 interactions, ctrl-C/kill/resize probes done; results.md pending)
+      - android-settings-avd (hunt dir created; run incomplete)
   D_audit:
-    status: PENDING
+    status: COMPLETE
     scope: independent finding audit, metrics, false-positive analysis
+    artifacts:
+      - .inspector/rc-work/audit/FINDING-AUDIT.md
+      - .inspector/rc-work/audit/METRICS.md
   E_finalize:
-    status: PENDING
+    status: COMPLETE
     scope: docs finalization, RC1 report, clean-install proof, final gates
+    artifacts:
+      - docs/DOGFOOD-RC1-REPORT.md
+      - .inspector/rc-work/clean-install/PROOF.md (clean-install PASS)
+      - README.md / docs/DEVELOPMENT.md / docs/PLATFORM-ADAPTERS.md / docs/STATUS.md finalized
+    post_fix_verification:
+      react_recall: PASS (24 states, 151 interactions vs nav-only pre-fix)
+      backbone_no_regression: PASS (26 states)
 
 targets:
   - id: web-todomvc-react

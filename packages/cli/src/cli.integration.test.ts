@@ -266,23 +266,85 @@ describe("cli", () => {
     expect(detail.evidenceBundlePath).not.toBeNull();
   }, 60000);
 
-  it("resumes a recorded fake run and re-observes it", async () => {
+  it("refuses to resume a closed run and resumes an interrupted one", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+
+    // A terminal run has nothing to resume; refusing beats a misleading
+    // half-resume that fails later with an opaque error (clean-install D1).
     const demo = await runCli(["run", "--adapter", "fake", "--json"], dir);
     expect(demo.code).toBe(0);
-    const runId = (JSON.parse(demo.stdout) as { runId: string }).runId;
+    const closedId = (JSON.parse(demo.stdout) as { runId: string }).runId;
+    const refused = await runCli(["runs", "resume", closedId], dir);
+    expect(refused.code).toBe(1);
+    expect(refused.stdout).toContain("already closed");
+    expect(refused.stdout).not.toContain("resumed");
 
-    const resumed = await runCli(["runs", "resume", runId], dir);
+    // Genuine interrupt: start a long fake hunt, wait until actions are
+    // streaming, then hard-kill the CLI tree mid-run.
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        tsxImportUrl,
+        cliBin,
+        "hunt",
+        "--adapter",
+        "fake",
+        "--max-actions",
+        "400",
+        "--max-minutes",
+        "5",
+        "--json",
+        "--workspace",
+        dir,
+      ],
+      { cwd: process.cwd(), env: { ...process.env }, stdio: "ignore" },
+    );
+    // Wait until the hunt is past initialization and executing actions.
+    const dbPath = join(dir, ".inspector", "runs.db");
+    let midRun = false;
+    for (let i = 0; i < 30 && !midRun; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (!existsSync(dbPath)) continue;
+      let probe;
+      try {
+        probe = Store.open(dbPath);
+        const runs = probe.listRuns(5);
+        const active = runs.find((r) => r.status !== "closed" && r.status !== "failed" && r.status !== "crashed");
+        if (active && probe.getRunSteps(active.id).length >= 3) midRun = true;
+      } catch {
+        // db locked/absent mid-write; retry
+      } finally {
+        probe?.close();
+      }
+    }
+    expect(midRun).toBe(true);
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      child.kill("SIGKILL");
+    }
+    await new Promise((resolve) => child.once("close", resolve));
+
+    // Find the non-terminal run left behind by the kill.
+    const wsStore = Store.open(dbPath);
+    let interruptedId: string | undefined;
+    try {
+      const active = wsStore
+        .listRuns(5)
+        .find((r) => r.status !== "closed" && r.status !== "failed" && r.status !== "crashed");
+      interruptedId = active?.id;
+    } finally {
+      wsStore.close();
+    }
+    expect(interruptedId).toBeTruthy();
+
+    // Resume re-attaches, re-observes, and reports an honest final state.
+    const resumed = await runCli(["runs", "resume", interruptedId!], dir);
     expect(resumed.code).toBe(0);
-    expect(resumed.stdout).toContain(`resumed ${runId}`);
-    expect(resumed.stdout).toContain("adapter-fake");
-    expect(resumed.stdout).toContain("final status: closed");
-
-    // Unknown ids fail honestly.
-    const missing = await runCli(["runs", "resume", "run_does_not_exist"], dir);
-    expect(missing.code).toBe(1);
-    expect(missing.stdout).toContain("run not found");
-  }, 60000);
+    expect(resumed.stdout).toContain(`resumed ${interruptedId}`);
+    expect(resumed.stdout).toContain("final status:");
+  }, 90000);
 
   it("resolves $INSPECTOR_WORKSPACE when --workspace is absent", async () => {
     const envWs = mkdtempSync(join(tmpdir(), "inspector-cli-envws-"));

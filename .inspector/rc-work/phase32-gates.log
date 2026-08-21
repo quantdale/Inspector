@@ -1,0 +1,40 @@
+=== PHASE32 FINAL GATES START 2026-08-22T06:39:16+08:00 HEAD=1125ba9aa78ace4161783dd0c8d172130f127366 ===
+INSTALL_OK
+
+> inspector@0.1.0 lint C:\Users\Michael Roy\Documents\Inspector
+> eslint .
+
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\dom-shims.d.ts
+  3:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  4:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  5:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\index.ts
+  4:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/triple-slash-reference')
+
+C:\Users\Michael Roy\Documents\Inspector\packages\adapter-web\src\web-adapter.ts
+  359:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 5 problems (0 errors, 5 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
+LINT_OK
+
+> inspector@0.1.0 typecheck C:\Users\Michael Roy\Documents\Inspector
+> tsc --noEmit -p tsconfig.json
+
+TYPECHECK_OK
+ Test Files  37 passed (37)
+      Tests  460 passed | 3 skipped (463)
+   Start at  06:39:34
+   Duration  18.89s (transform 3.71s, setup 0ms, collect 16.37s, tests 44.55s, environment 15ms, prepare 10.31s)
+
+ Test Files  1 failed | 26 passed (27)
+      Tests  1 failed | 131 passed (132)
+   Start at  06:39:55
+   Duration  385.08s (transform 4.44s, setup 0ms, collect 29.54s, tests 2008.08s, environment 10ms, prepare 9.81s)
+
+ ELIFECYCLE  Command failed with exit code 1.
+INT_EXIT=1
+=== END 2026-08-22T06:46:21+08:00 ===

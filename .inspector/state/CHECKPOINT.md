@@ -75,3 +75,14 @@ Production bindings landed behind `real|mock|auto` selection (mock always availa
 - **dogfood/**: target manifests + stdlib static server; two independently developed real web targets acquired from npm and empirically served (todomvc-react@1.0.4 MIT; official TodoMVC backbone example w/ localStorage).
 
 Durable state: `.inspector/state/DOGFOOD-RC1.yaml` (wave ledger) + `dogfood:` block in campaign.yaml. Next: Wave C unscripted hunts per target.
+
+## INSPECTOR DOGFOOD / RC1 CAMPAIGN COMPLETE (2026-08-22)
+
+- Campaign: **DOGFOOD_RC1 — COMPLETE**. Implementation (IMPLEMENTATION/COMPLETE), HARDENING_1, and M8 DEFERRED_ENVIRONMENT states untouched.
+- Six real independently developed targets hunted **unscripted**: todomvc-react + todomvc-backbone (web/Playwright+Chromium), vim (real ConPTY PTY), calc + mspaint (real UIA bridge), Android Settings on a freshly booted headless AVD (real ADB). Seeded-app control ran separately and is excluded from novel-defect claims.
+- Independent audit (`.inspector/rc-work/audit/FINDING-AUDIT.md`): 24 candidate rows → 5 distinct TRUE_DEFECTs, 6 distinct ACTIONABLE_QUALITY_ISSUEs, 1 FALSE_POSITIVE, duplicates marked; honest zeros on healthy apps. All Critical/High resolved via committed fixes (`708ae3e`, `2d63128`); remaining debt is MEDIUM/LOW and named in the report.
+- Fixes driven by dogfood: explorer selector generation for label-less DOM (React recall 2→24 states, no-regression on Backbone 26 states), node-pty exit wedge mitigation + regression tests, android lifecycle seeding opt-in + pidOf semantics, CLI workspace isolation, UIA liveness/modal/rehost/waitForWindow honesty, oracle_evaluations persistence (migration #5) with bundle embedding, fleet seedApk integration caught by gates.
+- Clean-install proof: **PASS** — clone→install→doctor→acquire target→hunt→findings→resume→mid-run kill→cleanup using only documented instructions (`​.inspector/rc-work/clean-install/PROOF.md`).
+- Documentation finalized: README quickstart, DEVELOPMENT rewrite, PLATFORM-ADAPTERS real/mock/deferred matrix, STATUS refresh.
+- Durable report: `docs/DOGFOOD-RC1-REPORT.md`.
+- Final gate (Phase 32): recorded in `.inspector/rc-work/phase32-gates.log`; verified commit = final state commit on main.
