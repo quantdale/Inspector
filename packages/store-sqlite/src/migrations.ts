@@ -116,6 +116,33 @@ export const MIGRATIONS: string[] = [
   CREATE UNIQUE INDEX IF NOT EXISTS idx_actions_pending_idempotency
     ON actions(idempotency) WHERE status IN ('pending', 'unknown');
   `,
+  // Oracle evaluation records (docs/ORACLE-SYSTEM.md): one row per oracle
+  // evaluated per evaluation event (reproduction attempts, minimization
+  // verifications, repair verification), so evidence bundles can answer
+  // "which oracles ran, what did they see, and why was this promoted".
+  `
+  CREATE TABLE IF NOT EXISTS oracle_evaluations (
+    id TEXT PRIMARY KEY,
+    run_id TEXT,
+    step_id TEXT,
+    finding_id TEXT,
+    subject_key TEXT,
+    phase TEXT NOT NULL,
+    oracle_id TEXT NOT NULL,
+    oracle_kind TEXT,
+    oracle_strength TEXT,
+    oracle_class TEXT,
+    reproduced INTEGER NOT NULL,
+    confidence REAL,
+    expected TEXT,
+    observed TEXT,
+    explanation TEXT,
+    version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_oracle_evaluations_run ON oracle_evaluations(run_id);
+  CREATE INDEX IF NOT EXISTS idx_oracle_evaluations_finding ON oracle_evaluations(finding_id);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

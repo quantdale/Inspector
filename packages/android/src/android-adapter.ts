@@ -17,6 +17,21 @@ import type { AdbBackend, AndroidFaults } from "./types.js";
 import { parseUiautomatorDump } from "./uiautomator.js";
 import { SEED_PACKAGE } from "./mock-backend.js";
 
+/**
+ * Lifecycle options for create/reset. Seeding is OPTIONAL: targets that need
+ * an APK install pass `seedApk`; targets driving already-present apps (system
+ * apps, pre-installed builds) pass `launchPackage`/`launchActivity`. With no
+ * options, create only ensures a device is alive and reset is a no-op.
+ */
+export interface AndroidLifecycleOptions {
+  /** Host path to an APK to install (the legacy seeded-conformance path). */
+  seedApk?: string;
+  /** Package to launch (and to force-stop/clear on reset). */
+  launchPackage?: string;
+  /** Optional activity component for `am start -n pkg/activity`. */
+  launchActivity?: string;
+}
+
 export const ANDROID_CAPABILITIES: CapabilityDoc = {
   protocolVersion: PROTOCOL_VERSION,
   adapter: "android-uiautomator",
@@ -60,6 +75,8 @@ function quoteDeviceShellWord(value: string): string {
  */
 export class AndroidAdapterHandler implements AdapterHandler {
   private serial: string | null = null;
+  /** Package reported in observations (launchPackage, else the seed package). */
+  private currentPackage = SEED_PACKAGE;
   private readonly artifacts: ArtifactStore;
   /** Unique per-instance artifact directory (mkdtemp under the base). */
   private readonly artifactDir: string;
@@ -86,18 +103,41 @@ export class AndroidAdapterHandler implements AdapterHandler {
   async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
     switch (params.op) {
       case "create": {
+        const opts = this.lifecycleOptions(params.options);
         this.applyAttribution(params.options);
         const devices = await this.backend.devices();
         this.serial = devices[0] ?? null;
         if (!this.serial) throw protocolError("VALIDATION", "no device connected");
-        await this.backend.install(this.serial, "/fixtures/seeddroid.apk");
+        if (opts.seedApk !== undefined) {
+          // Legacy seeded-conformance path: install the APK (byte-compatible
+          // with the pre-option behavior).
+          await this.backend.install(this.serial, opts.seedApk);
+          this.currentPackage = SEED_PACKAGE;
+        } else {
+          this.currentPackage = opts.launchPackage ?? SEED_PACKAGE;
+        }
+        if (opts.launchPackage !== undefined) {
+          await this.launchApp(this.serial, opts);
+        }
         return { ok: true };
       }
       case "reset": {
         if (!this.serial) throw protocolError("VALIDATION", "environment not created");
-        // Package data reset == back to the seeded login screen.
-        await this.backend.uninstall(this.serial, SEED_PACKAGE);
-        await this.backend.install(this.serial, "/fixtures/seeddroid.apk");
+        const opts = this.lifecycleOptions(params.options);
+        if (opts.seedApk !== undefined) {
+          // Package data reset == back to the seeded login screen.
+          await this.backend.uninstall(this.serial, SEED_PACKAGE);
+          await this.backend.install(this.serial, opts.seedApk);
+          this.currentPackage = SEED_PACKAGE;
+          return { ok: true };
+        }
+        if (opts.launchPackage !== undefined) {
+          const pkg = opts.launchPackage;
+          await this.backend.shell(this.serial, `am force-stop ${pkg}`);
+          await this.backend.shell(this.serial, `pm clear ${pkg}`);
+          await this.launchApp(this.serial, opts);
+          this.currentPackage = pkg;
+        }
         return { ok: true };
       }
       case "close": {
@@ -169,8 +209,8 @@ export class AndroidAdapterHandler implements AdapterHandler {
       source: "adapter-android",
       capturedAt: new Date().toISOString(),
       summary: {
-        url: `android://${serial}/${SEED_PACKAGE}`,
-        title: SEED_PACKAGE,
+        url: `android://${serial}/${this.currentPackage}`,
+        title: this.currentPackage,
         uiTree,
         logcat,
         storage: {},
@@ -291,6 +331,25 @@ export class AndroidAdapterHandler implements AdapterHandler {
     if (typeof environmentId === "string" && environmentId) {
       this.environmentId = environmentId;
     }
+  }
+
+  /** Extract typed lifecycle options, ignoring non-string values. */
+  private lifecycleOptions(options?: Record<string, unknown>): AndroidLifecycleOptions {
+    const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+    return {
+      seedApk: str(options?.seedApk),
+      launchPackage: str(options?.launchPackage),
+      launchActivity: str(options?.launchActivity),
+    };
+  }
+
+  /** Launch (or relaunch) an app by package, preferring the named activity. */
+  private async launchApp(serial: string, opts: AndroidLifecycleOptions): Promise<void> {
+    if (opts.launchPackage === undefined) return;
+    const cmd = opts.launchActivity
+      ? `am start -n ${opts.launchPackage}/${opts.launchActivity}`
+      : `monkey -p ${opts.launchPackage} -c android.intent.category.LAUNCHER 1`;
+    await this.backend.shell(serial, cmd);
   }
 
   /** Resolve "#id" to tappable element center via a fresh UI dump. */

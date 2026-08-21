@@ -196,10 +196,13 @@ describe.skipIf(!adbAvailable)("android real ADB backend", () => {
       const png = await backend.screencap(serial);
       expect(png.length).toBeGreaterThan(100);
 
-      // Process-death observation around force-stop / pm clear.
-      // `pidof` exits 1 with empty output when no process matches.
+      // Process-death observation around force-stop / pm clear, via the
+      // normalized pidof contract (null = not running, no throw).
       const pidOf = async (): Promise<string> =>
-        (await backend.shell(serial, `pidof ${TARGET_PKG}`).catch(() => "")).trim();
+        (await (backend.pidOf
+          ? backend.pidOf(serial, TARGET_PKG)
+          : backend.shell(serial, `pidof ${TARGET_PKG} || true`).then((s) => s.trim() || null)
+        )) ?? "";
       // Give the launched activity a moment to materialize as a process.
       let pidBefore = "";
       for (let i = 0; i < 5 && !pidBefore; i++) {

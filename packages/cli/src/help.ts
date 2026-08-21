@@ -1,9 +1,20 @@
 /** Usage text for every command, kept in one place. */
 
+const WORKSPACE_NOTE = [
+  "Workspace:",
+  "  --workspace <dir> is THE isolation mechanism: each isolated directory",
+  "  gets its own runs.db and artifacts. Resolution order when --workspace",
+  "  is absent: $INSPECTOR_WORKSPACE, then the process working directory",
+  "  (note: `pnpm run` re-cwd's to the package directory, so prefer an",
+  "  explicit --workspace). A warning is printed when the resolved workspace",
+  "  is the Inspector repository root.",
+].join("\n");
+
 const GLOBAL = [
   "Global flags:",
   "  --json                Machine-readable JSON output",
-  "  --workspace <dir>     Workspace directory (default: <cwd>/.inspector)",
+  "  --workspace <dir>     Workspace directory (see Workspace below; default:",
+  "                        $INSPECTOR_WORKSPACE, else <cwd>/.inspector)",
   "  --debug               Print raw stack traces after errors",
   "  --version, -v         Print the Inspector version",
   "  --help, -h            Show help for a command",
@@ -24,6 +35,8 @@ export function generalUsage(): string {
     "  help [command]           Show help",
     "",
     GLOBAL,
+    "",
+    WORKSPACE_NOTE,
     "",
     "Examples:",
     "  inspector doctor --json",
@@ -47,6 +60,8 @@ const COMMAND_HELP: Record<string, string> = {
     "android adb, windows-uia, electron) are reported as WARN when missing.",
     "",
     "Exit code 0 only when all core checks pass.",
+    "",
+    WORKSPACE_NOTE,
   ].join("\n"),
   hunt: [
     "Usage: inspector hunt [--adapter web|fake] [options]",
@@ -65,12 +80,16 @@ const COMMAND_HELP: Record<string, string> = {
     "",
     "Exit code 1 on adapter-error / initial-observe-failed stops or any",
     "error-level finding outcome; otherwise 0.",
+    "",
+    WORKSPACE_NOTE,
   ].join("\n"),
   run: [
     "Usage: inspector run --adapter fake|web [--json]",
     "",
     "Scripted demonstration scenario against the chosen adapter. Records a",
     "durable run in the workspace store.",
+    "",
+    WORKSPACE_NOTE,
   ].join("\n"),
   runs: [
     "Usage: inspector runs list [--limit n]",
@@ -84,6 +103,8 @@ const COMMAND_HELP: Record<string, string> = {
     "           in-flight actions unknown, and print a re-observed summary.",
     "           Fails honestly when the original adapter kind is not",
     "           recoverable from the stored record.",
+    "",
+    WORKSPACE_NOTE,
   ].join("\n"),
   findings: [
     "Usage: inspector findings list [--run <id>] [--limit n]",
@@ -92,6 +113,8 @@ const COMMAND_HELP: Record<string, string> = {
     "  list     Findings (newest first), optionally filtered by run.",
     "  show     One finding with status history, reproduction stats, artifact",
     "           refs count, and the evidence bundle path when it exists on disk.",
+    "",
+    WORKSPACE_NOTE,
   ].join("\n"),
   help: ["Usage: inspector help [command]", "", "Show help for a command."].join("\n"),
 };

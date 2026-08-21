@@ -259,12 +259,10 @@ describe("android torture (mock-driven)", () => {
 
   it("input without a focused field is an automation miss (permission-style denial)", async () => {
     const handler = new AndroidAdapterHandler(new MockAdbBackend(), {}, ART_BASE);
-    await handler.lifecycle({ op: "create" });
-    const outcome = await handler.act({ action: act("p", "fill", { selector: "#username", value: "admin" }) });
-    // Tapping the field focuses it first, so fill succeeds; force the denial by
-    // filling after logout reset cleared focus state via reset.
-    expect(["success", "target-failure"]).toContain(outcome.status);
-    await handler.lifecycle({ op: "reset" });
+    // Seeded reset requires the seedApk option now that seeding is optional.
+    const seeded = { seedApk: "/fixtures/seeddroid.apk" };
+    await handler.lifecycle({ op: "create", options: seeded });
+    await handler.lifecycle({ op: "reset", options: seeded });
     const denied = await handler.act({ action: act("p2", "fill", { selector: "#msg", value: "admin" }) });
     expect(denied.status).toBe("target-failure");
     expect(denied.error?.code).toBe("ACTION_FAILED");
@@ -272,11 +270,12 @@ describe("android torture (mock-driven)", () => {
 
   it("reset/reinstall cycle restores the seeded baseline", async () => {
     const handler = new AndroidAdapterHandler(new MockAdbBackend(), {}, ART_BASE);
-    await handler.lifecycle({ op: "create" });
+    const seeded = { seedApk: "/fixtures/seeddroid.apk" };
+    await handler.lifecycle({ op: "create", options: seeded });
     await loginToDashboard(handler);
     let obs = await handler.observe({});
     expect((obs.summary as { uiTree: Array<{ id?: string }> }).uiTree.map((e) => e.id)).toContain("boom");
-    await handler.lifecycle({ op: "reset" });
+    await handler.lifecycle({ op: "reset", options: seeded });
     obs = await handler.observe({});
     const ids = (obs.summary as { uiTree: Array<{ id?: string }> }).uiTree.map((e) => e.id);
     expect(ids).toContain("login");

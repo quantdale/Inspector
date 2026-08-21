@@ -24,6 +24,8 @@ interface MockApp {
   focused: string | null;
   errors: string[];
   installed: boolean;
+  /** SeedDroid process pid; null when not running (force-stop / pm clear). */
+  pid: number | null;
 }
 
 function initialApp(): MockApp {
@@ -36,6 +38,7 @@ function initialApp(): MockApp {
     focused: null,
     errors: [],
     installed: true,
+    pid: null,
   };
 }
 
@@ -99,6 +102,7 @@ function unquoteDeviceShellWord(s: string): string {
 export class MockAdbBackend implements AdbBackend {
   private readonly apps = new Map<string, MockApp>();
   private readonly logs = new Map<string, string[]>();
+  private nextPid = 4242;
   deviceCrashed = false;
 
   async devices(): Promise<string[]> {
@@ -116,6 +120,13 @@ export class MockAdbBackend implements AdbBackend {
 
     if (cmd.startsWith("am force-stop") || cmd.startsWith("pm clear")) {
       this.apps.set(serial, initialApp());
+      return "Success";
+    }
+
+    // App launch (`am start -n pkg/activity` or `monkey -p pkg ...`): assign a
+    // fresh simulated process so pidOf reflects "running".
+    if (cmd.startsWith("am start") || cmd.startsWith("monkey ")) {
+      app.pid = this.nextPid++;
       return "Success";
     }
 
@@ -145,6 +156,17 @@ export class MockAdbBackend implements AdbBackend {
     throw new Error(`unsupported shell command: ${cmd}`);
   }
 
+  /**
+   * Mirrors the normalized real-backend contract (D-A2): pid string when the
+   * seed app is running, null when not, typed error when the device is down.
+   */
+  async pidOf(serial: string, pkg: string): Promise<string | null> {
+    if (pkg !== SEED_PACKAGE) return null;
+    this.assertAlive();
+    const app = this.appFor(serial);
+    return app.pid === null ? null : String(app.pid);
+  }
+
   async screencap(): Promise<Buffer> {
     this.assertAlive();
     // Minimal valid PNG header bytes stand in for a screenshot.
@@ -160,12 +182,12 @@ export class MockAdbBackend implements AdbBackend {
     return [...this.appFor(serial).errors];
   }
 
-  async install(serial: string): Promise<void> {
+  async install(serial: string, _apkPath?: string): Promise<void> {
     this.assertAlive();
     if (!this.apps.has(serial)) this.apps.set(serial, initialApp());
   }
 
-  async uninstall(serial: string): Promise<void> {
+  async uninstall(serial: string, _pkg?: string): Promise<void> {
     this.assertAlive();
     this.apps.set(serial, initialApp());
   }

@@ -99,6 +99,34 @@ export interface FindingRecord {
   adapter: string | null;
 }
 
+/**
+ * One oracle's outcome for a single evaluation event. Persisted per
+ * docs/ORACLE-SYSTEM.md so evidence bundles and campaign provenance can
+ * reconstruct which oracles ran, what they saw, and why a finding was
+ * promoted. `oracle_class` is nullable: the codebase only carries
+ * kind/strength today; class is populated from kind where unambiguous.
+ */
+export interface OracleEvaluationRecord {
+  id: string;
+  runId: string | null;
+  stepId: string | null;
+  findingId: string | null;
+  /** Replay subject key when no finding exists yet (e.g. baseline evals). */
+  subjectKey: string | null;
+  phase: "reproduce" | "minimize" | "repair-verify";
+  oracleId: string;
+  oracleKind: string | null;
+  oracleStrength: string | null;
+  oracleClass: string | null;
+  reproduced: boolean;
+  confidence: number | null;
+  expected: string | null;
+  observed: string | null;
+  explanation: string | null;
+  version: string;
+  createdAt: string;
+}
+
 /** Raised when a second unresolved action tries to claim an idempotency key
  * that is already held by a pending/unknown action. */
 export class DuplicateActionIdempotencyError extends Error {
@@ -586,5 +614,61 @@ export class Store {
     return this.db
       .prepare(`${FINDING_SELECT} ORDER BY updated_at DESC LIMIT ?`)
       .all(limit) as FindingRecord[];
+  }
+
+  /** Append one oracle evaluation record. Insert-only: evaluation history is
+   * immutable evidence and is never updated in place. */
+  putOracleEvaluation(r: OracleEvaluationRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO oracle_evaluations(id, run_id, step_id, finding_id, subject_key, phase,
+           oracle_id, oracle_kind, oracle_strength, oracle_class, reproduced, confidence,
+           expected, observed, explanation, version, created_at)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        r.id,
+        r.runId,
+        r.stepId,
+        r.findingId,
+        r.subjectKey,
+        r.phase,
+        r.oracleId,
+        r.oracleKind,
+        r.oracleStrength,
+        r.oracleClass,
+        r.reproduced ? 1 : 0,
+        r.confidence,
+        r.expected,
+        r.observed,
+        r.explanation,
+        r.version,
+        r.createdAt,
+      );
+  }
+
+  private selectOracleEvaluations(where: string): string {
+    return `SELECT id, run_id AS runId, step_id AS stepId, finding_id AS findingId,
+      subject_key AS subjectKey, phase, oracle_id AS oracleId, oracle_kind AS oracleKind,
+      oracle_strength AS oracleStrength, oracle_class AS oracleClass, reproduced,
+      confidence, expected, observed, explanation, version, created_at AS createdAt
+      FROM oracle_evaluations ${where}`;
+  }
+
+  /** Evaluation history for a finding in insertion order (rowid breaks
+   * same-millisecond ties). */
+  listOracleEvaluationsForFinding(findingId: string): OracleEvaluationRecord[] {
+    const rows = this.db
+      .prepare(`${this.selectOracleEvaluations("WHERE finding_id = ?")} ORDER BY created_at, rowid`)
+      .all(findingId) as Array<Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }>;
+    return rows.map((r) => ({ ...r, reproduced: r.reproduced !== 0 }));
+  }
+
+  /** Evaluation history for a whole run in insertion order. */
+  listOracleEvaluationsForRun(runId: string): OracleEvaluationRecord[] {
+    const rows = this.db
+      .prepare(`${this.selectOracleEvaluations("WHERE run_id = ?")} ORDER BY created_at, rowid`)
+      .all(runId) as Array<Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }>;
+    return rows.map((r) => ({ ...r, reproduced: r.reproduced !== 0 }));
   }
 }

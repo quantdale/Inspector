@@ -1,14 +1,20 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { Store, type FindingRecord } from "@inspector/store-sqlite";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cliBin = join(here, "bin.ts");
+// Absolute tsx entry so the CLI can be spawned with a cwd outside the repo
+// (workspace-resolution tests) where bare 'tsx' would not resolve.
+const tsxEntry = createRequire(import.meta.url).resolve("tsx");
+const tsxImportUrl = pathToFileURL(tsxEntry).href;
 
 let dir: string | null = null;
 afterEach(() => {
@@ -19,10 +25,18 @@ afterEach(() => {
 });
 
 function runCli(args: string[], workspace: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  return spawnCli([...args, "--workspace", workspace], { cwd: process.cwd() });
+}
+
+/** Spawn the CLI without forcing --workspace, for resolution/env tests. */
+function spawnCli(
+  args: string[],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--import", "tsx", cliBin, ...args, "--workspace", workspace], {
-      cwd: process.cwd(),
-      env: { ...process.env },
+    const child = spawn(process.execPath, ["--import", tsxImportUrl, cliBin, ...args], {
+      cwd: opts.cwd ?? process.cwd(),
+      env: { ...process.env, ...opts.env },
     });
     let stdout = "";
     let stderr = "";
@@ -269,4 +283,81 @@ describe("cli", () => {
     expect(missing.code).toBe(1);
     expect(missing.stdout).toContain("run not found");
   }, 60000);
+
+  it("resolves $INSPECTOR_WORKSPACE when --workspace is absent", async () => {
+    const envWs = mkdtempSync(join(tmpdir(), "inspector-cli-envws-"));
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    try {
+      const run = await spawnCli(["run", "--adapter", "fake", "--json"], {
+        cwd: dir, // NOT the workspace; env must win over the process cwd
+        env: {
+          INSPECTOR_WORKSPACE: envWs,
+          TSX_TSCONFIG_PATH: join(here, "..", "..", "..", "tsconfig.json"),
+        },
+      });
+      expect(run.code).toBe(0);
+      expect(existsSync(join(envWs, ".inspector", "runs.db"))).toBe(true);
+    } finally {
+      rmSync(envWs, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("warns on stderr when the resolved workspace is a repository root", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "inspector-cli-repo-"));
+    dir = repo;
+    mkdirSync(join(repo, "packages"), { recursive: true });
+    mkdirSync(join(repo, ".inspector", "state"), { recursive: true });
+    writeFileSync(join(repo, "package.json"), "{}");
+    writeFileSync(join(repo, ".inspector", "state", "campaign.yaml"), "mode: IMPLEMENTATION\n");
+    const human = await spawnCli(["doctor"], {
+      cwd: repo,
+      env: { TSX_TSCONFIG_PATH: join(here, "..", "..", "..", "tsconfig.json") },
+    });
+    expect(human.stderr).toContain(
+      "warning: using repository-root workspace; pass --workspace <dir> to isolate runs",
+    );
+    // Under --json the warning moves into the payload instead of stderr.
+    const json = await spawnCli(["doctor", "--json"], {
+      cwd: repo,
+      env: { TSX_TSCONFIG_PATH: join(here, "..", "..", "..", "tsconfig.json") },
+    });
+    expect(json.stderr).not.toContain("repository-root workspace");
+    const parsed = JSON.parse(json.stdout);
+    expect(parsed.warning).toContain("--workspace <dir> to isolate");
+  }, 60000);
+
+  it("keeps two concurrent hunts in two workspaces fully isolated", async () => {
+    const wsA = mkdtempSync(join(tmpdir(), "inspector-cli-wsa-"));
+    const wsB = mkdtempSync(join(tmpdir(), "inspector-cli-wsb-"));
+    dir = wsA;
+    try {
+      const args = ["hunt", "--adapter", "fake", "--seed", "7", "--max-actions", "60", "--max-findings", "2", "--json"];
+      const [a, b] = await Promise.all([
+        runCli(args, wsA),
+        runCli(args, wsB),
+      ]);
+      // Sharing one runs.db would crash at least one hunt with
+      // UNIQUE constraint failed: actions.idempotency.
+      expect(a.code, a.stderr).toBe(0);
+      expect(b.code, b.stderr).toBe(0);
+      const runIdA = (JSON.parse(a.stdout) as { runId: string }).runId;
+      const runIdB = (JSON.parse(b.stdout) as { runId: string }).runId;
+      expect(runIdA).not.toBe(runIdB);
+      expect(existsSync(join(wsA, ".inspector", "runs.db"))).toBe(true);
+      expect(existsSync(join(wsB, ".inspector", "runs.db"))).toBe(true);
+
+      // Each store only knows its own run.
+      for (const [ws, own, other] of [
+        [wsA, runIdA, runIdB],
+        [wsB, runIdB, runIdA],
+      ] as const) {
+        const list = await runCli(["runs", "list", "--json"], ws);
+        const ids = (JSON.parse(list.stdout) as Array<{ id: string }>).map((r) => r.id);
+        expect(ids).toContain(own);
+        expect(ids).not.toContain(other);
+      }
+    } finally {
+      rmSync(wsB, { recursive: true, force: true });
+    }
+  }, 120000);
 });

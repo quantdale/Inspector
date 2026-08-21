@@ -1,7 +1,7 @@
 import { RunManager, type RunController } from "@inspector/core";
 import { intFlag, parseArgs, requirePositional, CliError } from "./args.js";
-import { closeRunGuarded, workDirOf, type CommandContext } from "./hunt.js";
-import { adapterSpawn, openWorkspace, type AdapterSpawnSpec } from "./workspace.js";
+import { closeRunGuarded, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { adapterSpawn, openWorkspace, remapWorkspaceConflict, type AdapterSpawnSpec } from "./workspace.js";
 
 /**
  * Map a stored adapter identity (self-reported at initialize) back to a spawn
@@ -23,7 +23,9 @@ export async function runsCommand(
     const rest = sub === undefined ? parentRest : parentRest.slice(1);
     const parsed = parseArgs(rest, ["--limit"], []);
     const limit = intFlag(parsed.flags, "--limit", 100);
-    const { store } = openWorkspace(workDirOf(ctx, parsed));
+    const dir = workDirOf(ctx, parsed);
+    warnRepoRootWorkspace(ctx, dir);
+    const { store } = openWorkspace(dir);
     try {
       const runs = store
         .listRuns(limit)
@@ -46,7 +48,9 @@ export async function runsCommand(
   if (sub === "show") {
     const parsed = parseArgs(parentRest.slice(1), [], []);
     const id = requirePositional(parsed.positionals, 0, "inspector runs show <id>");
-    const { store } = openWorkspace(workDirOf(ctx, parsed));
+    const dir = workDirOf(ctx, parsed);
+    warnRepoRootWorkspace(ctx, dir);
+    const { store } = openWorkspace(dir);
     try {
       const run = store.getRun(id);
       if (!run) {
@@ -93,7 +97,14 @@ async function resumeRunCommand(
 ): Promise<{ code: number; data?: unknown }> {
   const parsed = parseArgs(rest, [], []);
   const id = requirePositional(parsed.positionals, 0, "inspector runs resume <id>");
-  const { store, artifacts } = openWorkspace(workDirOf(ctx, parsed));
+  const dir = workDirOf(ctx, parsed);
+  warnRepoRootWorkspace(ctx, dir);
+  let store, artifacts;
+  try {
+    ({ store, artifacts } = openWorkspace(dir));
+  } catch (e) {
+    throw remapWorkspaceConflict(e);
+  }
   let controller: RunController | null = null;
   try {
     const record = store.getRun(id);
@@ -114,7 +125,14 @@ async function resumeRunCommand(
     let observationSummary: unknown = null;
     let observeError: string | null = null;
     try {
-      controller = await mgr.resumeRun(id, spec);
+      try {
+        controller = await mgr.resumeRun(id, spec);
+      } catch (e) {
+        // A shared/locked db must surface as an actionable error, not an
+        // observeError on an already-broken run.
+        const mapped = remapWorkspaceConflict(e);
+        throw mapped === e ? e : mapped;
+      }
       // Re-observation proves the fresh environment actually answers; a
       // failure here is reported honestly instead of being dressed up.
       const obs = await controller.observe(["state"]);

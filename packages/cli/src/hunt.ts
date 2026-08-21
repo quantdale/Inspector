@@ -21,7 +21,7 @@ import {
 import { ExploreController, WebReplayDriver, mulberry32 } from "@inspector/explore";
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
-import { adapterSpawn, openWorkspace } from "./workspace.js";
+import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorkspaceConflict } from "./workspace.js";
 
 /** Progress sink; stderr so stdout stays parseable. */
 export type ProgressFn = (line: string) => void;
@@ -537,10 +537,24 @@ export interface CommandContext {
 
 /**
  * Resolve the workspace directory: the command's own --workspace flag wins,
- * then a pre-command --workspace, then the working directory.
+ * then a pre-command --workspace, then INSPECTOR_WORKSPACE, then the working
+ * directory. --workspace is THE isolation mechanism: `pnpm run` re-cwd's to
+ * the package directory before executing, so an absent --workspace cannot be
+ * assumed to resolve to the operator's shell cwd.
  */
 export function workDirOf(ctx: CommandContext, parsed: ParsedInvocation): string {
-  return parsed.workspace ?? ctx.workspaceArg ?? ctx.baseCwd;
+  return parsed.workspace ?? ctx.workspaceArg ?? process.env.INSPECTOR_WORKSPACE ?? ctx.baseCwd;
+}
+
+/**
+ * Warn on stderr (suppressed under --json) when the resolved workspace is the
+ * Inspector repository root; returns the message so JSON payloads can carry a
+ * `warning` field instead.
+ */
+export function warnRepoRootWorkspace(ctx: CommandContext, dir: string): string | null {
+  if (!isRepoRoot(dir)) return null;
+  if (!ctx.json) ctx.progress(REPO_ROOT_WARNING);
+  return REPO_ROOT_WARNING;
 }
 
 export async function huntCommand(
@@ -548,7 +562,14 @@ export async function huntCommand(
   ctx: CommandContext,
 ): Promise<{ code: number; data?: unknown }> {
   const req = parseHuntRequest(parsed);
-  const workspace = openWorkspace(workDirOf(ctx, parsed));
+  const dir = workDirOf(ctx, parsed);
+  const warning = warnRepoRootWorkspace(ctx, dir);
+  let workspace: ReturnType<typeof openWorkspace>;
+  try {
+    workspace = openWorkspace(dir);
+  } catch (e) {
+    throw remapWorkspaceConflict(e);
+  }
   const { store, artifacts, base } = workspace;
   let run: RunController | null = null;
   try {
@@ -560,7 +581,11 @@ export async function huntCommand(
       req.adapter === "web" && req.targetUrl !== undefined
         ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
         : adapterSpawn(req.adapter);
-    run = await mgr.startRun(spawnSpec);
+    try {
+      run = await mgr.startRun(spawnSpec);
+    } catch (e) {
+      throw remapWorkspaceConflict(e);
+    }
 
     const result =
       req.adapter === "web"
@@ -576,6 +601,7 @@ export async function huntCommand(
 
     const summary = {
       ok: code === 0,
+      ...(warning !== null ? { warning } : {}),
       runId: result.runId,
       adapter: req.adapter,
       seed: result.seed,

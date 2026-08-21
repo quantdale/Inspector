@@ -18,7 +18,7 @@ import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, mkdtempSync } from "node:fs";
-import type { UiaBackend } from "./types.js";
+import type { UiaBackend, UiaBackendWindowOps } from "./types.js";
 
 export const WINDOWS_CAPABILITIES: CapabilityDoc = {
   protocolVersion: PROTOCOL_VERSION,
@@ -77,7 +77,10 @@ export class WindowsAdapterHandler implements AdapterHandler {
     return WINDOWS_CAPABILITIES;
   }
 
-  async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
+  async lifecycle(params: {
+    op: string;
+    options?: Record<string, unknown>;
+  }): Promise<{ ok: boolean; window?: { pid: number; title: string } }> {
     switch (params.op) {
       case "create":
         // Probe the backend so create fails for a dead UIA client instead of
@@ -90,6 +93,21 @@ export class WindowsAdapterHandler implements AdapterHandler {
         await this.backend.reset();
         this.created = true;
         return { ok: true };
+      case "waitForWindow": {
+        const winOps = this.backend as Partial<UiaBackendWindowOps>;
+        if (typeof winOps.waitForWindow !== "function") {
+          throw protocolError("CAPABILITY_DENIED", "backend does not support waitForWindow");
+        }
+        const opts = params.options ?? {};
+        const pid = typeof opts.pid === "number" ? opts.pid : undefined;
+        const titleContains = typeof opts.titleContains === "string" ? opts.titleContains : undefined;
+        if (pid === undefined && !titleContains) {
+          throw protocolError("VALIDATION", "waitForWindow requires pid or titleContains");
+        }
+        const timeoutMs = typeof opts.timeoutMs === "number" ? opts.timeoutMs : undefined;
+        const window = await winOps.waitForWindow({ pid, titleContains, timeoutMs });
+        return { ok: true, window };
+      }
       case "close":
         this.created = false;
         return { ok: true };

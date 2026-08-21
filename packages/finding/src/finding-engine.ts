@@ -1,6 +1,7 @@
 import { newId } from "@inspector/protocol";
-import type { Store, FindingRecord, FindingStatus } from "@inspector/store-sqlite";
+import type { Store, FindingRecord, FindingStatus, OracleEvaluationRecord } from "@inspector/store-sqlite";
 import { OracleEngine, defaultSignatureExtractor } from "./engine.js";
+import type { OracleEvaluationDetail } from "./engine.js";
 import type {
   Action,
   Finding,
@@ -52,6 +53,22 @@ export interface FindingEngineOptions {
   signatureExtractor?: SignatureExtractor;
 }
 
+/** Version stamped on persisted oracle evaluation records. */
+const ORACLE_EVALUATION_VERSION = "oracle-eval/1";
+
+/**
+ * Oracle-class taxonomy (docs/ORACLE-SYSTEM.md). The codebase carries only
+ * oracle kind/strength today, so `oracle_class` is populated from kind where
+ * the mapping is unambiguous and left null otherwise.
+ */
+const ORACLE_CLASSES: ReadonlySet<string> = new Set([
+  "invariant",
+  "metamorphic",
+  "structural",
+  "persistence",
+  "semantic-suspicion",
+]);
+
 function validatePolicy(policy: ReproductionPolicy): void {
   const { attempts, minSuccesses } = policy;
   if (!Number.isInteger(attempts) || attempts < 1) {
@@ -76,6 +93,27 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
+}
+
+/**
+ * Compact, stable replay-subject key: the ordered action ids. Used as
+ * provenance when no finding exists yet (pre-finding baseline evaluations).
+ */
+function subjectKeyOf(actions: Action[]): string {
+  return actions.map((a) => a.id).join(">");
+}
+
+/**
+ * Compact observed-evidence summary: oracle signal kinds and crash-class
+ * outcome codes only — never free-form detail — following the repo's
+ * redaction-before-persistence conventions.
+ */
+function summarizeObserved(result: ReplayResult): string {
+  const parts: string[] = result.signals.map((s) => s.kind);
+  for (const o of result.outcomes) {
+    if (o.status === "target-failure" && o.error?.code) parts.push(String(o.error.code));
+  }
+  return parts.length > 0 ? [...new Set(parts)].sort().join(",") : "(none)";
 }
 
 // PART2
@@ -173,6 +211,14 @@ export class FindingEngine {
         }
         lastSignals = result.signals;
         const evaluation = this.oracle.evaluate(result);
+        this.persistOracleEvaluations(evaluation.evaluations, {
+          phase: "reproduce",
+          findingId: finding.id,
+          runId: finding.runId,
+          subjectKey: subjectKeyOf(actions),
+          expected: "no defect signal on replay",
+          observed: summarizeObserved(result),
+        });
         if (evaluation.reproduced) {
           successes += 1;
           for (const id of evaluation.matchedOracleIds) matchedOracleIds.add(id);
@@ -242,10 +288,19 @@ export class FindingEngine {
       const baseResult = await driver.replay(current);
       const baseSig = this.signatureExtractor(baseResult);
       if (originalSignature === null) originalSignature = baseSig;
+      const baseEvaluation = this.oracle.evaluate(baseResult);
+      this.persistOracleEvaluations(baseEvaluation.evaluations, {
+        phase: "minimize",
+        findingId: finding.id,
+        runId: finding.runId,
+        subjectKey: subjectKeyOf(current),
+        expected: `baseline replay reproduces signature ${originalSignature ?? "(unknown)"}`,
+        observed: summarizeObserved(baseResult),
+      });
       verified =
         baseSig !== null &&
         baseSig === originalSignature &&
-        this.oracle.evaluate(baseResult).reproduced;
+        baseEvaluation.reproduced;
     }
     if (!verified) {
       finding.minimization = { probes, removals: 0, verifiedReproduction: false };
@@ -265,10 +320,19 @@ export class FindingEngine {
         replaysLeft -= 1;
         probes += 1;
         const candidateSig = this.signatureExtractor(result);
+        const candidateEvaluation = this.oracle.evaluate(result);
+        this.persistOracleEvaluations(candidateEvaluation.evaluations, {
+          phase: "minimize",
+          findingId: finding.id,
+          runId: finding.runId,
+          subjectKey: subjectKeyOf(candidate),
+          expected: `reduced replay reproduces signature ${originalSignature ?? "(unknown)"}`,
+          observed: summarizeObserved(result),
+        });
         if (
           candidateSig !== null &&
           candidateSig === originalSignature &&
-          this.oracle.evaluate(result).reproduced
+          candidateEvaluation.reproduced
         ) {
           removals += current.length - candidate.length;
           current = candidate;
@@ -312,6 +376,12 @@ export class FindingEngine {
       originalSteps: deepFreeze(structuredClone(original)),
       minimizedSteps: deepFreeze(structuredClone(minimized)),
       oracleEvidence: deepFreeze(structuredClone(opts.signals ?? [])),
+      // Evaluation history comes from the durable store so bundles answer
+      // "which oracles ran, what did they see, why promoted". Snapshotted
+      // (cloned + frozen) like every other bundle field.
+      evaluations: deepFreeze(
+        structuredClone(this.store?.listOracleEvaluationsForFinding(finding.id) ?? []),
+      ),
       // Frozen snapshot; the EvidenceBundle field predates readonly typing.
       artifactRefs: Object.freeze(artifactRefs) as unknown as string[],
       replayCommand: opts.replayCommand ?? `inspector replay --finding ${finding.id}`,
@@ -356,6 +426,94 @@ export class FindingEngine {
       ]);
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Persist one oracle-evaluation record per descriptor for a single
+   * evaluation event. Used by the repair pipeline (repair-verify phase) so
+   * verification-phase oracle outcomes are auditable like reproduction ones.
+   * Persistence failures are contained: provenance must never break repair.
+   */
+  recordRepairVerification(input: {
+    finding: Finding;
+    /** Descriptors of every oracle evaluated (matched or not). */
+    descriptors: Array<{
+      id: string;
+      kind?: string;
+      strength?: "hard" | "soft";
+      confidence?: number;
+      description?: string;
+    }>;
+    matchedIds: string[];
+    expected: string;
+    observed: string;
+  }): void {
+    const matched = new Set(input.matchedIds);
+    this.persistOracleEvaluations(
+      input.descriptors.map((d) => ({
+        oracleId: d.id,
+        reproduced: matched.has(d.id),
+        kind: d.kind ?? null,
+        strength: d.strength ?? null,
+        confidence: typeof d.confidence === "number" ? d.confidence : null,
+        description: d.description ?? null,
+      })),
+      {
+        phase: "repair-verify",
+        findingId: input.finding.id,
+        runId: input.finding.runId,
+        expected: input.expected,
+        observed: input.observed,
+      },
+    );
+  }
+
+  /** Failure-contained evaluation-record persistence (log-and-continue). */
+  private persistOracleEvaluations(
+    evaluations: OracleEvaluationDetail[],
+    opts: {
+      phase: OracleEvaluationRecord["phase"];
+      findingId: string | null;
+      runId: string | null;
+      subjectKey?: string | null;
+      expected: string;
+      observed: string;
+    },
+  ): void {
+    if (!this.store || evaluations.length === 0) return;
+    try {
+      for (const e of evaluations) {
+        const record: OracleEvaluationRecord = {
+          id: newId(),
+          runId: opts.runId,
+          stepId: null,
+          findingId: opts.findingId,
+          subjectKey: opts.subjectKey ?? null,
+          phase: opts.phase,
+          oracleId: e.oracleId,
+          oracleKind: e.kind,
+          oracleStrength: e.strength,
+          oracleClass: e.kind !== null && ORACLE_CLASSES.has(e.kind) ? e.kind : null,
+          reproduced: e.reproduced,
+          confidence: e.confidence,
+          expected: opts.expected,
+          observed: opts.observed,
+          explanation:
+            e.description ??
+            `${e.oracleId} ${e.reproduced ? "matched" : "did not match"} on replay`,
+          version: ORACLE_EVALUATION_VERSION,
+          createdAt: new Date().toISOString(),
+        };
+        this.store.putOracleEvaluation(record);
+      }
+    } catch (err) {
+      // Provenance enrichment only: never break the finding pipeline.
+      console.warn(
+        `[finding-engine] failed to persist oracle evaluation records: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 

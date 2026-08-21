@@ -6,6 +6,7 @@ import type {
   FindingEngine,
   OracleSignalKind,
   ReplayDriver,
+  ReplayResult,
 } from "@inspector/finding";
 import type { OracleSuite } from "@inspector/oracle";
 import {
@@ -69,6 +70,14 @@ function isTestPath(relPath: string): boolean {
 export class RepairEngine {
   private readonly regressions: RegressionGenerator;
   private readonly contextBuilder = new SourceContextBuilder();
+  /**
+   * Per-repair provenance sink for regression-gate evaluations. Set at the
+   * start of repair() (when the finding is known) and cleared afterwards;
+   * null when no store-backed evaluation recording applies.
+   */
+  private evaluationSink:
+    | ((gate: "regression-pre-patch" | "regression-post-patch", matchedIds: string[], observed: string) => void)
+    | null = null;
 
   constructor(
     private readonly findingEngine: FindingEngine,
@@ -82,6 +91,7 @@ export class RepairEngine {
     this.regressions = new RegressionGenerator({
       driverFor: opts.driverFor,
       oracleSuite: opts.oracleSuite,
+      onEvaluation: (gate, matchedIds, observed) => this.evaluationSink?.(gate, matchedIds, observed),
     });
   }
 
@@ -110,6 +120,18 @@ export class RepairEngine {
     }
 
     let workspace: RepairWorkspace | undefined;
+    this.evaluationSink = (gate, matchedIds, observed) => {
+      this.findingEngine.recordRepairVerification({
+        finding,
+        descriptors: this.opts.oracleSuite.descriptors,
+        matchedIds,
+        expected:
+          gate === "regression-pre-patch"
+            ? "regression scenario fails on the unpatched revision"
+            : "regression scenario passes post-patch",
+        observed,
+      });
+    };
     try {
       workspace = await RepairWorkspace.create(this.opts.repoRoot, this.opts.revision);
       const worktreeCommit = await workspace.headCommit().catch(() => null);
@@ -204,7 +226,16 @@ export class RepairEngine {
           // P4 verification: exact replay must no longer fire the oracle...
           const driver = await this.opts.driverFor(workspace);
           const replayResult = await driver.replay(minimizedActions);
-          const stillFails = this.opts.oracleSuite.evaluateStrict(replayResult).reproduced;
+          const postPatchVerdict = this.opts.oracleSuite.evaluateStrict(replayResult);
+          // Provenance: persist one evaluation record per registered oracle.
+          this.findingEngine.recordRepairVerification({
+            finding,
+            descriptors: this.opts.oracleSuite.descriptors,
+            matchedIds: postPatchVerdict.matched.map((m) => m.id),
+            expected: "post-patch reproducer replay fires no hard oracle",
+            observed: summarizeObserved(replayResult),
+          });
+          const stillFails = postPatchVerdict.reproduced;
 
           // Masking-by-removal defense: every action that crashed the
           // unpatched target with a genuine application failure (TARGET_FAILURE)
@@ -341,6 +372,7 @@ export class RepairEngine {
         reason: `repair pipeline failed: ${errorMessage(err)}`,
       });
     } finally {
+      this.evaluationSink = null;
       await workspace?.dispose();
     }
   }
@@ -463,4 +495,14 @@ export class RepairEngine {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Compact observed-evidence summary: signal kinds and crash-class outcome
+ * codes only — never free-form detail. */
+function summarizeObserved(result: ReplayResult): string {
+  const parts: string[] = result.signals.map((s) => s.kind);
+  for (const o of result.outcomes) {
+    if (o.status === "target-failure" && o.error?.code) parts.push(String(o.error.code));
+  }
+  return parts.length > 0 ? [...new Set(parts)].sort().join(",") : "(none)";
 }

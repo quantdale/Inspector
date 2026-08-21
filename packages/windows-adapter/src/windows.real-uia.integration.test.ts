@@ -142,4 +142,56 @@ describe.skipIf(!available)("windows real UIA backend (integration)", () => {
       expect(reaped).toBe(true);
     },
   );
+
+  it(
+    "waitForWindow resolves on cold start and times out typed; tree throws DEAD_WINDOW after kill",
+    { timeout: 70000 },
+    async () => {
+      const bridge = new PowerShellUiaBridge({ timeoutMs: 15000 });
+      const backend = new RealUiaBackend(bridge);
+      let paintPid = 0;
+      try {
+        // Cold start: the spawned launcher pid differs from / precedes the
+        // window's appearance in the top-level list, exactly the gap
+        // waitForWindow exists for.
+        const launcher = spawn("cmd", ["/c", "start", "mspaint"], {
+          detached: true,
+          stdio: "ignore",
+        });
+        launcher.unref();
+        const pidOut = spawnSync(
+          "powershell.exe",
+          ["-NoProfile", "-NonInteractive", "-Command", "(Get-Process mspaint | Select-Object -First 1).Id"],
+          { encoding: "utf8", timeout: 20000 },
+        );
+        paintPid = Number.parseInt((pidOut.stdout ?? "").trim(), 10);
+        expect(Number.isFinite(paintPid)).toBe(true);
+
+        // Success path: bounded poll until the window is enumerable.
+        const win = await backend.waitForWindow({ pid: paintPid, timeoutMs: 40000 });
+        expect(win.pid).toBe(paintPid);
+        await backend.attach({ pid: paintPid });
+        const tree = await backend.richTree();
+        expect(tree.pid).toBe(paintPid);
+        expect(tree.nodes.length).toBeGreaterThan(0);
+
+        // Timeout path: impossible pid must fail fast with WINDOW_NOT_FOUND.
+        await expect(
+          backend.waitForWindow({ pid: 999999, timeoutMs: 1500 }),
+        ).rejects.toMatchObject({ code: "WINDOW_NOT_FOUND" });
+
+        // Kill probe: after the process dies, richTree must throw a typed
+        // DEAD_WINDOW instead of returning stale/cached data.
+        spawnSync("taskkill", ["/PID", String(paintPid), "/T", "/F"], { timeout: 15000 });
+        const dead = await waitUntil(() => !pidAlive(paintPid), 15000);
+        expect(dead).toBe(true);
+        await expect(backend.richTree()).rejects.toMatchObject({ code: "DEAD_WINDOW" });
+      } finally {
+        if (paintPid && pidAlive(paintPid)) {
+          spawnSync("taskkill", ["/PID", String(paintPid), "/T", "/F"], { timeout: 15000 });
+        }
+        bridge.dispose();
+      }
+    },
+  );
 });

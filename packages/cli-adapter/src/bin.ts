@@ -1,5 +1,6 @@
 import { CliAdapterHandler } from "./cli-adapter.js";
 import { MockPtyBackend } from "./mock-pty.js";
+import { armPtyExitGuard } from "./node-pty-backend.js";
 import type { PtyBackend } from "./types.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
 
@@ -14,8 +15,22 @@ async function selectBackend(): Promise<PtyBackend> {
 }
 
 const program = process.env.INSPECTOR_CLI_PROGRAM ?? "seedcli";
+const usingRealPty = process.env.INSPECTOR_PTY === "real";
 const handler = new CliAdapterHandler(await selectBackend(), undefined, program);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
+
+// Guarded shutdown: when stdin EOF ends the JSON-RPC session and the real
+// PTY backend was used, arm a force-exit guard so leaked upstream node-pty
+// IPC handles can never wedge this host process at exit (see
+// armPtyExitGuard). The mock backend has no such leak; leave it untouched.
+if (usingRealPty) {
+  const arm = () => {
+    server.close();
+    armPtyExitGuard();
+  };
+  process.stdin.once("end", arm);
+  process.stdin.once("close", arm);
+}
 
 process.on("SIGTERM", () => {
   server.close();

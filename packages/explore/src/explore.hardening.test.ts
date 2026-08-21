@@ -853,7 +853,7 @@ describe("D9 hygiene", () => {
     expect(g.edges.get("s1::a")?.leadsToState).toBe("s2");
   });
 
-  it("escapes quotes and brackets in aria-label selectors", () => {
+  it("escapes quotes and brackets in text-derived selectors", async () => {
     const inv = buildInventory(
       [
         {
@@ -866,9 +866,9 @@ describe("D9 hygiene", () => {
       { allowFaults: false },
     );
     const click = inv.find((c) => c.kind === "click");
-    expect(click?.selector).toBe(
-      '[aria-label="He said \\"hi\\" \\[ok\\]"]',
-    );
+    // Buttons carry their label as observed text content, so the selector
+    // uses Playwright's text engine (not an aria-label attribute).
+    expect(click?.selector).toBe('text="He said \\"hi\\" \\[ok\\]"');
   });
 
   it("deduplicates identical actionKeys in the inventory", () => {

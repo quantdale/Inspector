@@ -52,6 +52,39 @@ function Get-TopWindows {
   return $wins
 }
 
+function Test-AttachedAlive {
+  if ($null -eq $script:window) { return $false }
+  try { $null = $script:window.Current.ProcessId } catch { return $false }
+  $p = Get-Process -Id $script:attachedPid -ErrorAction SilentlyContinue
+  return ($null -ne $p)
+}
+
+# Enumerate every top-level window owned by the given pid, starting from the
+# desktop root. Used as the bounded fallback when the cached main-window
+# subtree is blocked by a modal dialog: the dialog itself is a top-level
+# window of the same process, so this returns the live dialog tree.
+function Get-TreeFromDesktopPid($targetPid) {
+  $cond = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+    [int]$targetPid)
+  $wins = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
+  $nodes = @()
+  $max = 800
+  foreach ($w in $wins) {
+    $subtree = $null
+    try {
+      $subtree = $w.FindAll([System.Windows.Automation.TreeScope]::Subtree,
+        [System.Windows.Automation.Condition]::TrueCondition)
+    } catch { continue }
+    foreach ($e in $subtree) {
+      if ($nodes.Count -ge $max) { break }
+      try { $nodes += (Get-NodeInfo $e) } catch {}
+    }
+    if ($nodes.Count -ge $max) { break }
+  }
+  return $nodes
+}
+
 function Get-ElementByRuntimeId($ridString) {
   if ($null -eq $script:window) { throw 'STALE_ELEMENT: no attached window' }
   $rid = $ridString -split '-' | ForEach-Object { [int]$_ }
@@ -146,17 +179,52 @@ while ($true) {
       }
       'tree' {
         if ($null -eq $script:window) { throw 'NO_ATTACHED_WINDOW' }
-        $nodes = @()
-        $all = $script:window.FindAll([System.Windows.Automation.TreeScope]::Subtree,
-          [System.Windows.Automation.Condition]::TrueCondition)
-        $max = 800
-        $i = 0
-        foreach ($e in $all) {
-          if ($i -ge $max) { break }
-          try { $nodes += (Get-NodeInfo $e) } catch {}
-          $i++
+        # Liveness gate: never return a stale/cached tree for a dead target.
+        if (-not (Test-AttachedAlive)) {
+          throw ('DEAD_WINDOW: attached pid ' + $script:attachedPid + ' is not running')
         }
-        $result = @{ pid = $script:attachedPid; nodes = $nodes }
+        # Modal probe: when the main window is blocked by a modal dialog its
+        # own subtree stops responding, so fall back to enumerating from the
+        # desktop root scoped to the attached pid (returns the dialog tree).
+        $scopeEl = $script:window
+        $modalBlocking = $false
+        try {
+          $wp = $script:window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
+          if ($wp.Current.WindowInteractionState -eq
+            [System.Windows.Automation.WindowInteractionState]::BlockedByModalWindow) {
+            $modalBlocking = $true
+          }
+        } catch {}
+        $nodes = @()
+        if ($modalBlocking) {
+          $nodes = Get-TreeFromDesktopPid $script:attachedPid
+        } else {
+          $all = $null
+          try {
+            $all = $scopeEl.FindAll([System.Windows.Automation.TreeScope]::Subtree,
+              [System.Windows.Automation.Condition]::TrueCondition)
+          } catch {
+            throw 'STALE_ELEMENT: attached window is gone'
+          }
+          $max = 800
+          $i = 0
+          foreach ($e in $all) {
+            if ($i -ge $max) { break }
+            try { $nodes += (Get-NodeInfo $e) } catch {}
+            $i++
+          }
+        }
+        $result = @{ pid = $script:attachedPid; nodes = $nodes; modalBlocking = $modalBlocking }
+      }
+      'treeDesktop' {
+        # Bounded desktop-root enumeration scoped to a pid; used by the
+        # backend as fallback when the primary tree op times out.
+        $targetPid = [int]$req.params.pid
+        if ($targetPid -le 0) { throw 'VALIDATION: pid required' }
+        $p = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
+        if ($null -eq $p) { throw ('DEAD_WINDOW: pid ' + $targetPid + ' is not running') }
+        $nodes = Get-TreeFromDesktopPid $targetPid
+        $result = @{ pid = $targetPid; nodes = $nodes; modalBlocking = $true }
       }
       'invoke' {
         $e = Get-ElementByRuntimeId $req.params.rid
@@ -209,16 +277,7 @@ while ($true) {
         $result = $true
       }
       'windowStatus' {
-        $alive = $true
-        if ($null -eq $script:window) {
-          $alive = $false
-        } else {
-          try { $null = $script:window.Current.ProcessId } catch { $alive = $false }
-          if ($alive) {
-            $p = Get-Process -Id $script:attachedPid -ErrorAction SilentlyContinue
-            if ($null -eq $p) { $alive = $false }
-          }
-        }
+        $alive = Test-AttachedAlive
         $result = @{ alive = $alive; pid = $script:attachedPid }
       }
       default {

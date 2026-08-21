@@ -43,10 +43,31 @@ function escapeAttrValue(s: string): string {
     .replace(/\]/g, "\\]");
 }
 
-function selectorFor(el: UiElement): string | undefined {
+/**
+ * Semantic selector preference: id, then aria-label/text, then a positional
+ * CSS fallback. The positional fallback is what keeps generic external DOM
+ * (e.g. class/placeholder-only React apps with no ids or labels) explorable:
+ * without it such elements produced NO interaction candidates at all and the
+ * campaign degenerated to back/forward/reload/wait.
+ *
+ * `tagIndex` is the element's 0-based index among all uiTree entries sharing
+ * its tag (document order), matching Playwright's `tag >> nth=k` semantics
+ * over the full DOM (hidden elements included).
+ */
+function selectorFor(el: UiElement, tagIndex: number): string | undefined {
   if (el.id) return `#${el.id}`;
-  if (el.name) return `[aria-label="${escapeAttrValue(el.name)}"]`;
-  return undefined;
+  const label = (el.name ?? "").trim();
+  if (label) {
+    if (el.tag === "input" || el.tag === "textarea" || el.tag === "select") {
+      // Fields have no text content, so a non-empty name can only come from
+      // an aria-label attribute.
+      return `[aria-label="${escapeAttrValue(label)}"]`;
+    }
+    // Buttons/links: name is the observed text content; Playwright's text
+    // engine matches it without needing ids or classes.
+    return `text="${escapeAttrValue(label)}"`;
+  }
+  return `${el.tag} >> nth=${tagIndex}`;
 }
 
 /** Concrete keys pressed against text inputs (never a valueless press). */
@@ -72,10 +93,19 @@ export function buildInventory(
 ): CandidateAction[] {
   const out: CandidateAction[] = [];
   const actCaps = new Set(caps.capabilities.act ?? []);
+  // Per-tag document-order indices over the FULL tree (hidden included) so
+  // positional fallback selectors resolve against the real DOM.
+  const tagCounts = new Map<string, number>();
+  const tagIndexOf = new Map<UiElement, number>();
+  for (const el of uiTree) {
+    const i = tagCounts.get(el.tag) ?? 0;
+    tagIndexOf.set(el, i);
+    tagCounts.set(el.tag, i + 1);
+  }
   const visible = uiTree.filter((e) => !e.hidden && !e.disabled);
 
   for (const el of visible) {
-    const sel = selectorFor(el);
+    const sel = selectorFor(el, tagIndexOf.get(el) ?? 0);
     if (!sel) continue;
     const isInteractive =
       el.tag === "button" ||

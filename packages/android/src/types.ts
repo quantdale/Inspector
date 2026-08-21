@@ -29,6 +29,15 @@ export interface AdbBackend {
    * hierarchy. Optional so hand-rolled test stubs only need shell().
    */
   dumpUi?(serial: string): Promise<string>;
+  /**
+   * Process-presence probe with normalized pidof semantics (D-A2): resolves
+   * null when the package has no running process (`pidof` exits 1 with empty
+   * output — a meaningful answer, not a failure), the pid string(s) when
+   * running, and throws typed AdbError only on genuine failures (timeout,
+   * offline device, unexpected exit codes). Optional so hand-rolled test
+   * stubs only need shell().
+   */
+  pidOf?(serial: string, pkg: string): Promise<string | null>;
 }
 
 export interface AndroidFaults {

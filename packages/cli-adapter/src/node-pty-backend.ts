@@ -4,6 +4,27 @@ const SCREEN_HEIGHT = 12;
 const SCREEN_WIDTH = 120;
 const MAX_SCROLLBACK = 1000;
 
+/**
+ * Guarded shutdown for hosts that used the real PTY backend. Arms an
+ * unref'd timer that force-exits the process with its pending exit code.
+ *
+ * Why: @lydell/node-pty's Windows teardown can leak IPC handles (forked
+ * conpty_console_list_agent channels) that keep the event loop alive
+ * forever, wedging the HOST process at exit even after every session is
+ * closed and the adapter-level API behaved correctly. An unref'd timer does
+ * not delay a healthy drain (the process exits naturally first) but fires —
+ * and force-exits — if leaked handles keep the loop wedged. Call this once
+ * the host knows it is shutting down (stdin EOF, server close), not at
+ * startup.
+ */
+export function armPtyExitGuard(delayMs = 2000): void {
+  const t = setTimeout(() => {
+    process.exit(process.exitCode ?? 0);
+  }, delayMs);
+  // Never hold the loop open for the guard itself.
+  t.unref();
+}
+
 interface RealSession {
   id: string;
   pty: import("@lydell/node-pty").IPty;
@@ -26,6 +47,13 @@ function stripAnsi(text: string): string {
  * fixed-height plain-text screen buffer from VT output, matching the
  * MockPtyBackend readScreen contract. Selected via INSPECTOR_PTY=real in
  * bin.ts; MockPtyBackend remains the default.
+ *
+ * readScreen fidelity limitation (known, deliberate): the "screen" is the
+ * tail of ANSI-stripped scrollback, NOT a terminal cell grid. Full-screen
+ * TUI redraws (cursor addressing, status bars, `-- INSERT --` markers) leave
+ * stale fragments in the tail, so state detection for full-screen apps is
+ * unreliable. A real cell-buffer emulator is required to fix this; see
+ * .inspector/rc-work/hunts/vim-pty/results.md finding #1.
  */
 export class NodePtyBackend implements PtyBackend {
   private sessions = new Map<string, RealSession>();
@@ -99,6 +127,33 @@ export class NodePtyBackend implements PtyBackend {
         s.pty.kill();
       } catch {
         /* already gone */
+      }
+    }
+    // If the session is already dead (e.g. killed externally via taskkill),
+    // do NOT call pty.kill(): upstream WindowsPtyAgent.kill() unconditionally
+    // forks conpty_console_list_agent against the dead shell PID. That
+    // agent's native AttachConsole/getConsoleProcessList fails or wedges, its
+    // IPC channel Socket leaks into OUR process, and the host Node process
+    // hangs at exit ("AttachConsole failed", watchdog kill).
+    //
+    // The session's conout worker thread and out socket still need explicit
+    // teardown though (upstream disposes them only inside kill()), otherwise
+    // their handles keep the host event loop alive forever. Dispose them
+    // directly — same work as upstream _cleanUpProcess + ConoutConnection
+    // dispose, minus the console-list fork. Access to the private _agent is
+    // a deliberate, contained workaround for the shipped @lydell/node-pty
+    // 1.1.0 teardown defect; re-check on dependency upgrades.
+    if (!s.alive) {
+      const agent = (s.pty as unknown as { _agent?: { _conoutSocketWorker?: { dispose(): void }; _outSocket?: { destroy(): void } } })._agent;
+      try {
+        agent?._conoutSocketWorker?.dispose();
+      } catch {
+        /* best effort */
+      }
+      try {
+        agent?._outSocket?.destroy();
+      } catch {
+        /* best effort */
       }
     }
   }

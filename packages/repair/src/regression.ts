@@ -31,6 +31,16 @@ export class RegressionGenerator {
       /** Builds a replay driver for the current workspace contents. */
       driverFor: (workspace: RepairWorkspace) => Promise<ReplayDriver>;
       oracleSuite: OracleSuite;
+      /**
+       * Optional provenance sink for the strict evaluations performed by the
+       * pre-/post-patch regression gates (wired to oracle evaluation records
+       * by RepairEngine when a store-backed finding engine is available).
+       */
+      onEvaluation?: (
+        gate: "regression-pre-patch" | "regression-post-patch",
+        matchedIds: string[],
+        observed: string,
+      ) => void;
     },
   ) {}
 
@@ -53,7 +63,13 @@ export class RegressionGenerator {
 
     const driver = await this.opts.driverFor(workspace);
     const result = await driver.replay(minimizedActions);
-    const failedPrePatch = this.opts.oracleSuite.evaluateStrict(result).reproduced;
+    const verdict = this.opts.oracleSuite.evaluateStrict(result);
+    this.opts.onEvaluation?.(
+      "regression-pre-patch",
+      verdict.matched.map((m) => m.id),
+      summarizeObserved(result),
+    );
+    const failedPrePatch = verdict.reproduced;
 
     return { scenario, artifactPath, failedPrePatch, prePatch: result };
   }
@@ -65,6 +81,22 @@ export class RegressionGenerator {
   async passes(workspace: RepairWorkspace, steps: Action[]): Promise<boolean> {
     const driver = await this.opts.driverFor(workspace);
     const result = await driver.replay(steps);
-    return !this.opts.oracleSuite.evaluateStrict(result).reproduced;
+    const verdict = this.opts.oracleSuite.evaluateStrict(result);
+    this.opts.onEvaluation?.(
+      "regression-post-patch",
+      verdict.matched.map((m) => m.id),
+      summarizeObserved(result),
+    );
+    return !verdict.reproduced;
   }
+}
+
+/** Compact observed-evidence summary: signal kinds and crash-class outcome
+ * codes only — never free-form detail. */
+function summarizeObserved(result: ReplayResult): string {
+  const parts: string[] = result.signals.map((s) => s.kind);
+  for (const o of result.outcomes) {
+    if (o.status === "target-failure" && o.error?.code) parts.push(String(o.error.code));
+  }
+  return parts.length > 0 ? [...new Set(parts)].sort().join(",") : "(none)";
 }

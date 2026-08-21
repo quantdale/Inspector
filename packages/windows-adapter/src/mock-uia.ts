@@ -1,4 +1,12 @@
-import type { UiaBackend, UiaNode } from "./types.js";
+import type {
+  UiaBackend,
+  UiaBackendWindowOps,
+  UiaNode,
+  UiaWindowRef,
+  WaitForWindowParams,
+} from "./types.js";
+import { WindowsBackendError } from "./types.js";
+import type { UiaRichNode, UiaRichTree } from "./real-uia.js";
 
 interface MockWinApp {
   screen: "login" | "dashboard";
@@ -13,13 +21,27 @@ function initial(): MockWinApp {
   return { screen: "login", username: "", password: "", message: "", count: 0, errors: [] };
 }
 
+/** Fixed mock pid so window ops have stable, testable semantics. */
+export const MOCK_SEED_PID = 4242;
+
 /**
  * Seeded Win32 target ("SeedBank dialog"). Hidden defects mirror the other
  * seeded targets so the common finding pipeline proves out on Windows.
  */
-export class MockUiaBackend implements UiaBackend {
+export class MockUiaBackend implements UiaBackend, UiaBackendWindowOps {
   deviceCrashed = false;
   private app: MockWinApp = initial();
+
+  /**
+   * Injectable rehost-collapse scenario, mirroring RealUiaBackend's
+   * rehost-collapse semantics: when set (and a good baseline tree exists),
+   * the cached window enumerates as a root-only stub. The bounded reattach
+   * succeeds with `reattached: true` when `replacementWindow` is true and
+   * fails with typed REATTACH_FAILED when it is false.
+   */
+  rehostScenario: { replacementWindow: boolean } | null = null;
+  /** Node count of the last accepted (non-collapsed) rich tree this session. */
+  private lastGoodRichCount: number | null = null;
 
   async tree(): Promise<UiaNode[]> {
     this.assertAlive();
@@ -95,9 +117,134 @@ export class MockUiaBackend implements UiaBackend {
 
   async reset(): Promise<void> {
     this.app = initial();
+    this.rehostScenario = null;
+    this.lastGoodRichCount = null;
+  }
+
+  // ---- Rich tree with rehost-collapse semantics (mirror of RealUiaBackend) ----
+
+  /**
+   * Full semantic tree of the seeded window. Applies the same collapse
+   * heuristic (root-only or >90% drop versus the last good tree, baseline
+   * >= 5 nodes) and the same one-attempt bounded reattach contract as the
+   * real backend, driven by the injectable `rehostScenario`.
+   */
+  async richTree(): Promise<UiaRichTree> {
+    this.assertAlive();
+    const stubbed = this.rehostScenario !== null && this.lastGoodRichCount !== null;
+    const nodes: UiaRichNode[] = stubbed ? [this.richStub()] : (await this.richProjection());
+    if (this.isRehostCollapse(nodes.length)) {
+      try {
+        if (!this.rehostScenario?.replacementWindow) {
+          throw new Error("no replacement top-level window for the pid");
+        }
+        // Reattach lands on the new window; the scenario is consumed.
+        this.rehostScenario = null;
+        const fresh = await this.richProjection();
+        this.lastGoodRichCount = fresh.length;
+        return { pid: MOCK_SEED_PID, nodes: fresh, reattached: true };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new WindowsBackendError(
+          "REATTACH_FAILED",
+          `window rehost suspected (${this.lastGoodRichCount ?? 0} -> ${nodes.length} nodes, ` +
+            `pid ${MOCK_SEED_PID} alive); reattach failed: ${msg}`,
+        );
+      }
+    }
+    this.lastGoodRichCount = nodes.length;
+    return { pid: MOCK_SEED_PID, nodes };
+  }
+
+  /** Same heuristic as RealUiaBackend.isRehostCollapse. */
+  private isRehostCollapse(nodeCount: number): boolean {
+    const prev = this.lastGoodRichCount;
+    if (prev === null || prev < 5) return false;
+    return nodeCount <= 1 || nodeCount * 10 < prev;
+  }
+
+  private richStub(): UiaRichNode {
+    return {
+      id: "root",
+      type: "Window",
+      name: "SeedBank",
+      automationId: "",
+      enabled: true,
+      offscreen: false,
+      rect: null,
+      patterns: [],
+    };
+  }
+
+  private async richProjection(): Promise<UiaRichNode[]> {
+    const base = await this.tree();
+    return base.map((n) => ({
+      id: n.id,
+      type: n.type,
+      name: n.text,
+      automationId: n.id,
+      enabled: n.enabled,
+      offscreen: false,
+      rect: null,
+      patterns: [],
+    }));
+  }
+
+  /** Re-attach resets the per-session collapse baseline, like the real backend. */
+  attach(_params: { pid?: number; titleContains?: string }): Promise<void> {
+    this.lastGoodRichCount = null;
+    return Promise.resolve();
+  }
+
+  detach(): Promise<void> {
+    this.lastGoodRichCount = null;
+    return Promise.resolve();
+  }
+
+  // ---- Window ops (mirror the real backend's semantics for conformance) ----
+
+  async listWindows(): Promise<UiaWindowRef[]> {
+    if (this.deviceCrashed) return [];
+    return [{ pid: MOCK_SEED_PID, title: "SeedBank" }];
+  }
+
+  async waitForWindow(params: WaitForWindowParams): Promise<UiaWindowRef> {
+    const requested = Math.min(Math.max(params.timeoutMs ?? 10000, 0), 60000);
+    const deadline = Date.now() + requested;
+    for (;;) {
+      const windows = await this.listWindows();
+      const found = windows.find(
+        (w) =>
+          (params.pid !== undefined && w.pid === params.pid) ||
+          (params.titleContains !== undefined &&
+            params.titleContains.length > 0 &&
+            w.title.includes(params.titleContains)),
+      );
+      if (found) return found;
+      if (Date.now() >= deadline) {
+        throw new WindowsBackendError(
+          "WINDOW_NOT_FOUND",
+          `no top-level window matching ` +
+            `${params.pid !== undefined ? `pid=${params.pid}` : ""}` +
+            `${params.pid !== undefined && params.titleContains ? " " : ""}` +
+            `${params.titleContains !== undefined ? `title~="${params.titleContains}"` : ""}` +
+            ` within ${requested}ms`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+
+  async windowStatus(): Promise<{ alive: boolean; pid: number }> {
+    return { alive: !this.deviceCrashed, pid: MOCK_SEED_PID };
   }
 
   private assertAlive(): void {
-    if (this.deviceCrashed) throw new Error("UIA client disconnected (injected fault)");
+    if (this.deviceCrashed) {
+      throw new WindowsBackendError(
+        "DEAD_WINDOW",
+        "UIA client disconnected (injected fault)",
+      );
+    }
   }
 }

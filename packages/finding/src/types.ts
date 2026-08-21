@@ -3,6 +3,7 @@ import type {
   ActionOutcome,
   Observation,
 } from "@inspector/protocol";
+import type { OracleEvaluationRecord } from "@inspector/store-sqlite";
 
 export type { Action, ActionOutcome, Observation } from "@inspector/protocol";
 
@@ -31,6 +32,14 @@ export interface ReplayDriver {
 export interface Oracle {
   id: string;
   detect(result: ReplayResult): boolean;
+  /**
+   * Optional descriptor metadata for oracle provenance records. Plain
+   * detectors may omit them; the fields stay nullable in persisted evidence.
+   */
+  kind?: string;
+  strength?: "hard" | "soft";
+  confidence?: number;
+  description?: string;
 }
 
 export interface ReproductionPolicy {
@@ -135,6 +144,12 @@ export interface EvidenceBundle {
   originalSteps: Action[];
   minimizedSteps: Action[];
   oracleEvidence: OracleSignal[];
+  /**
+   * Persisted per-oracle evaluation history for this finding (reproduce,
+   * minimize, repair-verify phases) so the bundle answers which oracles ran,
+   * what they observed, and why the finding was promoted.
+   */
+  evaluations: OracleEvaluationRecord[];
   artifactRefs: string[];
   replayCommand: string;
 }

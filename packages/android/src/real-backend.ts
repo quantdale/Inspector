@@ -22,7 +22,7 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const LIVENESS_TIMEOUT_MS = 5_000;
 const ADB_PROBE_TIMEOUT_MS = 5_000;
 
-interface RunResult {
+export interface RunResult {
   stdout: Buffer;
   stderr: string;
   code: number | null;
@@ -105,16 +105,64 @@ export async function probeAdbAvailable(
   }
 }
 
+/**
+ * Normalized pidof semantics (D-A2): exit 1 with empty output is a meaningful
+ * "no process" answer, not a failure. Returns the trimmed pid string(s) on
+ * success, null when the package is not running, and throws ADB_COMMAND_FAILED
+ * only for unexpected outcomes (other codes, empty success output).
+ */
+export function parsePidofOutcome(code: number | null, stdout: Buffer): string | null {
+  const out = stdout.toString("utf8").trim();
+  if (code === 0 && out.length > 0) return out;
+  if (code === 1 && out.length === 0) return null;
+  throw new AdbError(
+    "ADB_COMMAND_FAILED",
+    `pidof exited ${code} with unexpected output: ${out || "(empty)"}`,
+  );
+}
+
 /** Quote a value as one POSIX device-shell word (mirrors H-61 rigor). */
 export function quoteDeviceShellWord(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
+/** Injectable low-level adb runner type (tests stub process outcomes). */
+export type AdbRunner = typeof runAdb;
+
 export class RealAdbBackend implements AdbBackend {
   constructor(
     private readonly adbPath: string = "adb",
     private readonly defaultTimeoutMs: number = DEFAULT_TIMEOUT_MS,
+    private readonly runner: AdbRunner = runAdb,
   ) {}
+
+  private runOrThrow(args: string[], timeoutMs = this.defaultTimeoutMs): Promise<string> {
+    return this.runner(this.adbPath, args, timeoutMs).then((r) => {
+      if (r.code !== 0) {
+        throw new AdbError(
+          "ADB_COMMAND_FAILED",
+          `adb ${args.join(" ")} exited ${r.code}: ${r.stderr.trim() || r.stdout.toString("utf8").trim()}`,
+          { command: args.join(" "), stderr: r.stderr.trim() },
+        );
+      }
+      return r.stdout.toString("utf8");
+    });
+  }
+
+  /**
+   * Process presence with normalized pidof semantics (D-A2): null when the
+   * package is not running (`pidof` exits 1 with empty output), the trimmed
+   * pid string(s) when running, typed errors only on genuine failures.
+   */
+  async pidOf(serial: string, pkg: string): Promise<string | null> {
+    await this.assertAlive(serial);
+    const r = await this.runner(
+      this.adbPath,
+      ["-s", serial, "shell", `pidof ${quoteDeviceShellWord(pkg)}`],
+      this.defaultTimeoutMs,
+    );
+    return parsePidofOutcome(r.code, r.stdout);
+  }
 
   /**
    * Device serials that are listed AND proven alive. Presence lies: a dead
@@ -122,7 +170,7 @@ export class RealAdbBackend implements AdbBackend {
    * hangs, so each candidate must survive a bounded echo round-trip.
    */
   async devices(): Promise<string[]> {
-    const out = await runAdbOrThrow(this.adbPath, ["devices"], this.defaultTimeoutMs);
+    const out = await this.runOrThrow(["devices"]);
     const candidates = out
       .split(/\r?\n/)
       .slice(1)
@@ -148,13 +196,13 @@ export class RealAdbBackend implements AdbBackend {
 
   async shell(serial: string, cmd: string): Promise<string> {
     await this.assertAlive(serial);
-    return runAdbOrThrow(this.adbPath, ["-s", serial, "shell", cmd], this.defaultTimeoutMs);
+    return this.runOrThrow(["-s", serial, "shell", cmd], this.defaultTimeoutMs);
   }
 
   async screencap(serial: string): Promise<Buffer> {
     await this.assertAlive(serial);
     // exec-out streams raw PNG bytes without CRLF mangling.
-    const r = await runAdb(this.adbPath, ["-s", serial, "exec-out", "screencap -p"], this.defaultTimeoutMs);
+    const r = await this.runner(this.adbPath, ["-s", serial, "exec-out", "screencap -p"], this.defaultTimeoutMs);
     if (r.code !== 0) {
       throw new AdbError("ADB_COMMAND_FAILED", `screencap failed: ${r.stderr.trim()}`, { serial });
     }
@@ -167,8 +215,7 @@ export class RealAdbBackend implements AdbBackend {
 
   async logcat(serial: string, lines = 200): Promise<string[]> {
     await this.assertAlive(serial);
-    const out = await runAdbOrThrow(
-      this.adbPath,
+    const out = await this.runOrThrow(
       ["-s", serial, "logcat", "-d", "-t", String(lines)],
       this.defaultTimeoutMs,
     );
@@ -177,7 +224,7 @@ export class RealAdbBackend implements AdbBackend {
 
   async install(serial: string, apkPath: string): Promise<void> {
     await this.assertAlive(serial);
-    const out = await runAdbOrThrow(this.adbPath, ["-s", serial, "install", "-r", apkPath], 120_000);
+    const out = await this.runOrThrow(["-s", serial, "install", "-r", apkPath], 120_000);
     if (!out.includes("Success")) {
       throw new AdbError("ADB_COMMAND_FAILED", `install failed: ${out.trim()}`, { serial });
     }
@@ -186,7 +233,7 @@ export class RealAdbBackend implements AdbBackend {
   async uninstall(serial: string, pkg: string): Promise<void> {
     await this.assertAlive(serial);
     // SUCCESS / Success / "not installed" are all acceptable reset outcomes.
-    await runAdbOrThrow(this.adbPath, ["-s", serial, "uninstall", pkg], 60_000).catch((e) => {
+    await this.runOrThrow(["-s", serial, "uninstall", pkg], 60_000).catch((e) => {
       throw e instanceof AdbError ? e : new AdbError("ADB_COMMAND_FAILED", String(e), { serial });
     });
   }
@@ -220,16 +267,14 @@ export class RealAdbBackend implements AdbBackend {
       let lastErr: unknown = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const dumpOut = await runAdbOrThrow(
-            this.adbPath,
+          const dumpOut = await this.runOrThrow(
             ["-s", serial, "shell", "uiautomator dump /sdcard/window_dump.xml"],
             30_000,
           );
           if (!dumpOut.includes("dumped")) {
             throw new AdbError("DUMP_FAILED", `uiautomator dump did not confirm: ${dumpOut.trim()}`, { serial });
           }
-          await runAdbOrThrow(
-            this.adbPath,
+          await this.runOrThrow(
             ["-s", serial, "pull", "/sdcard/window_dump.xml", local],
             15_000,
           );
@@ -251,7 +296,7 @@ export class RealAdbBackend implements AdbBackend {
   private async assertAlive(serial: string): Promise<void> {
     let r: RunResult;
     try {
-      r = await runAdb(this.adbPath, ["-s", serial, "shell", "echo ok"], LIVENESS_TIMEOUT_MS);
+      r = await this.runner(this.adbPath, ["-s", serial, "shell", "echo ok"], LIVENESS_TIMEOUT_MS);
     } catch (e) {
       if (e instanceof AdbError && e.code === "ADB_TIMEOUT") {
         throw new AdbError(

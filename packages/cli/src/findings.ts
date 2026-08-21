@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { FindingRecord } from "@inspector/store-sqlite";
 import { intFlag, parseArgs, requirePositional, CliError } from "./args.js";
-import { workDirOf, type CommandContext } from "./hunt.js";
+import { workDirOf, warnRepoRootWorkspace, type CommandContext } from "./hunt.js";
 import { openWorkspace } from "./workspace.js";
 
 function safeParse(raw: string | null): unknown {
@@ -55,7 +55,9 @@ export async function findingsCommand(
     const parsed = parseArgs(rest, ["--run", "--limit"], []);
     const limit = intFlag(parsed.flags, "--limit", 100);
     const runFilter = typeof parsed.flags["--run"] === "string" ? parsed.flags["--run"] : undefined;
-    const { store, base } = openWorkspace(workDirOf(ctx, parsed));
+    const dir = workDirOf(ctx, parsed);
+    warnRepoRootWorkspace(ctx, dir);
+    const { store, base } = openWorkspace(dir);
     try {
       let records = store.listFindings(limit);
       if (runFilter !== undefined) records = records.filter((r) => r.runId === runFilter);
@@ -80,7 +82,9 @@ export async function findingsCommand(
   if (sub === "show") {
     const parsed = parseArgs(parentRest.slice(1), [], []);
     const id = requirePositional(parsed.positionals, 0, "inspector findings show <id>");
-    const { store, base } = openWorkspace(workDirOf(ctx, parsed));
+    const dir = workDirOf(ctx, parsed);
+    warnRepoRootWorkspace(ctx, dir);
+    const { store, base } = openWorkspace(dir);
     try {
       const record = store.getFinding(id);
       if (!record) {

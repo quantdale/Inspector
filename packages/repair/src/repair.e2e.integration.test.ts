@@ -120,6 +120,22 @@ describe("M4 autonomous repair", () => {
     expect(record.attempts.some((a) => a.verdict === "ACCEPTED")).toBe(true);
     expect(rep.finding.status).toBe("RESOLVED");
     expect(existsSync(join(evidenceDir, `repair-${rep.finding.id}.json`))).toBe(true);
+
+    // Oracle provenance: verification-phase evaluations are persisted.
+    const evals = store.listOracleEvaluationsForFinding(rep.finding.id);
+    const repairVerify = evals.filter((e) => e.phase === "repair-verify");
+    expect(repairVerify.length).toBeGreaterThan(0);
+    // Pre-patch regression gate (must fail) and post-patch gates (must pass).
+    expect(repairVerify.some((e) => e.expected?.includes("unpatched") && e.reproduced)).toBe(true);
+    expect(
+      repairVerify.some(
+        (e) =>
+          e.expected === "post-patch reproducer replay fires no hard oracle" && !e.reproduced,
+      ),
+    ).toBe(true);
+    expect(repairVerify.every((e) => e.oracleId === "page-error")).toBe(true);
+    expect(repairVerify[0]!.oracleStrength).toBe("hard");
+
     // Repair happened outside the primary checkout: the fixture repo is untouched.
     const { stdout } = await runGit("git", ["-C", repoRoot, "status", "--porcelain"]);
     expect(stdout.trim()).toBe("");

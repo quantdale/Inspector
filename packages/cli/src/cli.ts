@@ -5,10 +5,10 @@ import type { ParsedInvocation } from "./args.js";
 import { commandHelp, generalUsage } from "./help.js";
 import { resolveVersion } from "./version.js";
 import { runDoctorProbes, renderDoctorReport } from "./doctor.js";
-import { huntCommand, workDirOf, type CommandContext } from "./hunt.js";
+import { huntCommand, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
 import { findingsCommand } from "./findings.js";
 import { runsCommand } from "./runs.js";
-import { adapterSpawn, openWorkspace } from "./workspace.js";
+import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 
 // Public workspace/spawn helpers re-exported for library consumers.
 export { openWorkspace, adapterSpawn, workspaceDirFrom } from "./workspace.js";
@@ -108,6 +108,7 @@ async function doctorCommand(rest: string[], ctx: CommandContext): Promise<CliRe
   // doctor takes no command-specific flags; parseArgs still validates them.
   const parsed = parseArgs(rest, [], []);
   const workDir = workDirOf(ctx, parsed);
+  const warning = warnRepoRootWorkspace(ctx, workDir);
   const checks = await runDoctorProbes(workDir);
   const failedRequired = checks.filter((c) => !c.ok && c.required).length;
   if (ctx.json) {
@@ -115,6 +116,7 @@ async function doctorCommand(rest: string[], ctx: CommandContext): Promise<CliRe
       JSON.stringify(
         {
           ok: failedRequired === 0,
+          ...(warning !== null ? { warning } : {}),
           workspace: workDir,
           checks,
         },
@@ -138,10 +140,22 @@ async function runDemo(parsed: ParsedInvocation, ctx: CommandContext): Promise<C
     ctx.out("only --adapter fake|web is supported");
     return { code: 1 };
   }
-  const { store, artifacts } = openWorkspace(workDirOf(ctx, parsed));
+  const dir = workDirOf(ctx, parsed);
+  warnRepoRootWorkspace(ctx, dir);
+  let store, artifacts;
+  try {
+    ({ store, artifacts } = openWorkspace(dir));
+  } catch (e) {
+    throw remapWorkspaceConflict(e);
+  }
   try {
     const mgr = new RunManager(store, artifacts);
-    const run = await mgr.startRun(adapterSpawn(adapterArg));
+    let run;
+    try {
+      run = await mgr.startRun(adapterSpawn(adapterArg));
+    } catch (e) {
+      throw remapWorkspaceConflict(e);
+    }
     const steps: unknown[] = [];
 
     if (adapterArg === "fake") {

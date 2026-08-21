@@ -107,17 +107,44 @@ describe("android adapter conformance (M5)", () => {
 
   it("7: reset returns to identical seeded state", async () => {
     client = await startAndroid();
-    await client.request("lifecycle", { op: "create" }, 30000);
+    // Seeding is optional now; this gate exercises the explicit seeded path.
+    const seeded = { seedApk: "/fixtures/seeddroid.apk" };
+    await client.request("lifecycle", { op: "create", options: seeded }, 30000);
     await client.request("act", { action: act("d1", "fill", { selector: "#username", value: "admin" }) }, 15000);
     await client.request("act", { action: act("d2", "fill", { selector: "#password", value: "admin" }) }, 15000);
     await client.request("act", { action: act("d3", "click", { selector: "#login" }) }, 15000);
-    await client.request("lifecycle", { op: "reset" }, 15000);
+    await client.request("lifecycle", { op: "reset", options: seeded }, 15000);
     const obs = (await client.request("observe", { observe: ["uiTree"] }, 20000)) as {
       summary: { uiTree: Array<{ id?: string }> };
     };
     const ids = obs.summary.uiTree.map((e) => e.id);
     expect(ids).toContain("login");
     expect(ids).not.toContain("increment");
+  });
+
+  it("8: create/reset with launchPackage (no seedApk) round-trips over the protocol", async () => {
+    client = await startAndroid();
+    await expect(
+      client.request(
+        "lifecycle",
+        { op: "create", options: { launchPackage: "com.android.settings" } },
+        30000,
+      ),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      client.request(
+        "lifecycle",
+        { op: "reset", options: { launchPackage: "com.android.settings" } },
+        15000,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("9: create with seedApk keeps the seeded install path working", async () => {
+    client = await startAndroid();
+    await expect(
+      client.request("lifecycle", { op: "create", options: { seedApk: "/fixtures/seeddroid.apk" } }, 30000),
+    ).resolves.toEqual({ ok: true });
   });
 });
 

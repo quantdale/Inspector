@@ -28,13 +28,13 @@ export class CrashOracle implements Oracle {
 
 export class ExplicitSignalOracle implements Oracle {
   readonly id: string;
-  private readonly kind: OracleSignalKind;
+  private readonly signalKind: OracleSignalKind;
   constructor(kind: OracleSignalKind) {
-    this.kind = kind;
+    this.signalKind = kind;
     this.id = `signal:${kind}`;
   }
   detect(result: ReplayResult): boolean {
-    return result.signals.some((s) => s.kind === this.kind);
+    return result.signals.some((s) => s.kind === this.signalKind);
   }
 }
 
@@ -49,6 +49,28 @@ export const defaultSignatureExtractor: SignatureExtractor = (result) => {
 
 export interface OracleEngineOptions {
   signatureExtractor?: SignatureExtractor;
+}
+
+/** Per-oracle outcome of one evaluate() call, for evaluation provenance. */
+export interface OracleEvaluationDetail {
+  oracleId: string;
+  reproduced: boolean;
+  kind: string | null;
+  strength: "hard" | "soft" | null;
+  confidence: number | null;
+  description: string | null;
+}
+
+export interface OracleEvaluation {
+  reproduced: boolean;
+  signals: OracleSignal[];
+  /** Ids of the registered oracles that matched, for downstream evidence. */
+  matchedOracleIds: string[];
+  /**
+   * One entry per registered oracle (matched or not), so persisted
+   * evaluation records capture which oracles RAN, not only which fired.
+   */
+  evaluations: OracleEvaluationDetail[];
 }
 
 export class OracleEngine {
@@ -70,17 +92,20 @@ export class OracleEngine {
     ]);
   }
 
-  evaluate(result: ReplayResult): {
-    reproduced: boolean;
-    signals: OracleSignal[];
-    /** Ids of the registered oracles that matched, for downstream evidence. */
-    matchedOracleIds: string[];
-  } {
+  evaluate(result: ReplayResult): OracleEvaluation {
     const matched = this.oracles.filter((o) => o.detect(result));
     return {
       reproduced: matched.length > 0,
       signals: result.signals,
       matchedOracleIds: matched.map((o) => o.id),
+      evaluations: this.oracles.map((o) => ({
+        oracleId: o.id,
+        reproduced: matched.includes(o),
+        kind: o.kind ?? null,
+        strength: o.strength ?? null,
+        confidence: typeof o.confidence === "number" ? o.confidence : null,
+        description: o.description ?? null,
+      })),
     };
   }
 

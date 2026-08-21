@@ -302,3 +302,87 @@ describe("hardening: reproduction integrity", () => {
   });
 });
 
+describe("oracle evaluation provenance records", () => {
+  function openTempStore(): Store {
+    dir = mkdtempSync(join(tmpdir(), "inspector-oeval-"));
+    store = Store.open(join(dir, "run.db"));
+    return store;
+  }
+
+  /** A store whose oracle-evaluation writes fail, to prove containment. */
+  function throwingEvaluationStore(real: Store): Store {
+    const throwing = Object.assign(Object.create(Object.getPrototypeOf(real)), real);
+    throwing.putOracleEvaluation = () => {
+      throw new Error("simulated disk failure");
+    };
+    return throwing as Store;
+  }
+
+  it("persists one record per registered oracle per reproduction attempt", async () => {
+    const st = openTempStore();
+    const engine = new FindingEngine(undefined, st);
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" }, { runId: "run_prov" });
+    await engine.reproduce(f, defectActions, new FakeStateMachineDriver(), {
+      attempts: 2,
+      minSuccesses: 2,
+    });
+    const rows = st.listOracleEvaluationsForFinding(f.id);
+    // OracleEngine.defaults() registers five oracles; every attempt evaluates
+    // ALL of them, matched or not.
+    expect(rows).toHaveLength(10);
+    expect(rows.every((r) => r.phase === "reproduce")).toBe(true);
+    expect(rows.every((r) => r.runId === "run_prov")).toBe(true);
+    expect(rows.every((r) => r.version === "oracle-eval/1")).toBe(true);
+    expect(new Set(rows.map((r) => r.oracleId)).size).toBe(5);
+    // The firing oracle is marked reproduced; clean oracles are recorded as ran-but-silent.
+    const submitInvalid = rows.filter((r) => r.oracleId === "signal:DEFECT_SUBMIT_INVALID");
+    expect(submitInvalid.map((r) => r.reproduced)).toEqual([true, true]);
+    const silent = rows.find((r) => r.oracleId === "signal:ADAPTER_CRASH");
+    expect(silent?.reproduced).toBe(false);
+    // Observed summaries are per evaluation event (shared by all oracles of
+    // that replay), listing signal kinds and crash codes compactly.
+    expect(silent?.observed).toBe("DEFECT_SUBMIT_INVALID,TARGET_FAILURE");
+    expect(rows[0]!.subjectKey).toBe("a1>a2>a3");
+  });
+
+  it("persists minimize-phase verification records", async () => {
+    const st = openTempStore();
+    const engine = new FindingEngine(undefined, st);
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    await engine.reproduce(f, defectActions, new FakeStateMachineDriver(), { attempts: 1, minSuccesses: 1 });
+    await engine.minimize(f, defectActions, new FakeStateMachineDriver());
+    const rows = st.listOracleEvaluationsForFinding(f.id).filter((r) => r.phase === "minimize");
+    // Baseline probe + at least one reduction probe, each over all oracles.
+    expect(rows.length).toBeGreaterThanOrEqual(2 * 5);
+    expect(rows.some((r) => r.reproduced)).toBe(true);
+  });
+
+  it("embeds the persisted evaluation history into evidence bundles", async () => {
+    const st = openTempStore();
+    const engine = new FindingEngine(undefined, st);
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    await engine.reproduce(f, defectActions, new FakeStateMachineDriver(), { attempts: 1, minSuccesses: 1 });
+    const minimized = await engine.minimize(f, defectActions, new FakeStateMachineDriver());
+    const bundle = engine.buildBundle(f, defectActions, minimized, { revision: "rev1" });
+    expect(bundle.evaluations.length).toBeGreaterThan(0);
+    expect(bundle.evaluations.every((r) => r.findingId === f.id)).toBe(true);
+    // Immutability guarantee holds for the embedded history too.
+    expect(Object.isFrozen(bundle.evaluations)).toBe(true);
+    expect(() => {
+      (bundle.evaluations as unknown as { push: (...args: unknown[]) => unknown }).push("x");
+    }).toThrow();
+  });
+
+  it("contains evaluation-persistence failures without breaking the pipeline", async () => {
+    const st = openTempStore();
+    const engine = new FindingEngine(undefined, throwingEvaluationStore(st));
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    const { finding } = await engine.reproduce(f, defectActions, new FakeStateMachineDriver(), {
+      attempts: 2,
+      minSuccesses: 2,
+    });
+    expect(finding.status).toBe("CONFIRMED");
+    expect(st.getFinding(f.id)?.status).toBe("CONFIRMED");
+  });
+});
+
