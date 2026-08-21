@@ -15,21 +15,21 @@ The architecture/documentation foundation was merged to `main` in PR #1 at commi
 
 ## Active work
 
-- Milestone: `M6 — Cross-platform adapters (CLI, Electron, Windows)` — **ACTIVE**
-- Specification: `specs/006-cross-platform/SPEC.md`
-- Task graph: `specs/006-cross-platform/TASKS.md` (to be created at M6 start)
-- Next milestone after M6: `M7 — Scale, integrations, and unattended operations` (`specs/007-scale-integrations/SPEC.md`)
+- Milestone: `M7 — Scale, integrations, and unattended operations` — **ACTIVE**
+- Specification: `specs/007-scale-integrations/SPEC.md`
+- Task graph: `specs/007-scale-integrations/TASKS.md` (to be created at M7 start)
+- Next milestone after M7: `M8 — iOS` (environment-deferred)
 
-## Verified gates (M5)
+## Verified gates (M6)
 
 | Gate | Result |
 | --- | --- |
 | lint (0 errors) | PASS |
 | typecheck (exit 0) | PASS |
 | test (57 unit tests) | PASS |
-| test:integration (38 integration tests, 8 files) | PASS |
+| test:integration (44 integration tests, 11 files) | PASS |
 
-M5 exit gate evidence: the Android adapter passes common conformance over a spawned JSON-RPC subprocess against the injectable ADB backend; reset produces deterministic fixture state; app crashes classify as TARGET_FAILURE vs automation misses as ACTION_FAILED; the unchanged core finding pipeline confirms two seeded Android defects.
+M6 exit gate evidence: CLI/PTY, Electron, and Windows adapters all pass the common conformance contract (`runCommonConformance` in adapter-sdk) over spawned JSON-RPC subprocesses; each platform's seeded defect surfaces with correct TARGET_FAILURE/ACTION_FAILED classification; no platform branching in core finding semantics.
 
 ## Known blockers
 
@@ -45,8 +45,8 @@ None currently known.
 | M3 Autonomous exploration | COMPLETE |
 | M4 Oracle/repair | COMPLETE |
 | M5 Android | COMPLETE |
-| M6 Cross-platform adapters | ACTIVE |
-| M7 Scale/integrations | PENDING |
+| M6 Cross-platform adapters | COMPLETE |
+| M7 Scale/integrations | ACTIVE |
 | M8 iOS | PENDING / environment-dependent |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

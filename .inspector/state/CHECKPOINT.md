@@ -10,9 +10,9 @@
 
 ## Last trusted implementation state
 
-M5 Android adapter is COMPLETE. `@inspector/android` implements the full IAP adapter contract against an injectable `AdbBackend` (production wrapper binds the adb CLI; `MockAdbBackend` simulates a dedicated device), with uiautomator XML parsing into the common semantic element model, semantic tap/text-entry/keyevent actions, screenshot/logcat sensors, package install/uninstall/reset lifecycle, injected device-loss faults, and the SeedDroid fixture app whose hidden defects mirror the web seeded app. Genuine app crashes classify as TARGET_FAILURE, automation misses as ACTION_FAILED — identical outcome semantics to the web adapter, with zero Android logic in core packages.
+M6 cross-platform adapters are COMPLETE. `@inspector/adapter-sdk` now carries the common conformance contract (`runCommonConformance`: version negotiation, deterministic baseline + reset, semantic uiTree, TARGET_FAILURE vs ACTION_FAILED classification). Three new packages satisfy it: `@inspector/cli-adapter` (injectable PtyBackend + seeded "seedcli" REPL; line-entry interaction model; process death -> TARGET_FAILURE, command-not-found -> ACTION_FAILED), `@inspector/electron-adapter` (deliberately reuses web Chromium semantics with Electron identity and injectable app content), and `@inspector/windows-adapter` (injectable UiaBackend + SeedBank Win32 dialog mock; invoke/setValue actions). No platform branching in core finding semantics.
 
-M5 exit gate satisfied: conformance passes over a spawned JSON-RPC subprocess; reset produces deterministic fixture state; the unchanged FindingEngine + AndroidReplayDriver confirm two seeded Android defects through the standard reproduction policy. All four gates green.
+M6 exit gate satisfied: all three adapters pass the common conformance contract over spawned JSON-RPC subprocesses, produce evidence in the same IAP schema, and keep platform logic inside adapter packages. All four gates green.
 
 ## Active waypoint
 
@@ -22,20 +22,21 @@ M5 exit gate satisfied: conformance passes over a spawned JSON-RPC subprocess; r
 - Milestone: M3 Autonomous exploration — **COMPLETE**
 - Milestone: M4 Oracle expansion and autonomous repair — **COMPLETE**
 - Milestone: M5 Android adapter — **COMPLETE**
-- Spec M5: `specs/005-android/SPEC.md` (status COMPLETE)
-- Task graph M5: `specs/005-android/TASKS.md` (A0–A6 all checked)
+- Milestone: M6 Cross-platform adapters — **COMPLETE**
+- Spec M6: `specs/006-cross-platform/SPEC.md` (status COMPLETE)
+- Task graph M6: `specs/006-cross-platform/TASKS.md` (C0–C3 all checked)
 
 ## Next milestone
 
-- Milestone: **M6 Cross-platform adapters (CLI, Electron, Windows)**
-- Spec: `specs/006-cross-platform/SPEC.md`
-- First waypoint: M6.C0 cli-pty-adapter
+- Milestone: **M7 Scale, integrations, and unattended operations**
+- Spec: `specs/007-scale-integrations/SPEC.md`
+- First waypoint: M7.S0 worker-orchestration
 
 ## Exact next action
 
-Begin M6: create `specs/006-cross-platform/TASKS.md`; implement the CLI/PTY adapter against an injectable PTY backend, the Electron adapter reusing web semantics via an injectable renderer backend, and the Windows adapter via an injectable UI Automation backend — each passing the common conformance contract, producing evidence in the same schema, with no platform branching in core finding semantics. Run the M6 exit gate.
+Begin M7: create `specs/007-scale-integrations/TASKS.md`; implement `@inspector/scale` — isolated parallel workers with SQLite-backed leases, deterministic scheduling, finding dedup/clustering, model router + token/cost accounting, MCP facade exposing Inspector capabilities over JSON-RPC, crash-safe multi-run recovery, and plugin/adapter discovery. Run the M7 exit gate (bounded unattended campaign across >=2 isolated workers, controller-restart recovery, stable external control).
 
-Continue autonomously; do not stop at the M5/M6 boundary.
+Continue autonomously; do not stop at the M6/M7 boundary.
 
 ## Known blockers
 
@@ -45,11 +46,10 @@ None.
 
 - Replay oracle still counts ACTION_FAILED target-failures as reproduction in the legacy TargetFailureOracle path; partially mitigated by OracleSuite.
 - Web exploration E2E takes ~4–6 min wall clock; acceptable but flagged for later perf work.
-- Real ADB CLI wrapper and emulator provisioning remain production hardening items; the injectable contract is proven by MockAdbBackend per spec blocker policy.
+- Real PTY/UIA/Electron-runtime bindings remain production hardening items; the injectable contracts are proven by mocks per spec blocker policy.
 
 ## Do not do yet
 
-- Do not start iOS adapter work before M7 completion (M8 is environment-deferred).
+- Do not start iOS adapter implementation before M7 completion (M8 is environment-deferred).
 - Do not start broad hardening/audit campaigns.
 - Do not add a cloud control plane or dashboard.
-- Do not bypass policy/capability semantics to make the demo easier.

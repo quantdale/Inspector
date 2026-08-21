@@ -1,3 +1,4 @@
 export * from "./jsonrpc.js";
 export * from "./server.js";
 export * from "./client.js";
+export * from "./conformance.js";

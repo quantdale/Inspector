@@ -62,7 +62,34 @@ importers:
 
   packages/cli: {}
 
+  packages/cli-adapter:
+    dependencies:
+      '@inspector/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/core: {}
+
+  packages/electron-adapter:
+    dependencies:
+      '@inspector/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@inspector/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/explore:
     dependencies:
@@ -135,6 +162,18 @@ importers:
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0
+
+  packages/windows-adapter:
+    dependencies:
+      '@inspector/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
 packages:
 

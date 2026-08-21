@@ -22,18 +22,18 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M6
-  milestone_name: Cross-platform adapters (CLI, Electron, Windows)
-  spec: specs/006-cross-platform/SPEC.md
-  tasks: specs/006-cross-platform/TASKS.md
-  task_group: C0
-  waypoint: M6.C0.cli-pty-adapter
+  milestone_id: M7
+  milestone_name: Scale, integrations, and unattended operations
+  spec: specs/007-scale-integrations/SPEC.md
+  tasks: specs/007-scale-integrations/TASKS.md
+  task_group: S0
+  waypoint: M7.S0.worker-orchestration
   waypoint_status: READY
   next_action: >-
-    M5 is complete. Begin M6: implement the CLI/PTY adapter, the Electron
-    adapter reusing web semantics, and the Windows adapter via an injectable
-    UI Automation backend — each passing the common conformance contract and
-    producing evidence in the same schema with no platform branching in core.
+    M6 is complete. Begin M7 (Scale, integrations, unattended operations):
+    implement isolated parallel workers with leases, deterministic scheduling,
+    finding dedup/clustering, model router + cost accounting, MCP facade,
+    checkpoint/recovery, and plugin/adapter discovery. Run the M7 exit gate.
 
 progress:
   completed_milestones:
@@ -43,6 +43,7 @@ progress:
     - M3
     - M4
     - M5
+    - M6
   completed_task_groups:
     - F0
     - F1
@@ -106,6 +107,8 @@ progress:
     - M4.P3.patch-agent-contract
     - M4.P4.verification
     - M4.P5.resolution
+    - M5.A5.fault-injection
+    - M5.A6.core-pipeline-proof
     - M5.A0.environment-worker
     - M5.A1.app-lifecycle
     - M5.A2.sensors
@@ -113,11 +116,15 @@ progress:
     - M5.A4.seeded-target
     - M5.A5.fault-injection
     - M5.A6.core-pipeline-proof
+    - M6.C0.common-conformance
+    - M6.C1.cli-pty-adapter
+    - M6.C2.electron-adapter
+    - M6.C3.windows-adapter
   deferred_milestones: []
 
 verification:
-  last_verified_commit: HEAD (M5 checkpoint commit)
-  last_gate: M5
+  last_verified_commit: HEAD (M6 checkpoint commit)
+  last_gate: M6
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 
@@ -148,4 +155,4 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: M7
+next_milestone_after_completion: M8
