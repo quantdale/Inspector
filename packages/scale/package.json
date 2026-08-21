@@ -12,6 +12,13 @@
     "@inspector/protocol": "workspace:*",
     "@inspector/core": "workspace:*",
     "@inspector/finding": "workspace:*",
-    "@inspector/store-sqlite": "workspace:*"
+    "@inspector/store-sqlite": "workspace:*",
+    "@inspector/adapter-web": "workspace:*",
+    "@inspector/android": "workspace:*",
+    "@inspector/cli-adapter": "workspace:*",
+    "@inspector/electron-adapter": "workspace:*",
+    "@inspector/windows-adapter": "workspace:*",
+    "@inspector/artifact-store": "workspace:*",
+    "@inspector/adapter-sdk": "workspace:*"
   }
 }
