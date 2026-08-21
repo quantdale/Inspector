@@ -1,41 +1,18 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
-import { existsSync } from "node:fs";
-import { Store } from "@inspector/store-sqlite";
-import { ArtifactStore } from "@inspector/artifact-store";
 import { RunManager } from "@inspector/core";
 import type { Action } from "@inspector/protocol";
+import { parseArgs, CliError } from "./args.js";
+import type { ParsedInvocation } from "./args.js";
+import { commandHelp, generalUsage } from "./help.js";
+import { resolveVersion } from "./version.js";
+import { runDoctorProbes, renderDoctorReport } from "./doctor.js";
+import { huntCommand, workDirOf, type CommandContext } from "./hunt.js";
+import { findingsCommand } from "./findings.js";
+import { runsCommand } from "./runs.js";
+import { adapterSpawn, openWorkspace } from "./workspace.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const fakeBin = join(here, "..", "..", "adapter-fake", "src", "bin.ts");
-const webBin = join(here, "..", "..", "adapter-web", "src", "bin.ts");
-
-export interface Workspace {
-  store: Store;
-  artifacts: ArtifactStore;
-  base: string;
-}
-
-export function workspaceDirFrom(cwd: string): string {
-  return join(cwd, ".inspector");
-}
-
-export function openWorkspace(cwd: string): Workspace {
-  const base = workspaceDirFrom(cwd);
-  const store = Store.open(join(base, "runs.db"));
-  const artifacts = new ArtifactStore(join(base, "artifacts"));
-  return { store, artifacts, base };
-}
-
-export function adapterSpawn(name: string): { adapterCommand: string; adapterArgs: string[]; adapterEnv: NodeJS.ProcessEnv } {
-  const bin = name === "web" ? webBin : fakeBin;
-  return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", bin],
-    adapterEnv: { ...process.env },
-  };
-}
+// Public workspace/spawn helpers re-exported for library consumers.
+export { openWorkspace, adapterSpawn, workspaceDirFrom } from "./workspace.js";
+export type { Workspace, AdapterSpawnSpec } from "./workspace.js";
 
 function act(id: string, kind: string, input?: Record<string, unknown>): Action {
   return { id, runId: "run", environmentId: "env", kind, risk: "interact", deadlineMs: 5000, idempotency: "safe-retry", input };
@@ -46,93 +23,122 @@ export interface CliResult {
   data?: unknown;
 }
 
-export async function runCli(argv: string[], cwd: string = process.cwd()): Promise<CliResult> {
-  const args = argv.slice();
-  const json = args.includes("--json");
-  const wsIdx = args.indexOf("--workspace");
-  const workspaceArg = wsIdx >= 0 ? args[wsIdx + 1] : undefined;
-  const workDir = workspaceArg ?? cwd;
-  const out = (data: unknown) => {
-    if (json) {
-      process.stdout.write(JSON.stringify(data, null, 2) + "\n");
+interface CommandSplit {
+  command: string | null;
+  rest: string[];
+  workspaceArg?: string;
+}
+
+/** Find the command token without rejecting flags yet (help/version first). */
+function splitCommand(argv: string[]): CommandSplit {
+  const rest: string[] = [];
+  let command: string | null = null;
+  let workspaceArg: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i]!;
+    if (command === null) {
+      if (token === "--") continue;
+      if (token === "--workspace") {
+        const value = argv[i + 1];
+        if (value !== undefined) {
+          workspaceArg = value;
+          i += 1;
+        }
+        continue;
+      }
+      if (token.startsWith("-") && token.length > 1) continue;
+      command = token;
     } else {
-      process.stdout.write(String(data) + "\n");
+      rest.push(token);
     }
+  }
+  return { command, rest, workspaceArg };
+}
+
+export async function runCli(argv: string[], cwd: string = process.cwd()): Promise<CliResult> {
+  // --version wins over everything.
+  if (argv.includes("--version") || argv.includes("-v")) {
+    process.stdout.write(`${resolveVersion()}\n`);
+    return { code: 0 };
+  }
+
+  const { command, rest, workspaceArg } = splitCommand(argv);
+  const json = argv.includes("--json");
+  const out = (line: string): void => {
+    process.stdout.write(line + "\n");
+  };
+  const progress = (line: string): void => {
+    if (!json) process.stderr.write(line + "\n");
   };
 
-  const command = args[0];
-  if (!command) {
-    out(usage());
+  // Help: explicit flag anywhere or the help command (even without a target).
+  const helpRequested = argv.includes("--help") || argv.includes("-h");
+  if (command === null && !helpRequested) {
+    out(generalUsage());
     return { code: 1 };
   }
+  if (helpRequested || command === "help") {
+    const target = command === "help" ? (rest[0] ?? "") : command!;
+    out(target === "" ? generalUsage() : commandHelp(target));
+    return { code: 0 };
+  }
+
+  const ctx: CommandContext = { baseCwd: cwd, workspaceArg, json, out, progress };
 
   switch (command) {
     case "doctor":
-      return doctor(json, out);
+      return doctorCommand(rest, ctx);
+    case "hunt":
+      return huntCommand(parseArgs(rest, ["--adapter", "--url", "--seed", "--max-actions", "--max-minutes", "--max-findings"], []), ctx);
     case "run":
-      return runDemo(args, json, out, workDir);
+      return runDemo(parseArgs(rest, ["--adapter"], []), ctx);
     case "runs":
-      return runsCommand(args, json, out, workDir);
+      return runsCommand(rest, ctx);
+    case "findings":
+      return findingsCommand(rest, ctx);
+    case "version":
+      out(resolveVersion());
+      return { code: 0 };
     default:
-      out(`unknown command: ${command}`);
-      out(usage());
-      return { code: 1 };
+      throw new CliError("unknown-command", `${command} (try 'inspector --help')`);
   }
 }
 
-function usage(): string {
-  return [
-    "inspector - autonomous environment inspector",
-    "",
-    "Usage:",
-    "  inspector doctor                 Run environment/health checks",
-    "  inspector run --adapter fake     Run a fake demonstration scenario",
-    "  inspector runs list              List recorded runs",
-    "  inspector runs show <id>         Show a run's steps and outcomes",
-    "  Add --json for machine-readable output.",
-  ].join("\n");
-}
-
-async function doctor(json: boolean, out: (d: unknown) => void): Promise<CliResult> {
-  const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
-  const nodeOk = Number(process.versions.node.split(".")[0]) >= 22;
-  checks.push({ name: "node >= 22", ok: nodeOk, detail: `node ${process.versions.node}` });
-
-  const fakeExists = existsSync(fakeBin);
-  checks.push({ name: "fake adapter present", ok: fakeExists, detail: fakeBin });
-
-  let storeOk = false;
-  let storeDetail = "";
-  try {
-    const ws = openWorkspace(process.cwd());
-    ws.store.listRuns(1);
-    ws.store.close();
-    storeOk = true;
-    storeDetail = ws.base;
-  } catch (e) {
-    storeDetail = e instanceof Error ? e.message : String(e);
-  }
-  checks.push({ name: "sqlite store opens", ok: storeOk, detail: storeDetail });
-
-  const failed = checks.filter((c) => !c.ok);
-  if (json) {
-    out({ ok: failed.length === 0, checks });
+async function doctorCommand(rest: string[], ctx: CommandContext): Promise<CliResult> {
+  // doctor takes no command-specific flags; parseArgs still validates them.
+  const parsed = parseArgs(rest, [], []);
+  const workDir = workDirOf(ctx, parsed);
+  const checks = await runDoctorProbes(workDir);
+  const failedRequired = checks.filter((c) => !c.ok && c.required).length;
+  if (ctx.json) {
+    ctx.out(
+      JSON.stringify(
+        {
+          ok: failedRequired === 0,
+          workspace: workDir,
+          checks,
+        },
+        null,
+        2,
+      ),
+    );
   } else {
-    for (const c of checks) {
-      out(`${c.ok ? "PASS" : "FAIL"}  ${c.name}  (${c.detail})`);
-    }
-    out(failed.length === 0 ? "doctor: OK" : `doctor: ${failed.length} check(s) failed`);
+    ctx.out(renderDoctorReport(checks));
   }
-  return { code: failed.length === 0 ? 0 : 1 };
+  return { code: failedRequired === 0 ? 0 : 1, data: { ok: failedRequired === 0, checks } };
 }
 
-async function runDemo(args: string[], json: boolean, out: (d: unknown) => void, cwd: string): Promise<CliResult> {
-  const adapterArg = args[args.indexOf("--adapter") + 1];
+/** Legacy scripted demonstration (kept for compatibility with RC0 usage). */
+async function runDemo(parsed: ParsedInvocation, ctx: CommandContext): Promise<CliResult> {
+  const adapterArg = parsed.flags["--adapter"];
+  if (adapterArg === undefined || adapterArg === true) {
+    throw new CliError("missing-value", "--adapter requires a value (fake|web)");
+  }
   if (adapterArg !== "fake" && adapterArg !== "web") {
-    out("only --adapter fake|web is supported");
+    ctx.out("only --adapter fake|web is supported");
     return { code: 1 };
   }
-  const { store, artifacts } = openWorkspace(cwd);
+  const { store, artifacts } = openWorkspace(workDirOf(ctx, parsed));
   try {
     const mgr = new RunManager(store, artifacts);
     const run = await mgr.startRun(adapterSpawn(adapterArg));
@@ -153,7 +159,7 @@ async function runDemo(args: string[], json: boolean, out: (d: unknown) => void,
         adapter: "fake",
         deterministicFailure: (fail as { outcome?: { status: string } }).outcome?.status ?? "none",
       };
-      out(json ? summary : `run ${summary.runId} complete; deterministicFailure=${summary.deterministicFailure}`);
+      ctx.out(ctx.json ? JSON.stringify(summary, null, 2) : `run ${summary.runId} complete; deterministicFailure=${summary.deterministicFailure}`);
       await run.close();
       return { code: 0, data: summary };
     }
@@ -162,65 +168,29 @@ async function runDemo(args: string[], json: boolean, out: (d: unknown) => void,
     await run.submitAction(act("w1", "fill", { selector: "#username", value: "admin" }));
     await run.submitAction(act("w2", "fill", { selector: "#password", value: "admin" }));
     await run.submitAction(act("w3", "click", { selector: "#loginBtn" }));
-      const obs1 = await run.observe(["url", "uiTree"]);
-      await run.submitAction(act("w4", "click", { selector: "#increment" }));
-      await run.submitAction(act("w5", "click", { selector: "#save" }));
-      const obs2 = await run.observe(["storage", "screenshot", "console", "network", "trace"]);
-      // Deterministic target crash (boom button) -> target-failure, not adapter crash.
-      const crash = await run.submitAction(act("w6", "click", { selector: "#boom" }));
-      // Forbidden origin navigation must be rejected by policy/adapter.
-      const forbidden = await run.submitAction(act("w7", "navigate", { value: "https://evil.example.com/secret" }));
-      const obs3 = await run.observe(["url", "pageErrors"]);
-      const uiTree = (obs1.summary as { uiTree?: Array<{ id: string; hidden?: boolean }> }).uiTree ?? [];
-      const incrementNode = uiTree.find((e) => e.id === "increment");
-      const summary = {
-        runId: run.runId,
-        adapter: "web",
-        reachedDashboard: incrementNode ? incrementNode.hidden === false : false,
-        savedPreference: ((obs2.summary as { storage?: Record<string, string> }).storage?.["pref"] ?? "").startsWith("saved-"),
-        boomOutcome: (crash as { outcome?: { status: string } }).outcome?.status ?? "none",
-        forbiddenOutcome: (forbidden as { outcome?: { status: string } }).outcome?.status ?? "none",
-        pageErrorsAfterBoom: ((obs3.summary as { pageErrors?: Array<{ message: string }> }).pageErrors ?? []).length,
-      };
-    out(json ? summary : `run ${summary.runId} complete; dashboard=${summary.reachedDashboard}; pref=${summary.savedPreference}; boom=${summary.boomOutcome}; forbidden=${summary.forbiddenOutcome}`);
+    const obs1 = await run.observe(["url", "uiTree"]);
+    await run.submitAction(act("w4", "click", { selector: "#increment" }));
+    await run.submitAction(act("w5", "click", { selector: "#save" }));
+    const obs2 = await run.observe(["storage", "screenshot", "console", "network", "trace"]);
+    // Deterministic target crash (boom button) -> target-failure, not adapter crash.
+    const crash = await run.submitAction(act("w6", "click", { selector: "#boom" }));
+    // Forbidden origin navigation must be rejected by policy/adapter.
+    const forbidden = await run.submitAction(act("w7", "navigate", { value: "https://evil.example.com/secret" }));
+    const obs3 = await run.observe(["url", "pageErrors"]);
+    const uiTree = (obs1.summary as { uiTree?: Array<{ id: string; hidden?: boolean }> }).uiTree ?? [];
+    const incrementNode = uiTree.find((e) => e.id === "increment");
+    const summary = {
+      runId: run.runId,
+      adapter: "web",
+      reachedDashboard: incrementNode ? incrementNode.hidden === false : false,
+      savedPreference: ((obs2.summary as { storage?: Record<string, string> }).storage?.["pref"] ?? "").startsWith("saved-"),
+      boomOutcome: (crash as { outcome?: { status: string } }).outcome?.status ?? "none",
+      forbiddenOutcome: (forbidden as { outcome?: { status: string } }).outcome?.status ?? "none",
+      pageErrorsAfterBoom: ((obs3.summary as { pageErrors?: Array<{ message: string }> }).pageErrors ?? []).length,
+    };
+    ctx.out(ctx.json ? JSON.stringify(summary, null, 2) : `run ${summary.runId} complete; dashboard=${summary.reachedDashboard}; pref=${summary.savedPreference}; boom=${summary.boomOutcome}; forbidden=${summary.forbiddenOutcome}`);
     await run.close();
     return { code: 0, data: summary };
-  } finally {
-    store.close();
-  }
-}
-
-async function runsCommand(args: string[], json: boolean, out: (d: unknown) => void, cwd: string): Promise<CliResult> {
-  const sub = args[1];
-  const { store } = openWorkspace(cwd);
-  try {
-    if (sub === "list" || !sub) {
-      const runs = store.listRuns(100).map((r) => ({ id: r.id, status: r.status, createdAt: r.created_at, adapter: r.adapter }));
-      out(json ? runs : runs.map((r) => `${r.id}  ${r.status}  ${r.adapter ?? ""}  ${r.createdAt}`).join("\n"));
-      return { code: 0, data: runs };
-    }
-    if (sub === "show") {
-      const id = args[2];
-      if (!id) {
-        out("usage: inspector runs show <id>");
-        return { code: 1 };
-      }
-      const run = store.getRun(id);
-      if (!run) {
-        out(`run not found: ${id}`);
-        return { code: 1 };
-      }
-      const steps = store.getRunSteps(id).map((s) => ({
-        sequence: s.step.sequence,
-        action: s.action ? { id: s.action.id, kind: s.action.kind, status: s.action.status } : null,
-        observations: s.observations.length,
-      }));
-      const detail = { run: { id: run.id, status: run.status }, steps };
-      out(json ? detail : `run ${id}\n` + steps.map((s) => `  #${s.sequence} ${s.action?.kind ?? "(observe)"} -> ${s.action?.status ?? "ok"} (${s.observations} obs)`).join("\n"));
-      return { code: 0, data: detail };
-    }
-    out(`unknown runs subcommand: ${sub}`);
-    return { code: 1 };
   } finally {
     store.close();
   }

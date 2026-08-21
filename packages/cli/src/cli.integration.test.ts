@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { Store, type FindingRecord } from "@inspector/store-sqlite";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cliBin = join(here, "bin.ts");
@@ -17,17 +18,68 @@ afterEach(() => {
   }
 });
 
-function runCli(args: string[], workspace: string): Promise<{ code: number; stdout: string }> {
+function runCli(args: string[], workspace: string): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["--import", "tsx", cliBin, ...args, "--workspace", workspace], {
       cwd: process.cwd(),
       env: { ...process.env },
     });
     let stdout = "";
+    let stderr = "";
     child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
-    child.on("close", (code) => resolve({ code: code ?? 1, stdout }));
+    child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
     child.on("error", reject);
   });
+}
+
+function seedFindings(dbPath: string): FindingRecord[] {
+  const store = Store.open(dbPath);
+  try {
+    const now = new Date().toISOString();
+    const records: FindingRecord[] = [
+      {
+        id: "find_test_1",
+        runId: "run_seed_1",
+        status: "CONFIRMED",
+        title: "boom button crashes the app",
+        confidence: 1,
+        severity: "high",
+        revision: null,
+        oracleIds: '["page-error"]',
+        reproductionJson: '{"attempts":2,"successes":2,"errors":0}',
+        artifactRefs: '["sha_a","sha_b"]',
+        createdAt: now,
+        updatedAt: now,
+        signature: "PAGE_ERROR",
+        minimizationJson: '{"probes":3,"removals":1,"verifiedReproduction":true}',
+        lastTransitionJson: null,
+        adapter: "web-playwright",
+      },
+      {
+        id: "find_test_2",
+        runId: "run_seed_2",
+        status: "REJECTED",
+        title: "flaky candidate",
+        confidence: 0,
+        severity: "unknown",
+        revision: null,
+        oracleIds: "[]",
+        reproductionJson: null,
+        artifactRefs: "[]",
+        createdAt: now,
+        updatedAt: now,
+        signature: null,
+        minimizationJson: null,
+        lastTransitionJson: null,
+        adapter: null,
+      },
+    ];
+    for (const r of records) store.putFinding(r);
+    return records;
+  } finally {
+    store.close();
+  }
 }
 
 describe("cli", () => {
@@ -37,6 +89,69 @@ describe("cli", () => {
     expect(code).toBe(0);
     const parsed = JSON.parse(stdout);
     expect(parsed.ok).toBe(true);
+  });
+
+  it("doctor reports structured probes with remediation hints", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const { code, stdout } = await runCli(["doctor", "--json"], dir);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(Array.isArray(parsed.checks)).toBe(true);
+    const names = parsed.checks.map((c: { name: string }) => c.name);
+    for (const expected of [
+      "node >= 22",
+      "workspace writable",
+      "sqlite store opens",
+      "fake adapter resolvable",
+      "web adapter (Playwright + Chromium)",
+      "pty support (@lydell/node-pty)",
+      "android adb on PATH",
+      "windows-uia automation",
+      "electron runtime",
+    ]) {
+      expect(names).toContain(expected);
+    }
+    for (const c of parsed.checks) {
+      expect(typeof c.ok).toBe("boolean");
+      expect(typeof c.required).toBe("boolean");
+      expect(typeof c.detail).toBe("string");
+      if (!c.ok) expect(typeof c.remediation).toBe("string");
+    }
+    // Core probes must pass on a clean checkout.
+    for (const c of parsed.checks) {
+      if (c.required) expect(c.ok, c.name).toBe(true);
+    }
+  });
+
+  it("rejects unknown flags with a named error on stderr", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const { code, stdout, stderr } = await runCli(["doctor", "--frobnicate"], dir);
+    expect(code).toBe(1);
+    expect(stderr).toContain("unknown-flag: --frobnicate");
+    expect(stdout).not.toContain("--frobnicate");
+  });
+
+  it("prints the version from the root package.json", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const short = await runCli(["-v"], dir);
+    const long = await runCli(["--version"], dir);
+    for (const r of [short, long]) {
+      expect(r.code).toBe(0);
+      expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+    }
+  });
+
+  it("prints general and per-command help", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const general = await runCli(["--help"], dir);
+    expect(general.code).toBe(0);
+    expect(general.stdout).toContain("hunt");
+    expect(general.stdout).toContain("--workspace");
+
+    const huntHelp = await runCli(["help", "hunt"], dir);
+    expect(huntHelp.code).toBe(0);
+    expect(huntHelp.stdout).toContain("--max-actions");
+    expect(huntHelp.stdout).toContain("--url");
   });
 
   it("runs a non-interactive fake demonstration and records the run", async () => {
@@ -58,9 +173,100 @@ describe("cli", () => {
     expect(detail.steps.length).toBeGreaterThan(0);
   });
 
+  it("says 'no runs recorded' instead of printing nothing", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const list = await runCli(["runs", "list"], dir);
+    expect(list.code).toBe(0);
+    expect(list.stdout.trim()).toBe("no runs recorded");
+  });
+
   it("creates a durable workspace directory", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
     await runCli(["run", "--adapter", "fake"], dir);
     expect(existsSync(join(dir, ".inspector", "runs.db"))).toBe(true);
   });
+
+  it("lists and shows seeded findings", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    seedFindings(join(dir, ".inspector", "runs.db"));
+
+    const list = await runCli(["findings", "list", "--json"], dir);
+    expect(list.code).toBe(0);
+    const findings = JSON.parse(list.stdout);
+    expect(findings.map((f: { id: string }) => f.id).sort()).toEqual(["find_test_1", "find_test_2"]);
+    const confirmed = findings.find((f: { id: string }) => f.id === "find_test_1");
+    expect(confirmed.status).toBe("CONFIRMED");
+    expect(confirmed.artifactRefCount).toBe(2);
+    expect(confirmed.evidenceBundlePath).toBeNull();
+
+    const filtered = await runCli(["findings", "list", "--run", "run_seed_1", "--json"], dir);
+    const onlyRun1 = JSON.parse(filtered.stdout);
+    expect(onlyRun1.map((f: { id: string }) => f.id)).toEqual(["find_test_1"]);
+
+    const show = await runCli(["findings", "show", "find_test_1", "--json"], dir);
+    expect(show.code).toBe(0);
+    const detail = JSON.parse(show.stdout);
+    expect(detail.signature).toBe("PAGE_ERROR");
+    expect(detail.reproduction.attempts).toBe(2);
+    expect(detail.minimization.verifiedReproduction).toBe(true);
+
+    const missing = await runCli(["findings", "show", "find_missing", "--json"], dir);
+    expect(missing.code).toBe(1);
+  });
+
+  it("hunts autonomously against the fake adapter end-to-end", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const hunt = await runCli(
+      ["hunt", "--adapter", "fake", "--seed", "7", "--max-actions", "80", "--max-findings", "2", "--json"],
+      dir,
+    );
+    expect(hunt.code).toBe(0);
+    const summary = JSON.parse(hunt.stdout);
+    expect(summary.runId).toMatch(/^run_/);
+    expect(summary.adapter).toBe("fake");
+    expect(["finding-cap", "action-budget"]).toContain(summary.stoppedReason);
+    expect(summary.actionsExecuted).toBeGreaterThan(0);
+    expect(summary.findings.length).toBeGreaterThanOrEqual(1);
+    for (const f of summary.findings) {
+      expect(f.status).toBe("CONFIRMED");
+      expect(f.signature).toBe("DEFECT_SUBMIT_INVALID");
+    }
+
+    // Evidence bundles are written under <workspace>/bundles/<runId>/.
+    expect(summary.bundles.length).toBe(summary.findings.length);
+    for (const b of summary.bundles) {
+      expect(existsSync(b.path)).toBe(true);
+      expect(b.path).toContain(join(".inspector", "bundles", summary.runId));
+    }
+
+    // Findings were durably persisted through the same store.
+    const list = await runCli(["findings", "list", "--json"], dir);
+    const persisted = JSON.parse(list.stdout) as Array<{ id: string; status: string }>;
+    for (const f of summary.findings) {
+      expect(persisted.some((p) => p.id === f.id && p.status === "CONFIRMED")).toBe(true);
+    }
+    const firstFinding = summary.findings[0];
+    const show = await runCli(["findings", "show", firstFinding.id, "--json"], dir);
+    const detail = JSON.parse(show.stdout);
+    expect(detail.reproduction.successes).toBeGreaterThanOrEqual(1);
+    expect(detail.evidenceBundlePath).not.toBeNull();
+  }, 60000);
+
+  it("resumes a recorded fake run and re-observes it", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const demo = await runCli(["run", "--adapter", "fake", "--json"], dir);
+    expect(demo.code).toBe(0);
+    const runId = (JSON.parse(demo.stdout) as { runId: string }).runId;
+
+    const resumed = await runCli(["runs", "resume", runId], dir);
+    expect(resumed.code).toBe(0);
+    expect(resumed.stdout).toContain(`resumed ${runId}`);
+    expect(resumed.stdout).toContain("adapter-fake");
+    expect(resumed.stdout).toContain("final status: closed");
+
+    // Unknown ids fail honestly.
+    const missing = await runCli(["runs", "resume", "run_does_not_exist"], dir);
+    expect(missing.code).toBe(1);
+    expect(missing.stdout).toContain("run not found");
+  }, 60000);
 });
