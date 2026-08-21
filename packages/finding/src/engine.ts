@@ -70,9 +70,18 @@ export class OracleEngine {
     ]);
   }
 
-  evaluate(result: ReplayResult): { reproduced: boolean; signals: OracleSignal[] } {
+  evaluate(result: ReplayResult): {
+    reproduced: boolean;
+    signals: OracleSignal[];
+    /** Ids of the registered oracles that matched, for downstream evidence. */
+    matchedOracleIds: string[];
+  } {
     const matched = this.oracles.filter((o) => o.detect(result));
-    return { reproduced: matched.length > 0, signals: result.signals };
+    return {
+      reproduced: matched.length > 0,
+      signals: result.signals,
+      matchedOracleIds: matched.map((o) => o.id),
+    };
   }
 
   /** The defect signature of a replay result under this engine's extractor. */

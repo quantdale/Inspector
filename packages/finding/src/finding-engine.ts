@@ -157,6 +157,7 @@ export class FindingEngine {
     let errors = 0;
     let lastError: string | null = null;
     let lastSignals: OracleSignal[] = [];
+    const matchedOracleIds = new Set<string>();
     let stats: ReproductionStats = { attempts: policy.attempts, successes: 0, errors: 0, lastError: null };
     try {
       for (let i = 0; i < policy.attempts; i++) {
@@ -171,9 +172,20 @@ export class FindingEngine {
           continue;
         }
         lastSignals = result.signals;
-        if (this.oracle.evaluate(result).reproduced) successes += 1;
+        const evaluation = this.oracle.evaluate(result);
+        if (evaluation.reproduced) {
+          successes += 1;
+          for (const id of evaluation.matchedOracleIds) matchedOracleIds.add(id);
+        }
       }
-      stats = { attempts: policy.attempts, successes, errors, lastError };
+      stats = {
+        attempts: policy.attempts,
+        successes,
+        errors,
+        lastError,
+        // Name the deciding oracles so confirmed findings are auditable.
+        ...(matchedOracleIds.size > 0 ? { matchedOracleIds: [...matchedOracleIds].sort() } : {}),
+      };
       finding.reproduction = stats;
       const ratio = successes / policy.attempts;
       finding.confidence = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;

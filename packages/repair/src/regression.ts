@@ -53,7 +53,7 @@ export class RegressionGenerator {
 
     const driver = await this.opts.driverFor(workspace);
     const result = await driver.replay(minimizedActions);
-    const failedPrePatch = this.opts.oracleSuite.evaluate(result).reproduced;
+    const failedPrePatch = this.opts.oracleSuite.evaluateStrict(result).reproduced;
 
     return { scenario, artifactPath, failedPrePatch, prePatch: result };
   }
@@ -65,6 +65,6 @@ export class RegressionGenerator {
   async passes(workspace: RepairWorkspace, steps: Action[]): Promise<boolean> {
     const driver = await this.opts.driverFor(workspace);
     const result = await driver.replay(steps);
-    return !this.opts.oracleSuite.evaluate(result).reproduced;
+    return !this.opts.oracleSuite.evaluateStrict(result).reproduced;
   }
 }

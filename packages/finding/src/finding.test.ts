@@ -65,6 +65,36 @@ describe("finding engine (M2)", () => {
     expect(finding.confidence).toBe(1);
   });
 
+  it("evaluate() exposes which registered oracles matched", async () => {
+    const engine = OracleEngine.defaults();
+    const clean = engine.evaluate({ outcomes: [], signals: [], observations: [] });
+    expect(clean.reproduced).toBe(false);
+    expect(clean.matchedOracleIds).toEqual([]);
+    const hit = engine.evaluate(await new FakeStateMachineDriver().replay(defectActions));
+    expect(hit.reproduced).toBe(true);
+    expect(hit.matchedOracleIds).toContain("signal:DEFECT_SUBMIT_INVALID");
+  });
+
+  it("confirmed findings record the deciding oracle ids in reproduction stats", async () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    const { finding } = await engine.reproduce(f, defectActions, new FakeStateMachineDriver(), {
+      attempts: 2,
+      minSuccesses: 2,
+    });
+    expect(finding.status).toBe("CONFIRMED");
+    expect(finding.reproduction?.matchedOracleIds).toBeDefined();
+    expect(finding.reproduction!.matchedOracleIds!.length).toBeGreaterThan(0);
+    // Rejected runs must not claim any oracle fired.
+    const g = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    const { finding: rejected } = await engine.reproduce(g, okActions, new FakeStateMachineDriver(), {
+      attempts: 1,
+      minSuccesses: 1,
+    });
+    expect(rejected.status).toBe("REJECTED");
+    expect(rejected.reproduction?.matchedOracleIds).toBeUndefined();
+  });
+
   it("non-defect suspicion is rejected", async () => {
     const engine = new FindingEngine();
     const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });

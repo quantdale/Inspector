@@ -51,6 +51,11 @@ export interface ReproductionStats {
   errors?: number;
   /** Message of the last contained driver error, if any. */
   lastError?: string | null;
+  /**
+   * Ids of the oracles that fired on successful reproduction attempts
+   * (union across attempts). Names the deciding detectors for audit.
+   */
+  matchedOracleIds?: string[];
 }
 
 /** Statistics recorded by a minimization run. */

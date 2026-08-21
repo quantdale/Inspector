@@ -204,7 +204,7 @@ export class RepairEngine {
           // P4 verification: exact replay must no longer fire the oracle...
           const driver = await this.opts.driverFor(workspace);
           const replayResult = await driver.replay(minimizedActions);
-          const stillFails = this.opts.oracleSuite.evaluate(replayResult).reproduced;
+          const stillFails = this.opts.oracleSuite.evaluateStrict(replayResult).reproduced;
 
           // Masking-by-removal defense: every action that crashed the
           // unpatched target with a genuine application failure (TARGET_FAILURE)

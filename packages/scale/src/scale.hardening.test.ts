@@ -21,6 +21,8 @@ function fresh(name: string): string {
   return dir;
 }
 afterEach(() => {
+  for (const m of openManagers) m.close();
+  openManagers.length = 0;
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
   dirs = [];
 });
@@ -37,6 +39,21 @@ function items(suffix = ""): WorkItem[] {
 }
 
 const USAGE = { modelRequests: 1, tokens: 100, costUsd: 0.01, actions: 2 };
+
+// SQLite keeps the leases.db handle open; managers must be closed before the
+// temp dirs are removed (Windows cannot delete an open database file).
+const openManagers: LeaseManager[] = [];
+function makeLeases(
+  dir: string,
+  backend: "json" | "sqlite",
+  now?: () => number,
+  ttl?: number,
+): LeaseManager {
+  const m = new LeaseManager(dir, now, ttl, { backend });
+  openManagers.push(m);
+  return m;
+}
+const BACKENDS = ["json", "sqlite"] as const;
 
 type ExecuteItemImpl = (this: unknown, item: WorkItem, workerId: string, generation?: number) => Promise<boolean>;
 
@@ -100,17 +117,67 @@ function finding(id: string): Finding {
   };
 }
 
-describe("D1: cross-instance state must be serialized through a durable lock", () => {
+describe.each(BACKENDS)("lease durability via %s backend", (backend) => {
   it("two LeaseManager instances on one stateDir cannot both acquire the same item", () => {
-    const dir = fresh("d1-leases");
-    const a = new LeaseManager(dir);
-    const b = new LeaseManager(dir); // snapshot predates a's persist
+    const dir = fresh(`d1-leases-${backend}`);
+    const a = makeLeases(dir, backend);
+    const b = makeLeases(dir, backend); // snapshot predates a's persist
     expect(a.acquire("item-x", "w1").ok).toBe(true);
     const second = b.acquire("item-x", "w2");
     if (second.ok) throw new Error("double acquire succeeded for w2");
     expect(second.reason).toBe("held");
   });
 
+  it("reclaim bumps the generation and a stale completion is rejected", () => {
+    let t = 1000;
+    const now = (): number => t;
+    const dir = fresh(`d2-fencing-${backend}`);
+    const m = makeLeases(dir, backend, now, 100);
+    const first = m.acquire("item", "w1");
+    if (!first.ok) throw new Error("initial acquire failed");
+    expect(first.lease.generation).toBe(1);
+
+    t += 200; // expire the lease
+    const again = m.acquire("item", "w1"); // reclaim after expiry
+    if (!again.ok) throw new Error("expired lease not reclaimable");
+    expect(again.lease.generation).toBe(2);
+
+    // The generation-1 execution finally finishes and tries to complete.
+    expect(m.complete("item", "w1", 1)).toBe(false); // stale: fenced out
+    expect(m.isDone("item")).toBe(false);
+    expect(m.complete("item", "w1", 2)).toBe(true); // current generation wins
+    expect(m.isDone("item")).toBe(true);
+  });
+
+  it("renew validates ownership and generation", () => {
+    let t = 1000;
+    const now = (): number => t;
+    const dir = fresh(`d2-renew-${backend}`);
+    const m = makeLeases(dir, backend, now, 100);
+    const lease = m.acquire("item", "w1");
+    if (!lease.ok) throw new Error("acquire failed");
+    t += 200; // expire
+    const other = makeLeases(dir, backend, now, 100);
+    const reclaimed = other.acquire("item", "w2");
+    if (!reclaimed.ok) throw new Error("reclaim failed");
+    expect(m.renew("item", "w1", 1)).toBe(false); // stale owner + stale generation
+    expect(other.renew("item", "w3", reclaimed.lease.generation)).toBe(false); // wrong owner
+    expect(other.renew("item", "w2", reclaimed.lease.generation)).toBe(true);
+    const inFlight = other.inFlight();
+    expect(inFlight).toHaveLength(1);
+    expect(inFlight[0]!.expiresAtMs).toBeGreaterThan(t + 50);
+  });
+
+  it("complete without an explicit generation still requires the current owner", () => {
+    const dir = fresh(`d2-compat-${backend}`);
+    const m = makeLeases(dir, backend);
+    expect(m.acquire("item", "w1")).toMatchObject({ ok: true });
+    expect(m.complete("item", "w2")).toBe(false);
+    expect(m.complete("item", "w1")).toBe(true);
+  });
+});
+
+describe("D1: cross-instance state must be serialized through a durable lock", () => {
   it("two ResourceLedger instances cannot both spend the same budget", () => {
     const dir = fresh("d1-ledger");
     const a = new ResourceLedger(dir, { maxActions: 10 });
@@ -137,56 +204,6 @@ describe("D1: cross-instance state must be serialized through a durable lock", (
     } finally {
       patch.restore();
     }
-  });
-});
-
-describe("D2: lease fencing via generation tokens", () => {
-  it("reclaim bumps the generation and a stale completion is rejected", () => {
-    let t = 1000;
-    const now = (): number => t;
-    const dir = fresh("d2-fencing");
-    const m = new LeaseManager(dir, now, 100);
-    const first = m.acquire("item", "w1");
-    if (!first.ok) throw new Error("initial acquire failed");
-    expect(first.lease.generation).toBe(1);
-
-    t += 200; // expire the lease
-    const again = m.acquire("item", "w1"); // reclaim after expiry
-    if (!again.ok) throw new Error("expired lease not reclaimable");
-    expect(again.lease.generation).toBe(2);
-
-    // The generation-1 execution finally finishes and tries to complete.
-    expect(m.complete("item", "w1", 1)).toBe(false); // stale: fenced out
-    expect(m.isDone("item")).toBe(false);
-    expect(m.complete("item", "w1", 2)).toBe(true); // current generation wins
-    expect(m.isDone("item")).toBe(true);
-  });
-
-  it("renew validates ownership and generation", () => {
-    let t = 1000;
-    const now = (): number => t;
-    const dir = fresh("d2-renew");
-    const m = new LeaseManager(dir, now, 100);
-    const lease = m.acquire("item", "w1");
-    if (!lease.ok) throw new Error("acquire failed");
-    t += 200; // expire
-    const other = new LeaseManager(dir, now, 100);
-    const reclaimed = other.acquire("item", "w2");
-    if (!reclaimed.ok) throw new Error("reclaim failed");
-    expect(m.renew("item", "w1", 1)).toBe(false); // stale owner + stale generation
-    expect(other.renew("item", "w3", reclaimed.lease.generation)).toBe(false); // wrong owner
-    expect(other.renew("item", "w2", reclaimed.lease.generation)).toBe(true);
-    const inFlight = other.inFlight();
-    expect(inFlight).toHaveLength(1);
-    expect(inFlight[0]!.expiresAtMs).toBeGreaterThan(t + 50);
-  });
-
-  it("complete without an explicit generation still requires the current owner", () => {
-    const dir = fresh("d2-compat");
-    const m = new LeaseManager(dir);
-    expect(m.acquire("item", "w1")).toMatchObject({ ok: true });
-    expect(m.complete("item", "w2")).toBe(false);
-    expect(m.complete("item", "w1")).toBe(true);
   });
 });
 

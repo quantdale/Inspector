@@ -29,6 +29,9 @@ import {
 
 const TMP_PREFIX = "inspector-soakj-scale-";
 const roots: string[] = [];
+// SQLite keeps leases.db open; managers must be closed before temp dirs are
+// removed (Windows cannot delete an open database file).
+const openManagers: LeaseManager[] = [];
 function fresh(name: string): string {
   const dir = mkdtempSync(join(tmpdir(), `${TMP_PREFIX}${name}-`));
   roots.push(dir);
@@ -42,6 +45,7 @@ beforeAll(() => {
   tmpBaseline = countTmpRoots();
 });
 afterAll(() => {
+  for (const m of openManagers.splice(0)) m.close();
   for (const dir of roots) rmSync(dir, { recursive: true, force: true });
   roots.length = 0;
   // Dispose paths must leave the temp dir exactly as we found it.
@@ -393,16 +397,26 @@ describe("SOAK-J: unattended-campaign long-run churn", () => {
     },
   );
 
-  it(
-    "SOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected",
-    { timeout: 180_000 },
-    () => {
-      const dir = fresh("fencing");
+  // SQLite keeps leases.db open; close managers before temp dirs are removed.
+  function makeLeases(
+    dir: string,
+    backend: "json" | "sqlite",
+    now: () => number,
+    ttl: number,
+  ): LeaseManager {
+    const m = new LeaseManager(dir, now, ttl, { backend });
+    openManagers.push(m);
+    return m;
+  }
+  it.each(["json", "sqlite"] as const)(
+    "SOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected [%s]",
+    (backend) => {
+      const dir = fresh(`fencing-${backend}`);
       let t = 10_000;
       const now = (): number => t;
       const ttl = 1_000;
-      const a = new LeaseManager(dir, now, ttl);
-      const b = new LeaseManager(dir, now, ttl);
+      const a = makeLeases(dir, backend, now, ttl);
+      const b = makeLeases(dir, backend, now, ttl);
       const ROUNDS = 250;
       let duplicateClaimsRejected = 0;
       let staleCompletionsRejected = 0;
@@ -464,16 +478,18 @@ describe("SOAK-J: unattended-campaign long-run churn", () => {
 
       // Done set is durable: a fresh manager sees no in-flight leases and the
       // sampled done items stay done.
-      const freshManager = new LeaseManager(dir, now, ttl);
+      const freshManager = makeLeases(dir, backend, now, ttl);
       expect(freshManager.inFlight()).toHaveLength(0);
       for (let round = 0; round < ROUNDS; round += 10) {
         expect(freshManager.isDone(`item-${round}`)).toBe(true);
       }
       console.info(
-        `[soak-j] J3 fencing: rounds=${ROUNDS}, duplicateClaimsRejected=${duplicateClaimsRejected}, ` +
+        `[soak-j] J3 fencing [${backend}]: rounds=${ROUNDS}, duplicateClaimsRejected=${duplicateClaimsRejected}, ` +
           `reclaims=${reclaims}, staleCompletionsRejected=${staleCompletionsRejected}, safeReleases=${safeReleases}`,
       );
+      for (const m of openManagers.splice(0)) m.close();
     },
+    180_000,
   );
 
   it(

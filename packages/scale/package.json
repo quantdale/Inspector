@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^11.7.0",
     "@inspector/protocol": "workspace:*",
     "@inspector/core": "workspace:*",
     "@inspector/finding": "workspace:*",
