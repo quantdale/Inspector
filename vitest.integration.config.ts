@@ -34,5 +34,9 @@ export default defineConfig({
     environment: "node",
     pool: "forks",
     testTimeout: 60000,
+    // Cold Chromium/emulator spawns under concurrent file execution can
+    // exceed the 10s default beforeAll budget on Windows; observed as
+    // random per-file "Hook timed out" flakes across full-suite runs.
+    hookTimeout: 30000,
   },
 });
