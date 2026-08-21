@@ -23,6 +23,8 @@ const alias = {
   "@inspector/cli": resolve(__dirname, "packages/cli/src/index.ts"),
   "@inspector/finding": resolve(__dirname, "packages/finding/src/index.ts"),
   "@inspector/explore": resolve(__dirname, "packages/explore/src/index.ts"),
+  "@inspector/oracle": resolve(__dirname, "packages/oracle/src/index.ts"),
+  "@inspector/repair": resolve(__dirname, "packages/repair/src/index.ts"),
 };
 
 export default defineConfig({

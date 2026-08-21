@@ -10,11 +10,9 @@
 
 ## Last trusted implementation state
 
-M3 autonomous exploration is COMPLETE. `@inspector/explore` provides the state/action graph with semantic fingerprints, capability-bounded action inventory, curiosity scoring (novelty/unvisited-edge/boundary/rarity/cycle-penalty), deterministic boundary + sequence input generation, capability-gated fault injection, inventory-bound planner fallback, and the `ExploreController` campaign loop (action/wall/reset/finding budgets, plateau resets, anomaly detection wired into every step, adapter-error recovery via reset + hazard blacklist, post-run reproduce → minimize → confirm against fresh environments).
+M4 oracle expansion and autonomous repair is COMPLETE. `@inspector/oracle` provides the composable OracleSuite (invariant/persistence/structural candidate oracles + metamorphic relations) with strength/confidence metadata and auditable verdicts, plus weak-suspicion handling: uncorroborated llm/vision/heuristic signals are held at NEEDS_HUMAN_ORACLE regardless of self-reported confidence. `@inspector/repair` provides exact-revision git worktree isolation (dirty-repo refusal, rollback, dispose), hint-ranked byte-bounded source context, regression-first repair (failing scenario materialized and proven pre-patch), a bounded PatchAgent contract with deterministic ScriptedPatchAgent, verification by exact replay + benign-flow masking probe + post-patch regression gate, and RESOLVED only when all gates pass — rejected patches rolled back and preserved in the audit trail.
 
-M3 exit gate satisfied: a bounded autonomous hunt discovers and confirms 3 distinct hidden seeded web defects (login validation crash, boom crash, increment overflow) that are not encoded as scripted tests, each reproduced on fresh Chromium instances with minimized reproducers and evidence bundles; identical seeds produce identical anomaly classKey sets. `pnpm test:integration` 27/27 green.
-
-Verified implementation gates at M3 checkpoint: **lint (0 errors), typecheck (exit 0), test (51 unit), test:integration (27 integration)** all green.
+M4 exit gate satisfied: a seeded defect completes the full autonomous DISCOVERED -> CONFIRMED -> PATCHING -> VERIFYING -> RESOLVED loop without manual debugging; bad patches are automatically rejected/rolled back; weak-suspicion findings are policy-blocked from repair; the primary checkout stays untouched. All four gates green (lint 0 errors; typecheck exit 0; 57 unit tests; 30 integration tests across 7 files).
 
 ## Active waypoint
 
@@ -22,20 +20,21 @@ Verified implementation gates at M3 checkpoint: **lint (0 errors), typecheck (ex
 - Milestone: M1 Web sensing and acting — **COMPLETE**
 - Milestone: M2 Finding, evidence, reproduction, minimization — **COMPLETE**
 - Milestone: M3 Autonomous exploration — **COMPLETE**
-- Spec M3: `specs/003-autonomous-exploration/SPEC.md` (status COMPLETE)
-- Task graph M3: `specs/003-autonomous-exploration/TASKS.md` (E0–E5, E7 checked; E6 deferred by design — no source instrumentation for black-box web target)
+- Milestone: M4 Oracle expansion and autonomous repair — **COMPLETE**
+- Spec M4: `specs/004-oracle-repair/SPEC.md` (status COMPLETE)
+- Task graph M4: `specs/004-oracle-repair/TASKS.md` (O0–O1, P0–P5 all checked)
 
 ## Next milestone
 
-- Milestone: **M4 Oracle expansion and autonomous repair**
-- Spec: `specs/004-oracle-repair/SPEC.md`
-- First waypoint: M4.O0 oracle-sdk
+- Milestone: **M5 Android adapter**
+- Spec: `specs/005-android/SPEC.md`
+- First waypoint: M5.A0 adb-lifecycle
 
 ## Exact next action
 
-Begin M4: create `specs/004-oracle-repair/TASKS.md`, implement `@inspector/oracle` (composable invariant/metamorphic/structural oracles with strength/confidence) and `@inspector/repair` (exact-revision git worktree isolation, evidence-before-patch invariant, regression-first repair, verify-by-replay, rejected-patch rollback), then run the M4 exit gate (one seeded defect completes DISCOVERED → CONFIRMED → PATCHING → VERIFYING → RESOLVED without manual debugging).
+Begin M5: create `specs/005-android/TASKS.md`, implement `@inspector/android` — ADB environment lifecycle against an injectable/mock ADB backend, UI Automator helper producing a semantic UI tree, screenshots and semantic actions, emulator state fixtures/snapshots, and a seeded Android target app. Conformance must run without real hardware/emulator. Run the M5 exit gate.
 
-Continue autonomously; do not stop at the M3/M4 boundary.
+Continue autonomously; do not stop at the M4/M5 boundary.
 
 ## Known blockers
 
@@ -43,12 +42,12 @@ None.
 
 ## Known debt (recorded in campaign.yaml)
 
-- Replay oracle is loose (`TargetFailureOracle` counts ACTION_FAILED target-failures as reproduction); tighten during M4 oracle work.
+- Replay oracle still counts ACTION_FAILED target-failures as reproduction in the legacy TargetFailureOracle path; partially mitigated by OracleSuite.
 - Web exploration E2E takes ~4–6 min wall clock; acceptable but flagged for later perf work.
 
 ## Do not do yet
 
-- Do not start Android/iOS/CLI/Electron/Windows adapter work before M4 completion.
+- Do not start iOS adapter work before M6/M7 completion (M8 is environment-deferred).
 - Do not start broad hardening/audit campaigns.
 - Do not add a cloud control plane or dashboard.
 - Do not bypass policy/capability semantics to make the demo easier.

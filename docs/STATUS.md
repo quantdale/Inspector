@@ -15,21 +15,21 @@ The architecture/documentation foundation was merged to `main` in PR #1 at commi
 
 ## Active work
 
-- Milestone: `M4 — Oracle expansion and autonomous repair` — **ACTIVE**
-- Specification: `specs/004-oracle-repair/SPEC.md`
-- Task graph: `specs/004-oracle-repair/TASKS.md` (to be created at M4 start)
-- Next milestone after M4: `M5 — Android adapter` (`specs/005-android/SPEC.md`)
+- Milestone: `M5 — Android adapter` — **ACTIVE**
+- Specification: `specs/005-android/SPEC.md`
+- Task graph: `specs/005-android/TASKS.md` (to be created at M5 start)
+- Next milestone after M5: `M6 — Cross-platform adapters` (`specs/006-cross-platform/SPEC.md`)
 
-## Verified gates (M3)
+## Verified gates (M4)
 
 | Gate | Result |
 | --- | --- |
 | lint (0 errors) | PASS |
 | typecheck (exit 0) | PASS |
-| test (51 unit tests) | PASS |
-| test:integration (27 integration tests, real Chromium) | PASS |
+| test (57 unit tests) | PASS |
+| test:integration (30 integration tests, 7 files) | PASS |
 
-M3 exit gate evidence: the autonomous hunt discovers and confirms 3 distinct hidden seeded web defects (login validation crash, boom crash, increment overflow) with minimized reproducers and evidence bundles on fresh environments; identical seeds produce identical anomaly classKey sets.
+M4 exit gate evidence: a seeded defect completes the full autonomous DISCOVERED -> CONFIRMED -> PATCHING -> VERIFYING -> RESOLVED loop in an isolated git worktree; bad patches are rejected and rolled back with an audit trail; weak-suspicion findings are policy-blocked from repair; the primary checkout remains untouched.
 
 ## Known blockers
 
@@ -43,8 +43,8 @@ None currently known.
 | M1 Web adapter | COMPLETE |
 | M2 Finding/reproduction | COMPLETE |
 | M3 Autonomous exploration | COMPLETE |
-| M4 Oracle/repair | ACTIVE |
-| M5 Android | PENDING |
+| M4 Oracle/repair | COMPLETE |
+| M5 Android | ACTIVE |
 | M6 Cross-platform adapters | PENDING |
 | M7 Scale/integrations | PENDING |
 | M8 iOS | PENDING / environment-dependent |

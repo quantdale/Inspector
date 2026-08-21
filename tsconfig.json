@@ -25,7 +25,9 @@
       "@inspector/core": ["packages/core/src/index.ts"],
       "@inspector/cli": ["packages/cli/src/index.ts"],
       "@inspector/finding": ["packages/finding/src/index.ts"],
-      "@inspector/explore": ["packages/explore/src/index.ts"]
+      "@inspector/explore": ["packages/explore/src/index.ts"],
+      "@inspector/oracle": ["packages/oracle/src/index.ts"],
+      "@inspector/repair": ["packages/repair/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts"],

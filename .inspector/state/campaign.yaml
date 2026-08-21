@@ -22,18 +22,18 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M4
-  milestone_name: Oracle expansion and autonomous repair
-  spec: specs/004-oracle-repair/SPEC.md
-  tasks: specs/004-oracle-repair/TASKS.md
-  task_group: O0
-  waypoint: M4.O0.oracle-sdk
+  milestone_id: M5
+  milestone_name: Android adapter
+  spec: specs/005-android/SPEC.md
+  tasks: specs/005-android/TASKS.md
+  task_group: A0
+  waypoint: M5.A0.adb-lifecycle
   waypoint_status: READY
   next_action: >-
-    M3 is complete. Begin M4 (Oracle expansion and autonomous repair):
-    implement the oracle SDK, weak-signal handling, repair workspace with git
-    worktree isolation, source context, regression-first repair, patch agent
-    contract, verification, and resolution. Run the M4 exit gate.
+    M4 is complete. Begin M5 (Android adapter): implement the ADB environment
+    lifecycle, UI Automator helper and semantic UI tree, screenshots and
+    semantic actions, emulator state fixtures, and a seeded Android target,
+    with conformance against an injectable/mock ADB. Run the M5 exit gate.
 
 progress:
   completed_milestones:
@@ -41,6 +41,7 @@ progress:
     - M1
     - M2
     - M3
+    - M4
   completed_task_groups:
     - F0
     - F1
@@ -94,11 +95,19 @@ progress:
     - M3.E4.fault-injection
     - M3.E5.planner-fallback
     - M3.E7.campaign-controller
+    - M4.O0.oracle-sdk
+    - M4.O1.weak-signal-handling
+    - M4.P0.repair-workspace
+    - M4.P1.source-context
+    - M4.P2.regression-first-repair
+    - M4.P3.patch-agent-contract
+    - M4.P4.verification
+    - M4.P5.resolution
   deferred_milestones: []
 
 verification:
-  last_verified_commit: HEAD (M3 checkpoint commit)
-  last_gate: M3
+  last_verified_commit: HEAD (M4 checkpoint commit)
+  last_gate: M4
   last_gate_result: PASS
   last_gate_at: "2026-08-20"
 
@@ -108,7 +117,7 @@ known_debt:
     Replay oracle is loose: TargetFailureOracle counts any target-failure
     outcome (including ACTION_FAILED automation misses) as reproduction, so
     minimization can over-reduce paths that end in a hidden-element miss.
-    Tighten with M4 weighted/structural oracles.
+    Partially mitigated by the M4 OracleSuite; full tightening deferred.
   - >-
     Web exploration E2E takes ~4-6 min wall clock (fresh Chromium per replay);
     acceptable for the gate but a candidate for later perf work.
@@ -129,4 +138,4 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: M5
+next_milestone_after_completion: M6

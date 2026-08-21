@@ -76,6 +76,15 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/oracle:
+    dependencies:
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/protocol:
     dependencies:
       ajv:
@@ -84,6 +93,27 @@ importers:
       ajv-formats:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.20.0)
+
+  packages/repair:
+    dependencies:
+      '@inspector/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/explore':
+        specifier: workspace:*
+        version: link:../explore
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/oracle':
+        specifier: workspace:*
+        version: link:../oracle
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/store-sqlite:
     dependencies:

@@ -1,5 +1,10 @@
 import { createServer, type Server } from "node:http";
 
+export interface SeedServerOptions {
+  /** Override the served HTML (used by repair verification to serve patched sources). */
+  html?: string;
+}
+
 export interface SeedServer {
   /** Base URL of the seeded target; valid once `ready` resolves. */
   readonly url: string;
@@ -8,10 +13,11 @@ export interface SeedServer {
   close(): void;
 }
 
-export function startSeedServer(): SeedServer {
+export function startSeedServer(opts: SeedServerOptions = {}): SeedServer {
+  const body = opts.html ?? SEED_HTML;
   const server: Server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(SEED_HTML);
+    res.end(body);
   });
   // Bind an ephemeral port: reproduction/minimization opens many fresh
   // environments in quick succession, and fixed-range random ports eventually

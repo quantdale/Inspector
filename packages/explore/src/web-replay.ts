@@ -10,6 +10,8 @@ import type {
 
 export interface WebReplayOptions {
   artifactBaseDir?: string;
+  /** Serve this HTML instead of the default seeded app (repair verification). */
+  seedHtml?: string;
 }
 
 /**
@@ -25,7 +27,7 @@ export class WebReplayDriver {
     const base =
       this.opts.artifactBaseDir ??
       join(tmpdir(), `inspector-web-replay-${process.pid}`);
-    const handler = new WebAdapterHandler({}, base);
+    const handler = new WebAdapterHandler({}, base, this.opts.seedHtml);
     const outcomes: ActionOutcome[] = [];
     const signals: OracleSignal[] = [];
     try {

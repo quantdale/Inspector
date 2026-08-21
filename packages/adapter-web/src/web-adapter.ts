@@ -60,6 +60,13 @@ export interface WebFaults {
   crashBrowser?: boolean;
 }
 
+export interface WebAdapterOptions {
+  faults?: WebFaults;
+  artifactBaseDir?: string;
+  /** Serve this HTML instead of the default seeded app (repair verification). */
+  seedHtml?: string;
+}
+
 function redact(url: string): string {
   try {
     const u = new URL(url);
@@ -95,6 +102,7 @@ export class WebAdapterHandler implements AdapterHandler {
   constructor(
     private readonly faults: WebFaults = {},
     artifactBaseDir: string = join(tmpdir(), "inspector-web-artifacts"),
+    private readonly seedHtml?: string,
   ) {
     mkdtempSync(artifactBaseDir); // ensure base exists
     this.artifacts = new ArtifactStore(artifactBaseDir);
@@ -107,7 +115,7 @@ export class WebAdapterHandler implements AdapterHandler {
   async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
     switch (params.op) {
       case "create": {
-        this.seed = startSeedServer();
+        this.seed = startSeedServer({ html: this.seedHtml });
         this.browser = await chromium.launch({ headless: true });
         this.context = await this.browser.newContext({
           viewport: { width: 1280, height: 800 },
