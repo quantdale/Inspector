@@ -50,7 +50,8 @@ function dirStats(dir, depth = 0, acc = { files: 0, bytes: 0 }) {
   try { entries = readdirSync(dir); } catch { return acc; }
   for (const e of entries) {
     const p = join(dir, e);
-    const st = statSync(p);
+    let st;
+    try { st = statSync(p); } catch { continue; } // vanishing temp entries
     if (st.isDirectory()) { if (depth < 8) dirStats(p, depth + 1, acc); }
     else { acc.files++; acc.bytes += st.size; }
   }
@@ -59,30 +60,33 @@ function dirStats(dir, depth = 0, acc = { files: 0, bytes: 0 }) {
 function checkpoint(ws, label) {
   const dbPath = join(ws, ".inspector", "runs.db");
   const art = dirStats(join(ws, ".inspector"));
-  const db = new Database(dbPath, { readonly: true });
-  try {
-    const counts = {
-      runs: db.prepare("SELECT COUNT(*) c FROM runs").get().c,
-      steps: db.prepare("SELECT COUNT(*) c FROM steps").get().c,
-      actions: db.prepare("SELECT COUNT(*) c FROM actions").get().c,
-      observations: db.prepare("SELECT COUNT(*) c FROM observations").get().c,
-      findings: db.prepare("SELECT COUNT(*) c FROM findings").get().c,
-    };
-    return {
-      label, at: new Date().toISOString(),
-      ...mem(),
-      procCounts: {
-        node: imagePids("node.exe").length,
-        powershell: imagePids("powershell.exe").length,
-        chrome: imagePids("chrome.exe").length,
-        vim: imagePids("vim.exe").length,
-        qemu: imagePids("qemu-system-x86_64.exe").length,
-      },
-      runsDbBytes: existsSync(dbPath) ? statSync(dbPath).size : 0,
-      artifactFiles: art.files, artifactBytes: art.bytes,
-      ...counts,
-    };
-  } finally { db.close(); }
+  let counts = { runs: 0, steps: 0, actions: 0, observations: 0, findings: 0 };
+  if (existsSync(dbPath)) {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      counts = {
+        runs: db.prepare("SELECT COUNT(*) c FROM runs").get().c,
+        steps: db.prepare("SELECT COUNT(*) c FROM steps").get().c,
+        actions: db.prepare("SELECT COUNT(*) c FROM actions").get().c,
+        observations: db.prepare("SELECT COUNT(*) c FROM observations").get().c,
+        findings: db.prepare("SELECT COUNT(*) c FROM findings").get().c,
+      };
+    } finally { db.close(); }
+  }
+  return {
+    label, at: new Date().toISOString(),
+    ...mem(),
+    procCounts: {
+      node: imagePids("node.exe").length,
+      powershell: imagePids("powershell.exe").length,
+      chrome: imagePids("chrome.exe").length,
+      vim: imagePids("vim.exe").length,
+      qemu: imagePids("qemu-system-x86_64.exe").length,
+    },
+    runsDbBytes: existsSync(dbPath) ? statSync(dbPath).size : 0,
+    artifactFiles: art.files, artifactBytes: art.bytes,
+    ...counts,
+  };
 }
 
 function runInspector(args, timeoutMs = 600000) {
@@ -140,7 +144,7 @@ const summary = {
   },
   tempDirDeltaFiles: tempBaseAfter.files - tempBaseBefore.files,
   workspaceCleanupPossible: cleanupOk,
-  verdictTieBreaker: { cleanupOk, huntFailures },
+  verdictTieBreaker: { cleanupOk, huntFailures: failures },
   checkpoints,
 };
 writeFileSync(join(here, "ga-longrun-summary.json"), JSON.stringify(summary, null, 2));

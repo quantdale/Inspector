@@ -1,11 +1,72 @@
-C:\Users\Michael Roy\AppData\Roaming\npm\node_modules\inspector-cli\node_modules\better-sqlite3\lib\database.js:65
-		throw new TypeError('Cannot open database because the directory does not exist');
-		      ^
-
-TypeError: Cannot open database because the directory does not exist
-    at new Database (C:\Users\Michael Roy\AppData\Roaming\npm\node_modules\inspector-cli\node_modules\better-sqlite3\lib\database.js:65:9)
-    at checkpoint (file:///C:/Users/Michael%20Roy/Documents/Inspector/.inspector/ga-work/hunts/longrun/ga-longrun.mjs:62:14)
-    at file:///C:/Users/Michael%20Roy/Documents/Inspector/.inspector/ga-work/hunts/longrun/ga-longrun.mjs:105:22
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-
-Node.js v22.23.2
+{"round":0,"exit":0,"actions":120,"states":4}
+{"round":1,"exit":0,"actions":120,"states":4}
+{"round":2,"exit":0,"actions":120,"states":4}
+{"round":3,"exit":0,"actions":120,"states":4}
+{"round":4,"exit":0,"actions":120,"states":4}
+{"round":5,"exit":0,"actions":120,"states":4}
+{
+ "rounds": 6,
+ "huntFailures": 0,
+ "startedAt": "2026-08-22T19:39:17.614Z",
+ "endedAt": "2026-08-22T19:41:55.760Z",
+ "growth": {
+  "runsDbBytes": {
+   "first": 462848,
+   "last": 2174976
+  },
+  "artifactBytes": {
+   "first": 462848,
+   "last": 2174976
+  },
+  "steps": {
+   "first": 245,
+   "last": 1470
+  },
+  "observations": {
+   "first": 245,
+   "last": 1470
+  },
+  "rssMB": [
+   59.6,
+   61.1,
+   61.1,
+   52.3,
+   52.9,
+   53.4,
+   54
+  ],
+  "heapMB": [
+   8.2,
+   9.2,
+   9.7,
+   7.6,
+   8.1,
+   7.7,
+   8.1
+  ],
+  "nodeProcs": [
+   9,
+   9,
+   9,
+   11,
+   11,
+   22,
+   12
+  ],
+  "chromeProcs": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "tempDirDeltaFiles": 337,
+ "workspaceCleanupPossible": true,
+ "verdictTieBreaker": {
+  "cleanupOk": true,
+  "huntFailures": 0
+ }
+}

@@ -1,0 +1,215 @@
+{
+  "rounds": 6,
+  "huntFailures": 0,
+  "startedAt": "2026-08-22T19:39:17.614Z",
+  "endedAt": "2026-08-22T19:41:55.760Z",
+  "growth": {
+    "runsDbBytes": {
+      "first": 462848,
+      "last": 2174976
+    },
+    "artifactBytes": {
+      "first": 462848,
+      "last": 2174976
+    },
+    "steps": {
+      "first": 245,
+      "last": 1470
+    },
+    "observations": {
+      "first": 245,
+      "last": 1470
+    },
+    "rssMB": [
+      59.6,
+      61.1,
+      61.1,
+      52.3,
+      52.9,
+      53.4,
+      54
+    ],
+    "heapMB": [
+      8.2,
+      9.2,
+      9.7,
+      7.6,
+      8.1,
+      7.7,
+      8.1
+    ],
+    "nodeProcs": [
+      9,
+      9,
+      9,
+      11,
+      11,
+      22,
+      12
+    ],
+    "chromeProcs": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "tempDirDeltaFiles": 337,
+  "workspaceCleanupPossible": true,
+  "verdictTieBreaker": {
+    "cleanupOk": true,
+    "huntFailures": 0
+  },
+  "checkpoints": [
+    {
+      "label": "baseline",
+      "at": "2026-08-22T19:39:17.614Z",
+      "rssMB": 59.6,
+      "heapMB": 8.2,
+      "procCounts": {
+        "node": 9,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 0,
+      "artifactFiles": 0,
+      "artifactBytes": 0,
+      "runs": 0,
+      "steps": 0,
+      "actions": 0,
+      "observations": 0,
+      "findings": 0
+    },
+    {
+      "label": "after-round-0",
+      "at": "2026-08-22T19:39:43.802Z",
+      "rssMB": 61.1,
+      "heapMB": 9.2,
+      "procCounts": {
+        "node": 9,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 462848,
+      "artifactFiles": 1,
+      "artifactBytes": 462848,
+      "runs": 1,
+      "steps": 245,
+      "actions": 120,
+      "observations": 245,
+      "findings": 0
+    },
+    {
+      "label": "after-round-1",
+      "at": "2026-08-22T19:40:07.379Z",
+      "rssMB": 61.1,
+      "heapMB": 9.7,
+      "procCounts": {
+        "node": 9,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 815104,
+      "artifactFiles": 1,
+      "artifactBytes": 815104,
+      "runs": 2,
+      "steps": 490,
+      "actions": 240,
+      "observations": 490,
+      "findings": 0
+    },
+    {
+      "label": "after-round-2",
+      "at": "2026-08-22T19:40:32.726Z",
+      "rssMB": 52.3,
+      "heapMB": 7.6,
+      "procCounts": {
+        "node": 11,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 1163264,
+      "artifactFiles": 1,
+      "artifactBytes": 1163264,
+      "runs": 3,
+      "steps": 735,
+      "actions": 360,
+      "observations": 735,
+      "findings": 0
+    },
+    {
+      "label": "after-round-3",
+      "at": "2026-08-22T19:40:59.802Z",
+      "rssMB": 52.9,
+      "heapMB": 8.1,
+      "procCounts": {
+        "node": 11,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 1511424,
+      "artifactFiles": 1,
+      "artifactBytes": 1511424,
+      "runs": 4,
+      "steps": 980,
+      "actions": 480,
+      "observations": 980,
+      "findings": 0
+    },
+    {
+      "label": "after-round-4",
+      "at": "2026-08-22T19:41:29.456Z",
+      "rssMB": 53.4,
+      "heapMB": 7.7,
+      "procCounts": {
+        "node": 22,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 1859584,
+      "artifactFiles": 1,
+      "artifactBytes": 1859584,
+      "runs": 5,
+      "steps": 1225,
+      "actions": 600,
+      "observations": 1225,
+      "findings": 0
+    },
+    {
+      "label": "after-round-5",
+      "at": "2026-08-22T19:41:55.760Z",
+      "rssMB": 54,
+      "heapMB": 8.1,
+      "procCounts": {
+        "node": 12,
+        "powershell": 7,
+        "chrome": 0,
+        "vim": 0,
+        "qemu": 0
+      },
+      "runsDbBytes": 2174976,
+      "artifactFiles": 1,
+      "artifactBytes": 2174976,
+      "runs": 6,
+      "steps": 1470,
+      "actions": 720,
+      "observations": 1470,
+      "findings": 0
+    }
+  ]
+}

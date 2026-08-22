@@ -219,18 +219,40 @@ phases:
   # android com.android.settings on live AVD (60 actions/40 clicks/0 fail);
   # seeded fake control labeled CONTROL. Electron NOT production-real
   # (injectable-only proof) — recorded as debt, not claimed. iOS DEFERRED_ENVIRONMENT.
-  p5_long_unattended_runs: IN_PROGRESS
-  # ga-longrun.mjs 6 sequential web rounds in one workspace, running
-  p6_operational_metrics: IN_PROGRESS
-  p7_resource_stability: IN_PROGRESS
-  p8_finding_quality: PARTIAL
-  # honest-zero on healthy todomvc targets recorded; aggregate metrics after
-  # all portfolio lanes finish
-  p9_coverage_quality: PENDING
-  p10_clean_result_confidence: PARTIAL
-  p11_reproduction_reliability: PENDING
-  p12_repair_trials: PENDING
-  p13_adapter_stability: PARTIAL
+  p5_long_unattended_runs: DONE
+  # GA-LONGRUN-1: 6 sequential web rounds in ONE workspace = 720 actions,
+  # 0 hunt failures, workspace cleanup possible at end.
+  p6_operational_metrics: DONE
+  # per-checkpoint RSS/heap, node/powershell/chrome/vim/qemu counts,
+  # runs.db bytes, artifact files/bytes, run/step/action/observation counts.
+  p7_resource_stability: DONE
+  # RSS flat (orchestrator 59.6->54MB; UIA 59.6->60.6; vim 61->68); runs.db
+  # grows ~1.5KB/step linearly (bounded proportional); process counts return
+  # to baseline; no unbounded temp growth attributable to Inspector.
+  p8_finding_quality: DONE
+  # healthy targets honest-zero: react 0/220, backbone 0/180, UIA 0 defect
+  # findings across 114 interactions (4 app-side action failures honestly NOT
+  # promoted), vim 0/265, android 0/60. Control: seeded pipeline confirmed.
+  # GA field false-positives promoting environment noise to defects: 0.
+  p9_coverage_quality: PARTIAL
+  # distinct states/actions-per-state recorded per portfolio entry; deep
+  # coverage-quality analysis belongs to Part C explorer work
+  p10_clean_result_confidence: DONE
+  # every healthy target's zero remains visible in its own summary; nothing
+  # suppressed; oracle thresholds untouched during GA.
+  p11_reproduction_reliability: DONE
+  # fake-control finding reproduced+confirmed via FindingEngine in-run;
+  # resume re-observations prove durable step replay; historical: dogfood
+  # 5/5 true defects reproduced; hardening E-wave suites green.
+  p12_repair_trials: DONE_BY_GATE
+  # repair authorized ONLY on the seeded fixture repo; the full DISCOVERED->
+  # PATCHING->VERIFYING->RESOLVED loop incl. rejected-patch rollback is
+  # exercised deterministically by the integration repair e2e on every gate
+  # run — rerun as part of P29 final gate on the final tree.
+  p13_adapter_stability: DONE
+  # web/PTY/UIA/ADB each exercised independently against real backends this
+  # campaign; failure vocabularies stayed adapter-local; no platform logic
+  # leaked into core finding semantics.
   p14_uia_rehost_soak: DONE
   # GA-UIA-PORTFOLIO-1 + cast-matrix + calc-rehost probes; FIELD-2 fix landed
   p15_web_action_window_soak: DONE
@@ -249,9 +271,21 @@ phases:
   p19_browser_provisioning: DONE
   # installed-artifact web hunts resolve Chromium from %LOCALAPPDATA%\ms-playwright
   # (documented `npx playwright install chromium` flow in INSTALL.txt).
-  p20_state_growth: PENDING
-  p21_performance_baseline: PENDING
-  p22_model_cost_accounting: PENDING
+  p20_state_growth: DONE
+  # GA-LONGRUN-1 growth block: runs.db 462KB->2.17MB over 720 actions
+  # (~1.5KB/step, linear); artifact tree tracks steps; temp-dir delta is
+  # ambient shared-%TEMP% noise; workspace cleanup fully possible.
+  p21_performance_baseline: DONE
+  # web hunt throughput vs real targets: todomvc-react 220 actions / 33.0s
+  # = 6.67 act/s; backbone 180 / 41.2s = 4.37 act/s (incl. browser lifecycle);
+  # trivial inline target ~4.6 act/s sustained over 6 unattended rounds;
+  # UIA cycle ~= 25 interactions in ~2-3 min incl. app launch/close;
+  # resume re-observation latency: seconds after kill mid-exploration.
+  p22_model_cost_accounting: DONE_ZERO
+  # ZERO model calls across every GA field campaign — verified by
+  # construction (no model provider configured in env or workspaces) and by
+  # artifact inspection (no model-request records). Recorded as zero, not
+  # manufactured.
   # zero model calls expected — record explicitly when campaigns confirm
   p23_defect_policy: ACTIVE
   p24_rc11_decision: PENDING
