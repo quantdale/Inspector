@@ -27,6 +27,8 @@ export interface EnvironmentRecord {
   adapter: string;
   created_at: string;
   status: string;
+  create_options: string | null;
+  spawn_env: string | null;
 }
 
 export interface ActionRecord {
@@ -220,15 +222,33 @@ export class Store {
     id: string;
     runId: string;
     adapter: string;
+    /** Durable resume spec: lifecycle-create options for a fresh process. */
+    createOptions?: Record<string, unknown>;
+    /** Durable resume spec: adapter spawn-env delta (never full env). */
+    spawnEnv?: NodeJS.ProcessEnv;
   }): EnvironmentRecord {
     const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO environments(id, run_id, adapter, created_at, status)
-         VALUES(?, ?, ?, ?, 'created')`,
+        `INSERT INTO environments(id, run_id, adapter, created_at, status, create_options, spawn_env)
+         VALUES(?, ?, ?, ?, 'created', ?, ?)`,
       )
-      .run(input.id, input.runId, input.adapter, now);
+      .run(
+        input.id,
+        input.runId,
+        input.adapter,
+        now,
+        input.createOptions ? JSON.stringify(input.createOptions) : null,
+        input.spawnEnv ? JSON.stringify(input.spawnEnv) : null,
+      );
     return this.getEnvironment(input.id)!;
+  }
+
+  /** The environment row for a run (resume reads the durable create spec). */
+  getEnvironmentForRun(runId: string): EnvironmentRecord | undefined {
+    return this.db
+      .prepare(`SELECT * FROM environments WHERE run_id = ? ORDER BY created_at LIMIT 1`)
+      .get(runId) as EnvironmentRecord | undefined;
   }
 
   getEnvironment(id: string): EnvironmentRecord | undefined {

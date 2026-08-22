@@ -577,12 +577,16 @@ export async function huntCommand(
     // RC1 external targets flow through WEB_TARGET_URL: RunManager issues the
     // lifecycle create itself, and the web adapter bin reads this env var as
     // its constructor-level default target.
-    const spawnSpec =
-      req.adapter === "web" && req.targetUrl !== undefined
-        ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
-        : adapterSpawn(req.adapter);
+    const webTarget = req.adapter === "web" && req.targetUrl !== undefined;
+    const spawnSpec = webTarget
+      ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
+      : adapterSpawn(req.adapter);
     try {
-      run = await mgr.startRun(spawnSpec);
+      run = await mgr.startRun({
+        ...spawnSpec,
+        // Persisted so runs resume re-creates the SAME target, never the default.
+        ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
+      });
     } catch (e) {
       throw remapWorkspaceConflict(e);
     }

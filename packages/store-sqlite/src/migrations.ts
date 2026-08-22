@@ -143,6 +143,13 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_oracle_evaluations_run ON oracle_evaluations(run_id);
   CREATE INDEX IF NOT EXISTS idx_oracle_evaluations_finding ON oracle_evaluations(finding_id);
   `,
+  // Durable resume spec: the lifecycle-create options and the adapter spawn-env
+  // DELTA (never the full process environment) needed to re-create a faithful
+  // environment on a fresh adapter process after host death.
+  `
+  ALTER TABLE environments ADD COLUMN create_options TEXT;
+  ALTER TABLE environments ADD COLUMN spawn_env TEXT;
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

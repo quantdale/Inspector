@@ -1,0 +1,147 @@
+{
+  "startedAt": "2026-08-22T15:51:43.317Z",
+  "tarball": "C:\\Users\\Michael Roy\\Documents\\Inspector\\dist-release\\inspector-cli-0.1.0-rc.1.tgz",
+  "tarballSha256": "82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a",
+  "bundleSha256": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
+  "installedPrefixBundleSha256": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
+  "globalParity": {
+    "checked": false
+  },
+  "targetUrl": "http://127.0.0.1:61343/",
+  "steps": [
+    {
+      "name": "tarball-sha256-matches-phase2-rebuild",
+      "ok": true,
+      "detail": {
+        "tgzSha": "82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a"
+      }
+    },
+    {
+      "name": "artifact-version-coherent",
+      "ok": true,
+      "detail": {
+        "pkgVersion": "0.1.0-rc.1"
+      }
+    },
+    {
+      "name": "artifact-entry-present",
+      "ok": true,
+      "detail": {
+        "bundle": "bundle/inspector-cli.js",
+        "bundleSha": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7"
+      }
+    },
+    {
+      "name": "disposable-prefix-install",
+      "ok": true,
+      "detail": {
+        "tail": ""
+      }
+    },
+    {
+      "name": "installed-entry-exists",
+      "ok": true
+    },
+    {
+      "name": "installed-bundle-bit-identical",
+      "ok": true
+    },
+    {
+      "name": "--version-reports-rc1",
+      "ok": true,
+      "detail": {
+        "out": "0.1.0-rc.1"
+      }
+    },
+    {
+      "name": "--help-exit-0-with-usage",
+      "ok": true,
+      "detail": {
+        "len": 1670
+      }
+    },
+    {
+      "name": "doctor-ok",
+      "ok": true,
+      "detail": {
+        "tail": "ent but the electron package is not installed\",\n      \"remediation\": \"install electron (see packages/electron-adapter) to use the electron adapter\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "name": "fake-hunt-exit-0",
+      "ok": true,
+      "detail": {
+        "tail": "h\": \"C:\\\\Users\\\\MICHAE~1\\\\AppData\\\\Local\\\\Temp\\\\ga-p3-fake-iO1O40\\\\.inspector\\\\bundles\\\\run_5fc61ae715e74f879d8506dd4712fb32\\\\find_62b6b42bd8f64eed809649e5ab44792f.json\"\n    }\n  ],\n  \"warnings\": []\n}\n"
+      }
+    },
+    {
+      "name": "fake-hunt-no-source-leak",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "findings-list-runs-on-fake-ws",
+      "ok": true,
+      "detail": {
+        "head": "[\n  {\n    \"id\": \"find_62b6b42bd8f64eed809649e5ab44792f\",\n    \"runId\": \"run_5fc61ae715e74f879d8506dd4712fb32\",\n    \"statu"
+      }
+    },
+    {
+      "name": "runs-list-shows-run",
+      "ok": true,
+      "detail": {
+        "head": "[\n  {\n    \"id\": \"run_5fc61ae715e74f879d8506dd4712fb32\",\n    \"status\": \"closed\",\n    \"createdAt\": \"2026-08-22T15:51:13.945Z\",\n    \"adapter\": \"adapter-fake\"\n  }\n]"
+      }
+    },
+    {
+      "name": "runs-show-detail",
+      "ok": true
+    },
+    {
+      "name": "real-local-web-hunt-exit-0",
+      "ok": true,
+      "detail": {
+        "tail": "adapter\": \"web\",\n  \"seed\": 9,\n  \"stoppedReason\": \"action-budget\",\n  \"actionsExecuted\": 60,\n  \"statesVisited\": 4,\n  \"resets\": 1,\n  \"anomalies\": 0,\n  \"findings\": [],\n  \"bundles\": [],\n  \"warnings\": []\n}\n"
+      }
+    },
+    {
+      "name": "web-hunt-no-source-leak",
+      "ok": true
+    },
+    {
+      "name": "findings-list-web-ws",
+      "ok": true
+    },
+    {
+      "name": "findings-show-detail",
+      "ok": true,
+      "detail": {
+        "note": "zero findings on healthy target (honest zero)"
+      }
+    },
+    {
+      "name": "interrupted-run-resume-honest",
+      "ok": false,
+      "detail": {
+        "exit": 1,
+        "tail": "974d3c80b213de275d6294\",\n  \"adapter\": \"web-playwright\",\n  \"reattached\": false,\n  \"observeError\": \"environment not created\",\n  \"observation\": null,\n  \"stepsRecorded\": 105,\n  \"finalStatus\": \"created\"\n}\n"
+      }
+    },
+    {
+      "name": "uninstall-removes-prefix-cleanly",
+      "ok": true
+    },
+    {
+      "name": "global-install-parity",
+      "ok": false,
+      "detail": {
+        "reason": "no global install found"
+      }
+    }
+  ],
+  "verdict": "FAIL",
+  "failures": [
+    "interrupted-run-resume-honest",
+    "global-install-parity"
+  ]
+}

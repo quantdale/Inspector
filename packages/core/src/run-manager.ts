@@ -1,6 +1,6 @@
 import type { Store, ActionRecord } from "@inspector/store-sqlite";
 import type { ArtifactStore } from "@inspector/artifact-store";
-import { AdapterClient } from "@inspector/adapter-sdk";
+import { AdapterClient, stripUrlCredentialsInText } from "@inspector/adapter-sdk";
 import {
   PolicyEngine,
   DEFAULT_POLICY,
@@ -25,6 +25,10 @@ export interface StartRunOptions {
   /** Optional lifecycle-create options forwarded verbatim to the adapter
    * (e.g. `{ targetUrl }` for the web adapter's external-target mode). */
   createOptions?: Record<string, unknown>;
+  /** The spawn-env DELTA (over process.env) the adapter needs — e.g.
+   * `WEB_TARGET_URL`. Persisted (credential-stripped) so a resume on a fresh
+   * process can re-create the SAME environment, never silently retargeting. */
+  spawnEnvDelta?: NodeJS.ProcessEnv;
 }
 
 export type SubmitResult =
@@ -306,7 +310,22 @@ export class RunManager {
     const envId = newId("env");
     const provisional = adapterLabel(opts.adapterCommand);
     this.store.createRun({ id: runId, adapter: provisional });
-    this.store.createEnvironment({ id: envId, runId, adapter: provisional });
+    this.store.createEnvironment({
+      id: envId,
+      runId,
+      adapter: provisional,
+      ...(opts.createOptions ? { createOptions: opts.createOptions } : {}),
+      ...(opts.spawnEnvDelta
+        ? {
+            spawnEnv: Object.fromEntries(
+              Object.entries(opts.spawnEnvDelta).map(([k, v]) => [
+                k,
+                typeof v === "string" ? stripUrlCredentialsInText(v) : v,
+              ]),
+            ),
+          }
+        : {}),
+    });
     const opened = this.engine.openEnvironment();
     if (!opened.allowed) {
       this.store.setRunStatus(runId, "failed");
@@ -364,10 +383,27 @@ export class RunManager {
   ): Promise<RunController> {
     const run = this.store.getRun(runId);
     if (!run) throw new Error(`run not found: ${runId}`);
-    const env = this.store.raw
-      .prepare(`SELECT * FROM environments WHERE run_id = ? LIMIT 1`)
-      .get(runId) as { id: string } | undefined;
+    const env = this.store.getEnvironmentForRun(runId);
     if (!env) throw new Error(`no environment for run: ${runId}`);
+    // Durable resume spec (persisted by startRun): without it a fresh adapter
+    // process would observe an environment that was never created, and a
+    // targeted web run would silently fall back to its default target.
+    let spawnEnv = opts.adapterEnv;
+    let createRequest: { op: string; options?: Record<string, unknown> } = { op: "create" };
+    if (env.spawn_env) {
+      try {
+        spawnEnv = { ...(opts.adapterEnv ?? process.env), ...JSON.parse(env.spawn_env) };
+      } catch {
+        /* corrupt spec: fall back to caller env rather than guessing */
+      }
+    }
+    if (env.create_options) {
+      try {
+        createRequest = { op: "create", options: JSON.parse(env.create_options) };
+      } catch {
+        /* corrupt spec: bare create is still better than skipping create */
+      }
+    }
     const opened = this.engine.openEnvironment();
     if (!opened.allowed) {
       throw new Error(
@@ -379,9 +415,13 @@ export class RunManager {
       adapter = await AdapterClient.spawn({
         command: opts.adapterCommand,
         args: opts.adapterArgs,
-        env: opts.adapterEnv,
+        env: spawnEnv,
       });
       const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
+      // Re-create the environment on the fresh process. The original
+      // environment died with the old host; re-observation below must hit a
+      // LIVE environment, so "resume" means faithful re-creation, not a no-op.
+      await adapter.request("lifecycle", createRequest, 30000);
       const controller = new RunController(
         this.store,
         this.artifactStore,

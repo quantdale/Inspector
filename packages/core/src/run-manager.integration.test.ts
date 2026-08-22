@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -168,6 +168,60 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
     expect(lost?.status).toBe("unknown");
     const count = store.raw.prepare(`SELECT COUNT(*) AS c FROM actions WHERE id = ?`).get("crash1") as { c: number };
     expect(count.c).toBe(1); // not duplicated
+    await run2.close();
+  });
+
+  it("FIELD-1 regression: resume replays the durable create spec (lifecycle.create + spawn-env delta) so re-observation works on a fresh process; targeted web runs must not silently retarget", async () => {
+    const base = tmpDir();
+    store = Store.open(join(base, "run.db"));
+    artifacts = new ArtifactStore(join(base, "artifacts"));
+    const logFile = join(base, "lifecycle.jsonl");
+    const strictBin = join(here, "fixtures", "strict-lifecycle-adapter.mjs");
+    const spawnOpts = () => ({
+      adapterCommand: process.execPath,
+      adapterArgs: ["--import", "tsx", strictBin],
+      // Callers merge the delta into the spawn env (adapterSpawn does) AND
+      // pass it separately so startRun can persist it durably.
+      adapterEnv: {
+        ...process.env,
+        LIFECYCLE_LOG_FILE: logFile,
+        STRICT_TARGET: "http://127.0.0.1:9/",
+      },
+    });
+    const mgr = new RunManager(store!, artifacts!);
+    const run1 = await mgr.startRun({
+      ...spawnOpts(),
+      createOptions: { targetUrl: "http://127.0.0.1:9/" },
+      // Simulates hunt.ts's WEB_TARGET_URL spawn-env delta.
+      spawnEnvDelta: { STRICT_TARGET: "http://127.0.0.1:9/" },
+    });
+    expect((await run1.submitAction(act("s1", "noop"))).kind).toBe("outcome");
+
+    // Abrupt host death: the adapter dies mid-flight and NEITHER process runs
+    // a cooperative close(). A fresh manager (fresh "process") resumes.
+    const dieOutcome = await run1.submitAction(act("die1", "noop", "interact", { value: "die" }));
+    expect(dieOutcome.kind).toBe("adapter-error");
+
+    const mgr2 = new RunManager(store!, artifacts!);
+    const run2 = await mgr2.resumeRun(run1.runId, spawnOpts());
+    // THE REGRESSION: before the fix this threw "environment not created"
+    // because resume never issued lifecycle.create on the fresh subprocess,
+    // and the persisted target env was lost (default-target retargeting).
+    const obs = await run2.observe(["state"]);
+    expect(obs).toBeTruthy();
+
+    // Prove faithful replay: the resumed create carried the SAME durable
+    // options AND the persisted spawn-env delta reached the new process.
+    const creates = readFileSync(logFile, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { op: string; options: { targetUrl?: string } | null; strictTargetSeen: string | null })
+      .filter((e) => e.op === "create");
+    expect(creates.length).toBe(2);
+    expect(creates[0]!.options?.targetUrl).toBe("http://127.0.0.1:9/");
+    expect(creates[1]!.options?.targetUrl).toBe("http://127.0.0.1:9/");
+    expect(creates[0]!.strictTargetSeen).toBe("http://127.0.0.1:9/");
+    expect(creates[1]!.strictTargetSeen).toBe("http://127.0.0.1:9/");
     await run2.close();
   });
 
