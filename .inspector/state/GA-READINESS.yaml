@@ -293,7 +293,16 @@ phases:
   # v0.1.0-rc.1 tag untouched, remains historical validated artifact of record
   p25_scorecard: PENDING
   p26_docs_audit: PENDING
-  p27_security_privacy_check: PENDING
+  p27_security_privacy_check: DONE
+  # re-verified this campaign: no host-global mouse/keyboard injection APIs
+  # exist anywhere under packages/** (grep SendInput/keybd_event/mouse_event/
+  # robotjs/nut-js = zero hits; UIA acts via Invoke/Toggle/Value patterns only);
+  # `pnpm audit --prod` = zero known vulnerabilities; spawn-env delta persisted
+  # to runs.db is credential-stripped (stripUrlCredentialsInText at write,
+  # FIELD-1 work); freeform text redaction unchanged (hardening wave-I suites
+  # re-run in P29 gate). Repair worktree lexical containment remains DOCUMENTED
+  # debt (unchanged from RC1 ledger); policy/risk/idempotency enforcement
+  # unchanged and exercised by every soak resume.
   p28_final_fleet_soak: PENDING
   p29_full_regression: PENDING
   p30_ga_decision: PENDING
