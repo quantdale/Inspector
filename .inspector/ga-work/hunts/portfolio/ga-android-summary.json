@@ -1,349 +1,382 @@
 {
   "avd": "Nitro_API_36",
   "targetPackage": "com.android.settings",
-  "startedAt": "2026-08-22T18:41:28.945Z",
+  "startedAt": "2026-08-22T18:58:25.775Z",
   "serial": "emulator-5554",
-  "bootedAt": "2026-08-22T18:41:28.984Z",
+  "bootedAt": "2026-08-22T18:58:25.816Z",
   "reusedLiveDevice": true,
-  "endedAt": "2026-08-22T18:45:11.913Z",
-  "actions": 46,
-  "clicks": 4,
-  "backs": 42,
-  "distinctScreens": 6,
+  "endedAt": "2026-08-22T19:08:06.895Z",
+  "actions": 60,
+  "clicks": 40,
+  "backs": 3,
+  "scrolls": 17,
+  "distinctScreens": 7,
   "actionFailures": 0,
   "honestZeroFindingsNote": "Settings is a healthy control-class app; zero findings is a valid result.",
   "timeline": [
     {
       "step": 0,
-      "screenHash": "70e440027222",
+      "screenHash": "2bc400eb24bb",
       "novel": true,
-      "picked": "text#search_bar_title",
+      "picked": "text#summary:Bluetooth, pairing",
       "status": "success",
       "error": null
     },
     {
       "step": 1,
-      "screenHash": "4cf993b76c97",
+      "screenHash": "7b6d75700402",
       "novel": true,
-      "picked": "text#search_src_text",
+      "picked": "text#title:Private DNS",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 2,
+      "screenHash": "faafe3c6b266",
+      "novel": true,
+      "picked": "text#summary:Searching for networks…",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 3,
+      "screenHash": "5370c8f792ed",
+      "novel": true,
+      "picked": "text#summary:Connected / 5G",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 4,
+      "screenHash": "bd13293bfe8c",
+      "novel": true,
+      "picked": "text#title:Saved networks",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 5,
+      "screenHash": "bd13293bfe8c",
+      "novel": false,
+      "picked": "text#summary:73.59 kB used Jul 25 – A",
       "status": "success",
       "error": null
     },
     {
       "step": 6,
-      "screenHash": "4cf993b76c97",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Non-carrier data usage",
       "status": "success",
       "error": null
     },
     {
       "step": 7,
-      "screenHash": "4cf993b76c97",
-      "novel": false,
-      "picked": "(back)",
+      "screenHash": "d2e179ab1645",
+      "novel": true,
+      "picked": "text#title:Add network",
       "status": "success",
       "error": null
     },
     {
       "step": 8,
-      "screenHash": "70e440027222",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "text#title",
+      "picked": "text#summary:Connected / 5G",
       "status": "success",
       "error": null
     },
     {
       "step": 9,
-      "screenHash": "7b6d75700402",
-      "novel": true,
-      "picked": "text#summary",
+      "screenHash": "bd13293bfe8c",
+      "novel": false,
+      "picked": "text#summary:Wi‑Fi doesn't turn back ",
       "status": "success",
       "error": null
     },
     {
       "step": 10,
-      "screenHash": "0405dd58d1b8",
-      "novel": true,
-      "picked": "(back)",
+      "screenHash": "bd13293bfe8c",
+      "novel": false,
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 11,
-      "screenHash": "7b6d75700402",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:1 network",
       "status": "success",
       "error": null
     },
     {
       "step": 12,
-      "screenHash": "70e440027222",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Saved",
       "status": "success",
       "error": null
     },
     {
       "step": 13,
-      "screenHash": "1f8ae8ff959b",
-      "novel": true,
-      "picked": "(back)",
+      "screenHash": "d2e179ab1645",
+      "novel": false,
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 14,
-      "screenHash": "5685d54b847f",
-      "novel": true,
-      "picked": "(back)",
+      "screenHash": "bd13293bfe8c",
+      "novel": false,
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 15,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:73.59 kB used Jul 25 – A",
       "status": "success",
       "error": null
     },
     {
       "step": 16,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Saved networks",
       "status": "success",
       "error": null
     },
     {
       "step": 17,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:AndroidWifi",
       "status": "success",
       "error": null
     },
     {
       "step": 18,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Connected / 5G",
       "status": "success",
       "error": null
     },
     {
       "step": 19,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Add network",
       "status": "success",
       "error": null
     },
     {
       "step": 20,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:73.59 kB used Jul 25 – A",
       "status": "success",
       "error": null
     },
     {
       "step": 21,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Wi‑Fi doesn't turn back ",
       "status": "success",
       "error": null
     },
     {
       "step": 22,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Wi-Fi",
       "status": "success",
       "error": null
     },
     {
       "step": 23,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:1 network",
       "status": "success",
       "error": null
     },
     {
       "step": 24,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Saved",
       "status": "success",
       "error": null
     },
     {
       "step": 25,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 26,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 27,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:1 network",
       "status": "success",
       "error": null
     },
     {
       "step": 28,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Saved networks",
       "status": "success",
       "error": null
     },
     {
       "step": 29,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:AndroidWifi",
       "status": "success",
       "error": null
     },
     {
       "step": 30,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Non-carrier data usage",
       "status": "success",
       "error": null
     },
     {
       "step": 31,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Saved",
       "status": "success",
       "error": null
     },
     {
       "step": 32,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:T-Mobile",
       "status": "success",
       "error": null
     },
     {
       "step": 33,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Wi‑Fi doesn't turn back ",
       "status": "success",
       "error": null
     },
     {
       "step": 34,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Wi-Fi",
       "status": "success",
       "error": null
     },
     {
       "step": 35,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:1 network",
       "status": "success",
       "error": null
     },
     {
       "step": 36,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Saved",
       "status": "success",
       "error": null
     },
     {
       "step": 37,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:73.59 kB used Jul 25 – A",
       "status": "success",
       "error": null
     },
     {
       "step": 38,
-      "screenHash": "5685d54b847f",
+      "screenHash": "bd13293bfe8c",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#title:Network preferences",
       "status": "success",
       "error": null
     },
     {
       "step": 39,
-      "screenHash": "5685d54b847f",
+      "screenHash": "d2e179ab1645",
       "novel": false,
-      "picked": "(back)",
+      "picked": "text#summary:Connected / 5G",
       "status": "success",
       "error": null
     },
     {
       "step": 40,
-      "screenHash": "5685d54b847f",
-      "novel": false,
-      "picked": "(back)",
+      "screenHash": "e3b0c44298fc",
+      "novel": true,
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 41,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 42,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 43,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 44,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 45,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
       "picked": "(back)",
       "status": "success",
@@ -351,33 +384,113 @@
     },
     {
       "step": 46,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 47,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
       "novel": false,
-      "picked": "(back)",
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     },
     {
       "step": 48,
-      "screenHash": "5685d54b847f",
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 49,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 50,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 51,
+      "screenHash": "e3b0c44298fc",
       "novel": false,
       "picked": "(back)",
       "status": "success",
       "error": null
     },
     {
-      "step": 49,
-      "screenHash": "5685d54b847f",
+      "step": 52,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 53,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 54,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 55,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 56,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 57,
+      "screenHash": "e3b0c44298fc",
       "novel": false,
       "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 58,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 59,
+      "screenHash": "e3b0c44298fc",
+      "novel": false,
+      "picked": "(scroll)",
       "status": "success",
       "error": null
     }

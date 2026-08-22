@@ -133,23 +133,29 @@ for (let i = 0; i < MAX_ACTIONS; i++) {
   }
 
   const tappable = nodes.filter(
-    (n) => n.id && !n.disabled && !tappedHere.has(n.id) &&
+    (n) => n.id && !n.disabled &&
       (n.role === "button" || (n.text && n.text.length <= 40)),
   );
+  const fresh = tappable.filter((n) => !tappedHere.has(n.id));
   let outcome;
   let picked = "(none)";
-  if (tappable.length > 0) {
-    const pick = tappable[0];
+  if (fresh.length > 0 || tappable.length > 0) {
+    // Prefer never-tapped-this-screen; otherwise re-tap deterministically at
+    // pseudo-random (uiautomator dumps of Settings expose many label texts
+    // whose row containers carry no resource-id, so revisits are normal).
+    const pool = fresh.length > 0 ? fresh : tappable;
+    const pick = pool[(i * 7 + Math.floor(h.length / 3)) % pool.length];
     tappedHere.add(pick.id);
     picked = `${pick.role}#${pick.id}:${String(pick.text ?? pick.name ?? "").slice(0, 24)}`;
     outcome = await handler.act({
       action: { id: `a${i}`, runId: "ga_android_portfolio", environmentId: "env", kind: "click", risk: "interact", deadlineMs: 8000, idempotency: "safe-retry", input: { selector: `#${pick.id}` } },
     }).catch((e) => ({ status: "action-failed", error: { message: String(e).slice(0, 120) } }));
     clicks++;
-  } else if (scrollStreak < 3) {
+    scrollStreak = 0;
+  } else if (scrollStreak < 5) {
     // Nothing fresh to tap: scroll down (harness-level swipe; production
     // non-web scroll vocabulary is the Part C milestone).
-    try { await backend.shell(SERIAL, "input swipe 540 1400 540 500 300"); } catch {}
+    try { await backend.shell(SERIAL, "input swipe 540 1600 540 300 250"); } catch {}
     scrolls++;
     scrollStreak++;
     outcome = { status: "success" };
