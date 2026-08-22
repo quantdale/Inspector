@@ -1,0 +1,241 @@
+{
+  "pid": 43168,
+  "interactions": 37,
+  "castErrors": 2,
+  "otherErrors": 1,
+  "okCount": 33,
+  "byRecovery": {
+    "none": 2
+  },
+  "classification": "APP_BROKEN_PATTERN",
+  "events": [
+    {
+      "step": 0,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 1,
+      "pick": "Button\"Add New Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 2,
+      "pick": "MenuItem\"Edit\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 3,
+      "pick": "MenuItem\"Undo\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 4,
+      "pick": "MenuItem\"View\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 5,
+      "pick": "MenuItem\"Status bar\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 6,
+      "pick": "Button\"Headings\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 7,
+      "pick": "Pane\"\"",
+      "kind": "invoke",
+      "result": "cast-error",
+      "error": "Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\"",
+      "recoveredBy": "none"
+    },
+    {
+      "step": 8,
+      "pick": "ListItem\"Title\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 9,
+      "pick": "Button\"Lists\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 10,
+      "pick": "Pane\"\"",
+      "kind": "invoke",
+      "result": "cast-error",
+      "error": "Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\"",
+      "recoveredBy": "none"
+    },
+    {
+      "step": 11,
+      "pick": "ListItem\"Bulleted list\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 12,
+      "pick": "Button\"Bold (Ctrl+B)\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 13,
+      "pick": "Button\"Italic (Ctrl+I)\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 14,
+      "pick": "Button\"Strikethrough (Ctrl+Shift+X)\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 15,
+      "pick": "Button\"Link (Ctrl+K)\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 16,
+      "pick": "Button\"Cancel\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 17,
+      "pick": "Button\"Table\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 18,
+      "pick": "MenuItem\"Insert table\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 19,
+      "pick": "Button\"Clear formatting (Ctrl+Space)\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 20,
+      "pick": "Button\"Writing tools\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 21,
+      "pick": "MenuItem\"Write\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 22,
+      "pick": "Button\"Discard\"",
+      "kind": "invoke",
+      "result": "other-error",
+      "error": "STALE_ELEMENT: runtime id not found in current tree: 42-2165088-4-221"
+    },
+    {
+      "step": 23,
+      "pick": "Button\"What's new\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 24,
+      "pick": "Button\"Formatted\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 25,
+      "pick": "Button\"Add New Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 26,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 27,
+      "pick": "MenuItem\"View\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 28,
+      "pick": "MenuItem\"Word wrap\"",
+      "kind": "toggle",
+      "result": "ok"
+    },
+    {
+      "step": 29,
+      "pick": "Button\"What's new\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 30,
+      "pick": "Button\"Markdown syntax\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 31,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 32,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 33,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 34,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 35,
+      "pick": "Button\"Close Tab\"",
+      "kind": "invoke",
+      "result": "ok"
+    },
+    {
+      "step": 36,
+      "pick": "(tree)",
+      "kind": "richTree",
+      "result": "failed",
+      "error": "WindowsBackendError: window rehost suspected (40 -> 0 nodes, pid 43168 alive); reattach failed: no top-level window remains for pid 43168"
+    }
+  ]
+}

@@ -1,50 +1,116 @@
 {
-  "cyclesTotal": 2,
+  "cyclesTotal": 6,
   "cyclesFatal": 0,
-  "interactionsTotal": 38,
-  "successTotal": 34,
+  "interactionsTotal": 114,
+  "successTotal": 110,
   "failureTotal": 4,
   "reattachEventsTotal": 0,
   "killProbes": [
+    {
+      "target": "mspaint",
+      "cycle": 1,
+      "killed": true,
+      "statusAfterKill": {
+        "alive": false,
+        "pid": 25876
+      },
+      "opAfterKillError": "WindowsBackendError: attached pid 25876 is not running; refusing to return a stale tree"
+    },
+    {
+      "target": "calc",
+      "cycle": 1,
+      "killed": true,
+      "statusAfterKill": {
+        "alive": false,
+        "pid": 3160
+      },
+      "opAfterKillError": "WindowsBackendError: attached pid 3160 is not running; refusing to return a stale tree"
+    },
     {
       "target": "notepad",
       "cycle": 1,
       "killed": true,
       "statusAfterKill": {
         "alive": false,
-        "pid": 132944
+        "pid": 34504
       },
-      "opAfterKillError": "WindowsBackendError: attached pid 132944 is not running; refusing to return a stale tree"
+      "opAfterKillError": "WindowsBackendError: attached pid 34504 is not running; refusing to return a stale tree"
     }
   ],
   "resources": [
     {
+      "afterCycle": "mspaint#0",
+      "rssMB": 59.6,
+      "powershellProcesses": 8
+    },
+    {
+      "afterCycle": "calc#0",
+      "rssMB": 59.8,
+      "powershellProcesses": 9
+    },
+    {
       "afterCycle": "notepad#0",
-      "rssMB": 61,
+      "rssMB": 60,
+      "powershellProcesses": 9
+    },
+    {
+      "afterCycle": "mspaint#1",
+      "rssMB": 60.4,
+      "powershellProcesses": 9
+    },
+    {
+      "afterCycle": "calc#1",
+      "rssMB": 60.5,
       "powershellProcesses": 9
     },
     {
       "afterCycle": "notepad#1",
-      "rssMB": 61.1,
+      "rssMB": 60.6,
       "powershellProcesses": 9
     }
   ],
   "cycles": [
     {
+      "target": "mspaint",
+      "cycle": 0,
+      "pid": 47300,
+      "attachedVia": "named-pid",
+      "treeNodesFirst": 191,
+      "interactions": 25,
+      "successes": 25,
+      "failures": [],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false
+    },
+    {
+      "target": "calc",
+      "cycle": 0,
+      "pid": 5948,
+      "attachedVia": "title-discovery",
+      "treeNodesFirst": 57,
+      "interactions": 25,
+      "successes": 25,
+      "failures": [],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false
+    },
+    {
       "target": "notepad",
       "cycle": 0,
-      "pid": 114480,
+      "pid": 36144,
       "attachedVia": "named-pid",
-      "treeNodesFirst": 38,
+      "treeNodesFirst": 40,
       "interactions": 25,
       "successes": 23,
       "failures": [
         {
-          "rid": "42-20056548-4-143",
+          "rid": "42-9504762-4-138",
           "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
         },
         {
-          "rid": "42-8719022-4-158",
+          "rid": "42-1312784-4-150",
           "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
         }
       ],
@@ -53,20 +119,62 @@
       "residualProcessKilled": false
     },
     {
+      "target": "mspaint",
+      "cycle": 1,
+      "pid": 25876,
+      "attachedVia": "named-pid",
+      "treeNodesFirst": 169,
+      "interactions": 13,
+      "successes": 13,
+      "failures": [],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false,
+      "killProbe": {
+        "killed": true,
+        "statusAfterKill": {
+          "alive": false,
+          "pid": 25876
+        },
+        "opAfterKillError": "WindowsBackendError: attached pid 25876 is not running; refusing to return a stale tree"
+      }
+    },
+    {
+      "target": "calc",
+      "cycle": 1,
+      "pid": 3160,
+      "attachedVia": "title-discovery",
+      "treeNodesFirst": 57,
+      "interactions": 13,
+      "successes": 13,
+      "failures": [],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false,
+      "killProbe": {
+        "killed": true,
+        "statusAfterKill": {
+          "alive": false,
+          "pid": 3160
+        },
+        "opAfterKillError": "WindowsBackendError: attached pid 3160 is not running; refusing to return a stale tree"
+      }
+    },
+    {
       "target": "notepad",
       "cycle": 1,
-      "pid": 132944,
+      "pid": 34504,
       "attachedVia": "named-pid",
-      "treeNodesFirst": 47,
+      "treeNodesFirst": 34,
       "interactions": 13,
       "successes": 11,
       "failures": [
         {
-          "rid": "42-11144554-4-147",
-          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
+          "rid": "42-1508114-4-140",
+          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"The target element corresponds to UI that is no longer available (for example, the parent window has cl"
         },
         {
-          "rid": "42-21563884-4-159",
+          "rid": "42-2099484-4-155",
           "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
         }
       ],
@@ -77,9 +185,9 @@
         "killed": true,
         "statusAfterKill": {
           "alive": false,
-          "pid": 132944
+          "pid": 34504
         },
-        "opAfterKillError": "WindowsBackendError: attached pid 132944 is not running; refusing to return a stale tree"
+        "opAfterKillError": "WindowsBackendError: attached pid 34504 is not running; refusing to return a stale tree"
       }
     }
   ]

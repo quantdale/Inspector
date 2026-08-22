@@ -94,6 +94,31 @@ function powershellBridgeCount(): number {
   }
 }
 
+function imagePids(image: string): number[] {
+  const name = image.toLowerCase().endsWith(".exe") ? image : `${image}.exe`;
+  const out = spawnSync("tasklist", ["/FI", `IMAGENAME eq ${name}`, "/FO", "CSV", "/NH"], {
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  const pids: number[] = [];
+  for (const line of (out.stdout ?? "").split(/\r?\n/)) {
+    const m = line.match(/^"([^"]+)","(\d+)"/);
+    if (m && m[1]!.toLowerCase() === name.toLowerCase()) pids.push(Number(m[2]));
+  }
+  return pids;
+}
+
+/** Pre-launch sweep: UWP single-instance activation makes `start <app>` a
+ * no-op while a stale host lingers, which would poison pid attribution. */
+async function sweepImage(image: string): Promise<number[]> {
+  const victims = imagePids(image);
+  for (const pid of victims) {
+    try { spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { timeout: 15000 }); } catch {}
+  }
+  if (victims.length > 0) await sleep(1000);
+  return victims;
+}
+
 async function waitUntil(
   fn: () => Promise<boolean>,
   ms: number,
@@ -153,6 +178,8 @@ interface CycleRecord {
   failures: { rid: string; error: string }[];
   reattachEvents: number;
   closeOk: boolean;
+  staleHostsSwept?: number[];
+  postCycleSwept?: number[];
   killProbe?: {
     killed: boolean;
     statusAfterKill: unknown;
@@ -181,6 +208,10 @@ async function runCycle(
     closeOk: false,
     residualProcessKilled: false,
   };
+
+  // UWP hosts are single-instance: clear stale instances BEFORE launch so the
+  // spawned window is genuinely ours and pid attribution stays clean.
+  rec.staleHostsSwept = await sweepImage(t.proc);
 
   spawn("cmd", t.startArgs, { detached: true, stdio: "ignore" }).unref();
   await sleep(2500);
@@ -330,6 +361,8 @@ async function runCycle(
       10000,
     ));
   }
+  // No instance of this target image may outlive its cycle.
+  rec.postCycleSwept = await sweepImage(t.proc);
   await sleep(800); // let the shell settle between cycles
   return rec;
 }

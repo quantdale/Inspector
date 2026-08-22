@@ -1,0 +1,29 @@
+[
+  {
+    "instance": 0,
+    "pid": 26984,
+    "candidatesTested": 0,
+    "invokeFailures": 0,
+    "transientAfterReresolve": 0,
+    "deterministicFailures": 0,
+    "failureDetails": []
+  },
+  {
+    "instance": 1,
+    "pid": 28220,
+    "candidatesTested": 0,
+    "invokeFailures": 0,
+    "transientAfterReresolve": 0,
+    "deterministicFailures": 0,
+    "failureDetails": []
+  },
+  {
+    "instance": 2,
+    "pid": 11304,
+    "candidatesTested": 0,
+    "invokeFailures": 0,
+    "transientAfterReresolve": 0,
+    "deterministicFailures": 0,
+    "failureDetails": []
+  }
+]

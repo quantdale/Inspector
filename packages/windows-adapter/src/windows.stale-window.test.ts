@@ -176,3 +176,99 @@ describe("root-level stale-window reattach + single retry", () => {
     expect(tree.reattached).toBe(true);
   });
 });
+
+describe("rehost across owner pids (C-F2): title-evidenced window migration", () => {
+  const fullNodes = Array.from({ length: 12 }, (_, i) => ({
+    id: `n${i}`,
+    type: "Button",
+    name: `n${i}`,
+    automationId: "",
+    enabled: true,
+    offscreen: false,
+    rect: null,
+    patterns: [],
+  }));
+  const stubNode = {
+    id: "root",
+    type: "Window",
+    name: "",
+    automationId: "",
+    enabled: true,
+    offscreen: false,
+    rect: null,
+    patterns: [],
+  };
+
+  function makeBackend(bridgeHandlers: Parameters<typeof fakeBridge>[0]) {
+    const attachedPids: unknown[] = [];
+    const wrapped = fakeBridge({
+      ...bridgeHandlers,
+      attach: (p) => {
+        attachedPids.push((p as { pid?: number }).pid);
+        return (
+          (bridgeHandlers.attach as ((q?: Record<string, unknown>) => unknown) | undefined)?.(p) ??
+          { name: "Calculator" }
+        );
+      },
+    });
+    return { bridge: wrapped, attachedPids };
+  }
+
+  it("richTree(): collapse recovery FOLLOWS a same-titled window that migrated to a new owner pid", async () => {
+    let trees = 0;
+    const { bridge, attachedPids } = makeBackend({
+      windowStatus: () => ({ alive: true, pid: 111 }), // UWP host stays alive
+      listWindows: () => [{ pid: 222, title: "Calculator" }], // new owner only
+      tree: () => {
+        trees++;
+        if (trees === 2) return { pid: 111, nodes: [stubNode] }; // rehost stub
+        return { pid: trees === 1 ? 111 : 222, nodes: fullNodes };
+      },
+    });
+    const backend = new RealUiaBackend(bridge as never);
+    await backend.attach({ pid: 111 });
+    expect((await backend.richTree()).nodes.length).toBe(12); // baseline
+    const recovered = await backend.richTree(); // collapse -> migrate by title
+    expect(recovered.nodes.length).toBe(12);
+    expect(recovered.reattached).toBe(true);
+    expect(attachedPids).toEqual([111, 222]);
+  });
+
+  it("does NOT follow a DIFFERENT-titled window; honest REATTACH_FAILED stands", async () => {
+    let trees = 0;
+    const { bridge, attachedPids } = makeBackend({
+      windowStatus: () => ({ alive: true, pid: 111 }),
+      listWindows: () => [{ pid: 222, title: "Unrelated App" }],
+      attach: () => ({ name: "Calculator" }),
+      tree: () => {
+        trees++;
+        if (trees === 2) return { pid: 111, nodes: [stubNode] };
+        return { pid: 111, nodes: fullNodes };
+      },
+    });
+    const backend = new RealUiaBackend(bridge as never);
+    await backend.attach({ pid: 111 });
+    await backend.richTree(); // baseline
+    await expect(backend.richTree()).rejects.toThrow(/reattach failed/i);
+    expect(attachedPids).toEqual([111]); // never hijacked the other window
+  });
+
+  it("invoke(): STALE_WINDOW recovery also follows title-evidenced owner migration", async () => {
+    let invocations = 0;
+    const { bridge, attachedPids } = makeBackend({
+      windowStatus: () => ({ alive: true, pid: 111 }),
+      listWindows: () => [{ pid: 222, title: "Paint" }],
+      attach: () => ({ name: "Paint" }),
+      invoke: () => {
+        invocations++;
+        if (invocations === 1) throw new Error(STALE_WINDOW);
+        return true;
+      },
+    });
+    const backend = new RealUiaBackend(bridge as never);
+    await backend.attach({ pid: 111 });
+    await expect(backend.invoke("1-2-3")).resolves.toBeUndefined();
+    expect(invocations).toBe(2);
+    expect(attachedPids).toEqual([111, 222]);
+  });
+});

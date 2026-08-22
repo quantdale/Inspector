@@ -60,6 +60,12 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
    */
   private lastGoodNodeCount: number | null = null;
 
+  /** Title of the attached window as of the successful attach; used by
+   * rehost recovery to follow a window that migrated to a NEW owner pid
+   * (e.g. Calculator "Keep on top" moves content into an always-on-top
+   * window owned by a different process). Cleared on detach. */
+  private lastAttachedTitle: string | null = null;
+
   async listWindows(): Promise<UiaWindowRef[]> {
     return this.bridge.request<UiaWindowInfo[]>("listWindows");
   }
@@ -70,11 +76,16 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
     titleContains?: string;
   }): Promise<void> {
     this.lastGoodNodeCount = null;
-    await this.bridge.request("attach", params);
+    const info = await this.bridge.request<{ name?: string }>("attach", params);
+    this.lastAttachedTitle =
+      typeof info?.name === "string" && info.name.trim().length > 0
+        ? info.name
+        : null;
   }
 
   async detach(): Promise<void> {
     this.lastGoodNodeCount = null;
+    this.lastAttachedTitle = null;
     await this.bridge.request("detach");
   }
 
@@ -175,15 +186,31 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
 
   /**
    * Re-resolve the process's current main top-level window and attach to it.
-   * Throws when the pid no longer owns any enumerable top-level window (the
-   * rehost consumed the last HWND or the process exited).
+   *
+   * Same-pid first. If the pid no longer owns any enumerable top-level window
+   * BUT a window carrying the remembered attached TITLE exists under another
+   * owner, attach to that instead: UWP apps can migrate their visible window
+   * across owner processes mid-session (observed: Calculator "Keep on top"
+   * rehosts into an always-on-top window owned by a different pid). The
+   * migration must be evidenced by the SAME window title — a merely similar
+   * window never hijacks the session. Throws when neither path finds a live
+   * window (the rehost consumed the last HWND or the process exited).
    */
   private async reattachToLiveWindow(pid: number): Promise<void> {
     const windows = await this.listWindows();
-    if (!windows.some((w) => w.pid === pid)) {
-      throw new Error(`no top-level window remains for pid ${pid}`);
+    if (windows.some((w) => w.pid === pid)) {
+      await this.attach({ pid });
+      return;
     }
-    await this.attach({ pid });
+    const hint = this.lastAttachedTitle;
+    if (hint !== null) {
+      const migrated = windows.find((w) => w.title === hint || w.title.includes(hint));
+      if (migrated) {
+        await this.attach({ pid: migrated.pid });
+        return;
+      }
+    }
+    throw new Error(`no top-level window remains for pid ${pid}`);
   }
 
   /**
@@ -228,21 +255,21 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
   /**
    * One bounded reattach attempt: resolve the process's current top-level
    * window, re-attach (the bridge re-resolves the pid's main window from the
-   * desktop root), and re-enumerate. ~3s total budget.
+   * desktop root), and re-enumerate. ~3s total budget. The re-resolve polls
+   * briefly (250ms interval) because rehosted windows can take a moment to
+   * materialize as enumerable top-level surfaces; the budget is hard-capped.
    */
   private async attemptReattach(pid: number): Promise<UiaRichTree> {
-    const budget = new Promise<never>((_, reject) => {
-      const t = setTimeout(
-        () => reject(new Error("reattach budget (3000ms) exceeded")),
-        3000,
-      );
-      t.unref?.();
-    });
-    const work = (async () => {
-      await this.reattachToLiveWindow(pid);
-      return this.bridge.request<UiaRichTree>("tree");
-    })();
-    return Promise.race([work, budget]);
+    const deadline = Date.now() + 3000;
+    for (;;) {
+      try {
+        await this.reattachToLiveWindow(pid);
+        return await this.bridge.request<UiaRichTree>("tree");
+      } catch (e) {
+        if (Date.now() >= deadline) throw e;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
   }
 
   /**
