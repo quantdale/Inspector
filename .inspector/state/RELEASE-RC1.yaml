@@ -53,8 +53,9 @@ release:
   # recorded 2026-08-22; only release-engineering changes permitted
   implementation_batch: COMMITTED
   # c338a40 ("progress") audited; blocker fixes in 160ec60
-  publish_status: NOT_AUTHORIZED
-  # never publish without explicit operator authorization
+  publish_status: NOT_PUBLISHED
+  # no npm publish / GitHub Release / hosted binaries occurred; publication
+  # remains unauthorized without explicit operator approval
   version_scheme: >-
     Workspace manifests stay 0.1.0/private; the shipped artifact reports
     0.1.0-rc.1 via the packaging definition (stamped inspector-version.txt
