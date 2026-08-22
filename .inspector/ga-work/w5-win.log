@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "runId": "run_2eabb53032ce4ad68ab51de844ef297b",
+  "adapter": "windows",
+  "seed": 21,
+  "stoppedReason": "action-budget",
+  "actionsExecuted": 40,
+  "statesVisited": 14,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": []
+}

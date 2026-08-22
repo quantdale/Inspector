@@ -1,0 +1,12 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/Michael Roy/Documents/Inspector[39m
+
+ [32m✓[39m packages/explore/src/native-session.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 6183[2mms[22m[39m
+   [33m[2m✓[22m[39m SPEC-009 A4: native exploration session over a live adapter[2m > [22mexplores SeedBank through policy+store+findings; promotes reproduced failures [33m6181[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 04:48:25
+[2m   Duration [22m 8.48s[2m (transform 550ms, setup 0ms, collect 1.18s, tests 6.18s, environment 0ms, prepare 381ms)[22m
+

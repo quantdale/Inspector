@@ -24,7 +24,7 @@ import {
 import { mulberry32 } from "./rng.js";
 import { buildNativeInventory } from "./native-inventory.js";
 import type { CandidateAction } from "./inventory.js";
-import { screenFingerprint, uiTreeOf } from "./state.js";
+import { stateFingerprint, uiTreeOf } from "./state.js";
 
 export interface NativeExplorationConfig {
   seed: number;
@@ -154,6 +154,7 @@ export async function runNativeHunt(
   };
 
   const seen = new Set();
+  const useCount = new Map();
   let plateau = 0;
   let actionsExecuted = 0;
   let stoppedReason: NativeHuntResult["stoppedReason"] = "action-budget";
@@ -171,7 +172,10 @@ export async function runNativeHunt(
     // Observe through the standard pipeline (persists an observation).
     const obs = await run.observe(["uiTree"]);
     const uiTree = uiTreeOf(obs);
-    const fp = screenFingerprint(obs);
+    // Fine-grained identity: terminal screens keep constant element ids
+    // (line-N), so novelty must include dynamic text/values, not just the
+    // visible-control set.
+    const fp = stateFingerprint(obs);
     const novel = !seen.has(fp);
     seen.add(fp);
     plateau = novel ? 0 : plateau + 1;
@@ -188,9 +192,13 @@ export async function runNativeHunt(
       stoppedReason = "no-candidates";
       break;
     }
-    // Seeded weighted pick over the highest-priority band keeps coverage
-    // broad without hammering one control.
-    candidates.sort((a, b) => b.priority - a.priority);
+    // Least-recently-executed rotation within the top priority band keeps
+    // coverage broad without hammering one control (platform-neutral).
+    candidates.sort(
+      (a, b) =>
+        (useCount.get(a.actionKey) ?? 0) - (useCount.get(b.actionKey) ?? 0) ||
+        b.priority - a.priority,
+    );
     const band = candidates.slice(0, Math.min(candidates.length, 8));
     const pick: CandidateAction = rng.pick(band);
 
@@ -200,7 +208,9 @@ export async function runNativeHunt(
       environmentId: run.environmentId,
       kind: pick.kind,
       risk: pick.risk === "observe" ? "observe" : "interact",
-      deadlineMs: 8000,
+      // Generous-but-bounded: real-device ops (uiautomator dump, ConPTY
+      // round-trips) legitimately take seconds under load.
+      deadlineMs: 20000,
       idempotency: "safe-retry",
       input: {
         ...(pick.selector !== undefined ? { selector: pick.selector } : {}),
@@ -231,6 +241,7 @@ export async function runNativeHunt(
 
     actionsExecuted++;
     segment.push(action);
+    useCount.set(pick.actionKey, (useCount.get(pick.actionKey) ?? 0) + 1);
 
     const outcome = submit.outcome;
     if (

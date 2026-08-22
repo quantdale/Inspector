@@ -22,17 +22,21 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M8
-  milestone_name: iOS simulator adapter
-  spec: specs/008-ios/SPEC.md
-  tasks: specs/008-ios/SPEC.md
-  task_group: DEFERRED
-  waypoint: M8.deferred-environment
-  waypoint_status: DEFERRED_ENVIRONMENT
+  milestone_id: M9
+  milestone_name: Platform-neutral autonomous exploration
+  spec: specs/009-native-autonomous-exploration/SPEC.md
+  tasks: specs/009-native-autonomous-exploration/SPEC.md
+  task_group: W0-W5
+  waypoint: W5-field-proofs
+  waypoint_status: IN_PROGRESS
   next_action: >-
-    M0-M7 are COMPLETE. M8 is DEFERRED_ENVIRONMENT (no macOS/Xcode/iOS
-    simulator runtime available; adapter interfaces and remote-worker contract
-    fully specified). Implementation campaign is COMPLETE.
+    GA campaign COMPLETE (GO_WITH_DOCUMENTED_DEBT for 0.1.0-rc.2; publication
+    NOT_PUBLISHED). M9 W0-W4 landed (vocabulary, autonomy gate, inventories,
+    generic session, hunt wiring) with unit+integration coverage. W5 field
+    proofs: P-WIN PASS (Calculator, 40 actions/14 states), P-CLI PASS (real
+    vim/ConPTY, 80 actions/80 states), P-ANDROID functional (65 actions,
+    honest zero; coverage depth + per-platform replay drivers = remaining
+    waypoints W6+).
 
 progress:
   completed_milestones:

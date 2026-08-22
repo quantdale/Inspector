@@ -199,6 +199,29 @@ Required:
 
 M8 is complete or explicitly `DEFERRED_ENVIRONMENT` with its reason and resumption requirements recorded.
 
+## M9 — Platform-neutral autonomous exploration (product development)
+
+Spec: `specs/009-native-autonomous-exploration/SPEC.md`
+
+Goal: close audit finding W6 — make product-level autonomous exploration
+(`inspector hunt`) capability-driven across CLI/PTY, Windows/UIA, and Android,
+replacing bespoke out-of-tree loops.
+
+Deliverables:
+
+- action vocabulary in the protocol (kinds, target schemes, adapter-declared
+  risk, autonomousEligible);
+- external-side-effect risk gate (adapter-declared risk + contextual label
+  deny-patterns + policy ceiling);
+- per-platform candidate inventories feeding the existing scorer;
+- generic exploration session through RunController/FindingEngine;
+- `hunt --adapter cli|windows|android` wiring with durable resume specs.
+
+Exit gate: production hunts autonomously explore a real TUI (vim), a real UWP
+app (Calculator or Paint), and com.android.settings on an AVD through the
+standard evidence/finding pipeline; per-platform replay-faithful reproduction
+is either wired or findings honestly remain CANDIDATE.
+
 ## Explicitly not required before implementation completion
 
 These are valuable but belong to later hardening/productization unless needed by a milestone gate:

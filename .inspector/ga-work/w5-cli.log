@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "runId": "run_ba6e427f58e64497a3c40624bcc87532",
+  "adapter": "cli",
+  "seed": 33,
+  "stoppedReason": "novelty-plateau",
+  "actionsExecuted": 40,
+  "statesVisited": 1,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": []
+}

@@ -87,6 +87,16 @@ Durable state: `.inspector/state/DOGFOOD-RC1.yaml` (wave ledger) + `dogfood:` bl
 - Durable report: `docs/DOGFOOD-RC1-REPORT.md`.
 - Final gate (Phase 32): recorded in `.inspector/rc-work/phase32-gates.log`; verified commit = final state commit on main.
 
+## M9 NATIVE AUTONOMOUS EXPLORATION — WAYPOINT 1 (2026-08-23)
+
+- SPEC-009 created (`specs/009-native-autonomous-exploration/SPEC.md`); roadmap entry M9 added.
+- W0 landed: `Capabilities.vocabulary` (ActionKindSpec: kind/targetScheme/risk/autonomousEligible) + schema validation + negotiation passthrough; backward compatible.
+- W1 landed: honest vocabulary declarations for web/cli/windows/android adapters; windows adapter gained targeted create-attach (titleContains/pid via waitForWindow+attach) and a rich observe path exposing UIA patterns for candidate selection.
+- W2 landed: two-layer external-side-effect gate — adapter-declared kind risk + contextual label deny-patterns (`sign in`, `purchase`, `delete`, `install`, ...) promoting candidates to external-side-effect; default policy denies.
+- W3/W4 landed: buildUiaInventory/buildAndroidInventory/buildPtyInventory dispatched purely by declared target scheme; `runNativeHunt` generic session through RunController+FindingEngine with LRU rotation and fine-grained novelty fingerprinting; `hunt --adapter cli|windows|android [--target]` wired incl. durable resume specs (createOptions/spawnEnvDelta) and configurable observe timeouts for real-device adapters.
+- Coverage: 494 unit / integration A4 test proves the session drives the Windows mock end-to-end with finding promotion + evidence bundles.
+- Field proofs: P-WIN PASS (real Calculator, 40 actions/14 states, honest zero), P-CLI PASS (real vim over ConPTY, 80 actions/80 distinct states), P-ANDROID functional (65 actions on Settings, honest zero; depth + replay-faithful reproduction = next waypoints).
+
 ## RC1_FIELD_VALIDATION RECOVERY (2026-08-22)
 
 Interrupted GA session reconciled at `main@f41063a` ("unfinished progress",

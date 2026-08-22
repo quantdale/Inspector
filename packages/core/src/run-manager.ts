@@ -29,6 +29,8 @@ export interface StartRunOptions {
    * `WEB_TARGET_URL`. Persisted (credential-stripped) so a resume on a fresh
    * process can re-create the SAME environment, never silently retargeting. */
   spawnEnvDelta?: NodeJS.ProcessEnv;
+  /** Per-observe deadline override (ms); see RunControllerContext. */
+  observeTimeoutMs?: number;
 }
 
 export type SubmitResult =
@@ -44,6 +46,9 @@ export interface RunControllerContext {
   envId: string;
   adapter: AdapterClient;
   caps: CapabilityDoc;
+  /** Per-observe deadline (ms). Default 10000; real-device adapters
+   * (uiautomator dumps, UIA subtree walks) legitimately need more. */
+  observeTimeoutMs?: number;
 }
 
 /** Provisional adapter label derived from the spawn command; replaced by the
@@ -122,7 +127,11 @@ export class RunController {
     // ADR 0002: validate before persisting; malformed payloads never touch
     // durable state or consume a sequence number.
     const obs = parseAdapterObservation(
-      await this.ctx.adapter.request("observe", { observe }, 10000),
+      await this.ctx.adapter.request(
+        "observe",
+        { observe },
+        this.ctx.observeTimeoutMs ?? 10000,
+      ),
     );
     const nextSeq = this.stepSeq + 1;
     const stepId = newId("step");
@@ -357,6 +366,9 @@ export class RunManager {
         envId,
         adapter,
         caps,
+        ...(opts.observeTimeoutMs !== undefined
+          ? { observeTimeoutMs: opts.observeTimeoutMs }
+          : {}),
       });
     } catch (err) {
       // Guaranteed cleanup: never orphan the subprocess, leak the environment

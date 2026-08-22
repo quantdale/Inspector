@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "runId": "run_1820b931406f4ae2a6b243301ca3ddc3",
+  "adapter": "android",
+  "seed": 44,
+  "stoppedReason": "adapter-error",
+  "actionsExecuted": 32,
+  "statesVisited": 11,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": [
+    "adapter error during click: deadline-exceeded: act"
+  ]
+}

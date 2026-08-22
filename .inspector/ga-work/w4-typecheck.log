@@ -1,0 +1,11 @@
+
+> inspector@0.1.0 typecheck C:\Users\Michael Roy\Documents\Inspector
+> tsc --noEmit -p tsconfig.json
+
+packages/explore/src/native-inventory.test.ts(43,44): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+packages/explore/src/native-inventory.test.ts(44,52): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+packages/explore/src/native-inventory.test.ts(45,43): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+packages/explore/src/native-inventory.test.ts(46,46): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+packages/explore/src/native-inventory.test.ts(47,56): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+packages/explore/src/native-inventory.test.ts(61,37): error TS2353: Object literal may only specify known properties, and 'patterns' does not exist in type 'Partial<UiElement> & { id: string; }'.
+ ELIFECYCLE  Command failed with exit code 2.

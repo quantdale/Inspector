@@ -672,6 +672,8 @@ export async function huntCommand(
         ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
         ...(createOptions ? { createOptions } : {}),
         ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
+        // Real-device adapters need headroom on observe (uiautomator dumps).
+        ...(isNative ? { observeTimeoutMs: 30000 } : {}),
       });
     } catch (e) {
       throw remapWorkspaceConflict(e);

@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "runId": "run_ef66b1335a3e407aac835f67493074c9",
+  "adapter": "cli",
+  "seed": 33,
+  "stoppedReason": "action-budget",
+  "actionsExecuted": 80,
+  "statesVisited": 80,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": []
+}

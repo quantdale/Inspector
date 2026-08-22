@@ -1,0 +1,4 @@
+
+> inspector@0.1.0 typecheck C:\Users\Michael Roy\Documents\Inspector
+> tsc --noEmit -p tsconfig.json
+
