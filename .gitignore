@@ -34,3 +34,10 @@ Thumbs.db
 
 # RC1 dogfood hunt bulk artifacts (curated summaries are committed instead)
 .inspector/rc-work/hunts/
+
+# GA field-validation run debris (harnesses + curated compact summaries are
+# committed instead; sandboxes/artifact dirs are generated at run time)
+.inspector/ga-work/**/sandbox/
+.inspector/ga-work/**/artifacts-*/
+.inspector/ga-work/**/art-*/
+*.swp

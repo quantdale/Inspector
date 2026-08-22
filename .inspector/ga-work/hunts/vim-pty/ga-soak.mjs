@@ -4,18 +4,41 @@
  * and resource probes. Reuses production CliAdapterHandler + NodePtyBackend
  * unmodified; only concession is appending the target filename at spawn.
  *
+ * Portability: vim path + sandbox are discovered/generated at run time (env:
+ * GA_VIM_EXE). Orphan detection is PID-ANCESTRY based: each session snapshots
+ * vim.exe PIDs before spawn and attributes the post-spawn delta to itself,
+ * then polls THOSE PIDs after close. The machine-global count is recorded
+ * only as secondary context.
+ *
  * Run from repo root:
  *   node --import tsx .inspector/ga-work/hunts/vim-pty/ga-soak.mjs [sessions] [stepsPerSession]
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { NodePtyBackend } from "../../../../packages/cli-adapter/src/node-pty-backend.js";
 import { CliAdapterHandler } from "../../../../packages/cli-adapter/src/cli-adapter.js";
+import { resolveVimExe, imagePids, pidAlive } from "../../tools/discovery.mjs";
+
+const require0 = createRequire(import.meta.url);
+const require = (m) => require0(m);
+const { execSync } = require("node:child_process");
 
 const here = dirname(fileURLToPath(import.meta.url));
-const sandbox = join(here, "sandbox");
+const VIM_EXE = resolveVimExe();
+
+// Deterministic scratch target, generated per run OUTSIDE the repository.
+const sandbox = mkdtempSync(join(tmpdir(), "ga-vim-sandbox-"));
+const SCRATCH_SEED = [
+  "ga field soak target",
+  "line two",
+  "line three",
+  "",
+].join("\n");
+writeFileSync(join(sandbox, "scratch.txt"), SCRATCH_SEED);
 process.chdir(sandbox);
 
 const SESSIONS = Number(process.argv[2] ?? 3);
@@ -23,9 +46,7 @@ const STEPS = Number(process.argv[3] ?? 80);
 
 class VimBackend extends NodePtyBackend {
   async spawn(program) {
-    const exe =
-      program === "vim" ? "C:\\Program Files\\Git\\usr\\bin\\vim.exe" : program;
-    return super.spawn(exe, ["scratch.txt"]);
+    return super.spawn(program === "vim" ? VIM_EXE : program, ["scratch.txt"]);
   }
 }
 
@@ -33,32 +54,35 @@ const hash = (lines) =>
   createHash("sha1").update(lines.join("\n")).digest("hex").slice(0, 12);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function resourceSnapshot(tag) {
+function resourceSnapshot(tag, sessionPids = []) {
   const mu = process.memoryUsage();
-  let vims = "?";
-  try {
-    const out = require("node:child_process")
-      .execSync('tasklist /FI "IMAGENAME eq vim.exe" /FO CSV /NH')
-      .toString()
-      .trim();
-    vims = out.includes("vim.exe") ? (out.match(/vim\.exe/g) ?? []).length : 0;
-  } catch {
-    /* tasklist unavailable */
-  }
+  const vims = imagePids("vim.exe");
   return {
     tag,
     rssMB: Number((mu.rss / 1048576).toFixed(1)),
     heapUsedMB: Number((mu.heapUsed / 1048576).toFixed(1)),
-    vimProcesses: vims,
+    vimProcessesGlobalCount: vims.length, // secondary context only
+    sessionPidsAlive: sessionPids.filter(pidAlive), // authoritative orphan metric
     openHandlesApprox: process._getActiveHandles?.().length ?? null,
     requestsApprox: process._getActiveRequests?.().length ?? null,
   };
 }
 
-// ESM shim for the CJS-only child_process import inside resourceSnapshot.
-import { createRequire } from "node:module";
-const require0 = createRequire(import.meta.url);
-const require = (m) => require0(m);
+/** PIDs that appeared between two snapshots => this session's vim. */
+function sessionPids(before, after) {
+  return after.filter((p) => !before.includes(p));
+}
+
+/** Poll specific PIDs until gone; returns {reapedMs, residualPids}. */
+async function awaitReap(pids, timeoutMs = 10000) {
+  const t0 = Date.now();
+  let pending = [...pids];
+  while (Date.now() - t0 < timeoutMs && pending.length > 0) {
+    await sleep(200);
+    pending = pending.filter(pidAlive);
+  }
+  return { reapedMs: Date.now() - t0, residualPids: pending };
+}
 
 const backend = new VimBackend();
 const resources = [resourceSnapshot("boot")];
@@ -85,7 +109,7 @@ for (let s = 0; s < SESSIONS; s++) {
       action: {
         kind: "fill",
         id: `act-s${s}-${seq}`,
-        runId: `ga-vim-soak-s${s}`,
+        runId: `ga_vim_soak_s${s}`,
         environmentId: "env-vim",
         input: { value },
       },
@@ -105,11 +129,12 @@ for (let s = 0; s < SESSIONS; s++) {
     return log[log.length - 1];
   }
 
+  const pidsBefore = imagePids("vim.exe");
   let boot = null;
   try {
     await handler.lifecycle({
       op: "create",
-      options: { runId: `ga-vim-soak-s${s}`, environmentId: "env-vim" },
+      options: { runId: `ga_vim_soak_s${s}`, environmentId: "env-vim" },
     });
     currentSessionId = `pty-${s}`;
     await sleep(700);
@@ -119,6 +144,7 @@ for (let s = 0; s < SESSIONS; s++) {
     sessionSummaries.push({ session: s, fatal: String(e) });
     break;
   }
+  const myVimPids = sessionPids(pidsBefore, imagePids("vim.exe"));
 
   const pool = [
     ["j", "down"],
@@ -131,8 +157,8 @@ for (let s = 0; s < SESSIONS; s++) {
     ["u", "undo"],
     ["dd", "delete-line"],
     ["i", "insert-mode"],
-    ["[200~ga-field-text[201~", "bracketed-paste"],
-    ["[1;5C", "ctrl-right"],
+    ["\x1b[200~ga-field-text\x1b[201~", "bracketed-paste"],
+    ["\x1b[1;5C", "ctrl-right"],
     ["a", "append"],
     ["o", "open-line"],
     ["ga soak text ", "text-token"],
@@ -156,46 +182,39 @@ for (let s = 0; s < SESSIONS; s++) {
   }
 
   // coverage: verified insert + save every session
-  await act("[200~", "paste-start-normalize");
-  await act("[201~", "paste-end-normalize");
+  await act("\x1b[200~", "paste-start-normalize");
+  await act("\x1b[201~", "paste-end-normalize");
   await act("gg", "goto-top");
-  await act(`oga session ${s} was here`, "insert-entry-verified");
+  await act(`oga session ${s} was here`, "insert-entry-verified");
   await act(":w", "save-file");
 
   // Ctrl-C probe mid-insert
   await act("i", "enter-insert-for-ctrlc");
   await act("typing before interrupt", "type-mid-insert");
-  const ctrlC = await act("", "ctrl-c-mid-insert");
+  const ctrlC = await act("\x03", "ctrl-c-mid-insert");
 
   let killProbe = {};
   if (s === SESSIONS - 1) {
-    const { execSync } = require("node:child_process");
-    try {
-      const out = execSync(
-        'tasklist /FI "IMAGENAME eq vim.exe" /FO CSV /NH',
-      ).toString();
-      const m = out.match(/"vim\.exe","(\d+)"/);
-      if (m) {
-        execSync(`taskkill /F /PID ${m[1]}`);
-        const polls = [];
-        for (let i = 0; i < 10; i++) {
-          await sleep(300);
-          polls.push(await backend.isAlive(currentSessionId));
-          if (!polls.at(-1)) break;
-        }
-        const postKillAct = await act("j", "act-after-external-kill").catch(
-          (e) => ({ threw: String(e) }),
-        );
-        killProbe = {
-          pid: m[1],
-          alivePollsMs300: polls,
-          aliveAfter: polls.at(-1),
-          postKillStatus: postKillAct.status ?? postKillAct.threw,
-          postKillError: postKillAct.error ?? null,
-        };
+    if (myVimPids.length > 0) {
+      execSync(`taskkill /F /PID ${myVimPids[0]}`);
+      const polls = [];
+      for (let i = 0; i < 10; i++) {
+        await sleep(300);
+        polls.push(await backend.isAlive(currentSessionId));
+        if (!polls.at(-1)) break;
       }
-    } catch (e) {
-      killProbe = { error: String(e) };
+      const postKillAct = await act("j", "act-after-external-kill").catch(
+        (e) => ({ threw: String(e) }),
+      );
+      killProbe = {
+        pid: myVimPids[0],
+        alivePollsMs300: polls,
+        aliveAfter: polls.at(-1),
+        postKillStatus: postKillAct.status ?? postKillAct.threw,
+        postKillError: postKillAct.error ?? null,
+      };
+    } else {
+      killProbe = { error: "no session-attributable vim pid" };
     }
   }
 
@@ -207,9 +226,12 @@ for (let s = 0; s < SESSIONS; s++) {
     closeError = String(e);
   }
   const aliveAfterClose = await backend.isAlive(currentSessionId);
+  const reap = await awaitReap(myVimPids);
 
   sessionSummaries.push({
     session: s,
+    vimExe: VIM_EXE,
+    sessionVimPids: myVimPids,
     interactions: log.length,
     novelScreens: seen.size,
     nonSuccessActions: log
@@ -221,16 +243,26 @@ for (let s = 0; s < SESSIONS; s++) {
     closeResult,
     closeError,
     aliveAfterClose,
+    reap: { ...reap, residualAlive: reap.residualPids.map((p) => pidAlive(p)) },
   });
-  resources.push(resourceSnapshot(`after-session-${s}`));
+  resources.push(resourceSnapshot(`after-session-${s}`, myVimPids));
 }
 
-writeFileSync(
-  join(here, "ga-summary.json"),
-  JSON.stringify(
-    { sessions: SESSIONS, stepsPerSession: STEPS, sessionSummaries, resources },
-    null,
-    2,
-  ),
-);
-console.log(JSON.stringify({ sessionSummaries, resources }, null, 1));
+// Final verdict inputs: every session's own vim PIDs must be reaped.
+const allSessionPids = sessionSummaries.flatMap((x) => x.sessionVimPids ?? []);
+const summary = {
+  sessions: SESSIONS,
+  stepsPerSession: STEPS,
+  vimExe: VIM_EXE,
+  sandbox,
+  orphanVerdict:
+    allSessionPids.some(pidAlive)
+      ? "RESIDUAL_PIDS"
+      : allSessionPids.length === 0
+        ? "UNVERIFIED_NO_PIDS_ATTRIBUTED"
+        : "ALL_SESSION_PIDS_REAPED",
+  sessionSummaries,
+  resources,
+};
+writeFileSync(join(here, "ga-summary.json"), JSON.stringify(summary, null, 2));
+console.log(JSON.stringify(summary, null, 1));

@@ -86,3 +86,21 @@ Durable state: `.inspector/state/DOGFOOD-RC1.yaml` (wave ledger) + `dogfood:` bl
 - Documentation finalized: README quickstart, DEVELOPMENT rewrite, PLATFORM-ADAPTERS real/mock/deferred matrix, STATUS refresh.
 - Durable report: `docs/DOGFOOD-RC1-REPORT.md`.
 - Final gate (Phase 32): recorded in `.inspector/rc-work/phase32-gates.log`; verified commit = final state commit on main.
+
+## RC1_FIELD_VALIDATION RECOVERY (2026-08-22)
+
+Interrupted GA session reconciled at `main@f41063a` ("unfinished progress",
+clean tree, synced with origin/main). What survived that commit and what it
+means:
+
+- **Survived (harnesses)**: `.inspector/ga-work/hunts/{uia-soak,vim-pty,web-attribution,interrupt-resume}` + `tools/`. These are TOOLS ONLY — their existence is not phase evidence.
+- **Survived (compact evidence)**: `ga-uia-summary.json` (2 notepad cycles only; 4× "Specified cast is not valid." invoke failures; kill probe honest) and `ga-summary.json` (3 vim PTY sessions, 265 interactions, ctrl-C ok, external-kill honest ACTION_FAILED, close clean). Both are retained as provenance-tagged inputs to phases P6/P5 but DO NOT by themselves complete those phases.
+- **Runtime litter removed**: `sandbox/.scratch.txt.swp`, `sandbox/scratch.txt` untracked and regenerated deterministically by the harness from now on.
+- **Portability fixed**: harnesses no longer hard-code `C:/Users/.../AppData/Roaming/npm/...` or Git-for-Windows vim paths; artifact/bin/vim/better-sqlite3 resolution is dynamic (env override → discovery → explicit failure).
+- **Known gap in old vim soak**: machine-global `tasklist vim.exe` count was the orphan metric — replaced by launched-PID ancestry tracking (before/after spawn snapshot diff + per-PID liveness polls).
+
+Phases 0–2 of `GA-READINESS.yaml` were independently re-checked against this
+tree: post-tag audit (745433b+acbf924 = state-only + formatting-only), fresh
+reproduction from ddeea86 with byte-identical tarball — records stand.
+
+Remaining: phases 3–31 per `.inspector/state/GA-READINESS.yaml`.

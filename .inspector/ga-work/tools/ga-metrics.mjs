@@ -2,14 +2,32 @@
 // GA field-campaign metrics extractor.
 // Usage: node ga-metrics.mjs <workspace-dir> [runLabel]
 // Emits one JSON record per run found in the workspace's runs.db.
+// better-sqlite3 is loaded from the INSTALLED artifact (GA_ARTIFACT_NODE_MODULES
+// or the global npm root); falls back to a workspace checkout resolution.
 import { createRequire } from "node:module";
 import { readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
-const loadFromArtifact = createRequire(
-  "C:/Users/Michael Roy/AppData/Roaming/npm/node_modules/inspector-cli/package.json",
-);
-const Database = loadFromArtifact("better-sqlite3");
+const here = dirname(fileURLToPath(import.meta.url));
+
+function artifactNodeModules() {
+  if (process.env.GA_ARTIFACT_NODE_MODULES) return process.env.GA_ARTIFACT_NODE_MODULES;
+  try {
+    const globalRoot = execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
+    const candidate = join(globalRoot, "inspector-cli");
+    if (existsSync(join(candidate, "package.json"))) return join(candidate, "node_modules");
+  } catch {
+    /* fall through */
+  }
+  // Workspace checkout fallback (repo root node_modules).
+  return join(here, "..", "..", "..", "..");
+}
+
+const req = createRequire(join(artifactNodeModules(), "package.json"));
+const Database = req("better-sqlite3");
 
 const ws = resolve(process.argv[2]);
 const label = process.argv[3] ?? ws;
