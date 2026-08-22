@@ -115,8 +115,13 @@ writeFileSync(
   [
     `Inspector CLI ${version}`,
     "",
-    "Install from this directory:",
-    "  npm install -g <this-directory>",
+    "Install globally from the packed tarball (dependencies are pulled",
+    "automatically):",
+    "  npm pack <this-directory>",
+    "  npm install -g inspector-cli-<version>.tgz",
+    "",
+    "NOTE: `npm install -g <this-directory>` (folder form) does NOT install",
+    "production dependencies on current npm - use the tarball flow.",
     "",
     "Then enable browser targets (downloads Chromium once):",
     "  npx --yes playwright install chromium",
@@ -177,4 +182,25 @@ if (process.platform === "win32") {
   if (rc.status !== 0) throw new Error(`zip failed with status ${rc.status}`);
 }
 
+// Also emit the npm tarball: it is the ONLY global-install form that pulls
+// production dependencies reliably across npm versions (folder-form
+// `npm install -g <dir>` skips them). Recorded in the release manifest.
+const packed = spawnSync("npm", ["pack", "--pack-destination", "."], {
+  cwd: outDir,
+  stdio: "pipe",
+  encoding: "utf8",
+  shell: process.platform === "win32",
+});
+if (packed.status !== 0)
+  throw new Error(
+    `npm pack failed with status ${packed.status}: ${packed.stderr}`,
+  );
+const tgzName = String(packed.stdout).trim().split("\n").at(-1).trim();
+if (!existsSync(join(outDir, tgzName)))
+  throw new Error(`npm pack produced no tarball: ${tgzName}`);
+
 console.log(`release artifact: ${relative(root, join(outDir, zipName))}`);
+console.log(
+  `release tarball:  ${relative(root, join(outDir, tgzName))} ` +
+    `(sha256 ${sha256(join(outDir, tgzName))})`,
+);
