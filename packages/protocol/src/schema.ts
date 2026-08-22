@@ -99,6 +99,25 @@ export const capabilityDocSchema = {
         lifecycle: { type: "array", items: { type: "string", minLength: 1 } },
         faults: { type: "array", items: { type: "string", minLength: 1 } },
         coverage: { type: "array", items: { type: "string", minLength: 1 } },
+        vocabulary: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["kind", "risk", "autonomousEligible"],
+            properties: {
+              kind: { type: "string", minLength: 1 },
+              targetScheme: {
+                enum: ["css", "uia-runtime-id", "android-resource-id", "pty-input"],
+              },
+              risk: {
+                enum: ["observe", "interact", "mutate-test-state", "external-side-effect"],
+              },
+              autonomousEligible: { type: "boolean" },
+              description: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+        },
       },
       additionalProperties: false,
     },

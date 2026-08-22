@@ -8,3 +8,6 @@ export * from "./faults.js";
 export * from "./rng.js";
 export * from "./campaign.js";
 export * from "./web-replay.js";
+export * from "./autonomy.js";
+export * from "./native-inventory.js";
+export * from "./native-session.js";

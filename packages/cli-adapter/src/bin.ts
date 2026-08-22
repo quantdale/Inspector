@@ -3,6 +3,16 @@ import { MockPtyBackend } from "./mock-pty.js";
 import { armPtyExitGuard } from "./node-pty-backend.js";
 import type { PtyBackend } from "./types.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
+import { mkdirSync } from "node:fs";
+
+// SPEC-009: optional long-path sandbox for real PTY programs (vim needs a
+// writable cwd for scratch files). MUST be a long path — ConPTY hard-crashes
+// with an 8.3 short-path cwd (see GA field evidence FIELD-ENV-CONPTY-SHORTPATH).
+const cliCwd = process.env.INSPECTOR_CLI_CWD;
+if (cliCwd) {
+  mkdirSync(cliCwd, { recursive: true });
+  process.chdir(cliCwd);
+}
 
 async function selectBackend(): Promise<PtyBackend> {
   // INSPECTOR_PTY=real opts into the native node-pty backend; mock stays the

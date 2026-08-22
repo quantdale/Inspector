@@ -13,10 +13,21 @@ const here = dirname(fileURLToPath(import.meta.url));
 // outside the repository.
 const repoTsconfig = join(here, "..", "..", "..", "tsconfig.json");
 
-function adapterBin(name: "web" | "fake"): AdapterBinRef {
-  return name === "web"
-    ? resolveAdapterBin(import.meta.url, "inspector-adapter-web.js", "..", "..", "adapter-web", "src", "bin")
-    : resolveAdapterBin(import.meta.url, "inspector-adapter-fake.js", "..", "..", "adapter-fake", "src", "bin");
+function adapterBin(
+  name: "web" | "fake" | "cli" | "windows" | "android",
+): AdapterBinRef {
+  switch (name) {
+    case "web":
+      return resolveAdapterBin(import.meta.url, "inspector-adapter-web.js", "..", "..", "adapter-web", "src", "bin");
+    case "fake":
+      return resolveAdapterBin(import.meta.url, "inspector-adapter-fake.js", "..", "..", "adapter-fake", "src", "bin");
+    case "cli":
+      return resolveAdapterBin(import.meta.url, "inspector-adapter-cli.js", "..", "..", "cli-adapter", "src", "bin");
+    case "windows":
+      return resolveAdapterBin(import.meta.url, "inspector-adapter-windows.js", "..", "..", "windows-adapter", "src", "bin");
+    case "android":
+      return resolveAdapterBin(import.meta.url, "inspector-adapter-android.js", "..", "..", "android", "src", "bin");
+  }
 }
 
 export interface Workspace {
@@ -90,7 +101,9 @@ export interface AdapterSpawnSpec {
 
 /** Spawn spec for a named adapter; extra env is merged over process.env. */
 export function adapterSpawn(name: string, extraEnv: NodeJS.ProcessEnv = {}): AdapterSpawnSpec {
-  const bin = adapterBin(name === "web" ? "web" : "fake");
+  const bin = adapterBin(
+    name === "cli" || name === "pty" ? "cli" : name === "windows" || name === "uia" ? "windows" : name === "android" ? "android" : name === "web" ? "web" : "fake",
+  );
   return {
     adapterCommand: bin.command,
     adapterArgs: bin.args,

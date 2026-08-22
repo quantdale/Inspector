@@ -28,6 +28,24 @@ export const CLI_CAPABILITIES: CapabilityDoc = {
     lifecycle: ["create", "reset", "close"],
     faults: ["crash"],
     coverage: [],
+    // SPEC-009 W1: terminal vocabulary. Input tokens come ONLY from the
+    // explorer's fixed safe pool — no free-form shell command synthesis.
+    vocabulary: [
+      {
+        kind: "terminal-input",
+        targetScheme: "pty-input",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "Submit a safe keystroke token to the terminal",
+      },
+      {
+        kind: "press",
+        targetScheme: "pty-input",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "Send a control key (e.g. Ctrl-C) to the terminal",
+      },
+    ],
   },
 };
 

@@ -18,7 +18,7 @@ import {
   type OracleSignal,
   type OracleSignalKind,
 } from "@inspector/finding";
-import { ExploreController, WebReplayDriver, mulberry32 } from "@inspector/explore";
+import { ExploreController, WebReplayDriver, runNativeHunt, mulberry32 } from "@inspector/explore";
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
 import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorkspaceConflict } from "./workspace.js";
@@ -27,8 +27,11 @@ import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorksp
 export type ProgressFn = (line: string) => void;
 
 export interface HuntRequest {
-  adapter: "web" | "fake";
+  adapter: "web" | "fake" | "cli" | "windows" | "android";
   targetUrl?: string;
+  /** Native target hint: UIA title substring, android launchPackage, or CLI
+   * program name — interpreted per adapter (SPEC-009 W4). */
+  target?: string;
   seed: number;
   maxActions: number;
   maxMinutes: number;
@@ -71,12 +74,25 @@ const ORACLE_SIGNAL_KINDS: readonly string[] = [
 export function parseHuntRequest(parsed: ParsedInvocation): HuntRequest {
   const adapterRaw = parsed.flags["--adapter"];
   const adapter = adapterRaw === undefined ? "web" : adapterRaw;
-  if (adapter !== "web" && adapter !== "fake") {
-    throw new CliError("invalid-value", `--adapter expects 'web' or 'fake', got '${adapter}'`);
+  if (
+    adapter !== "web" &&
+    adapter !== "fake" &&
+    adapter !== "cli" &&
+    adapter !== "windows" &&
+    adapter !== "android"
+  ) {
+    throw new CliError(
+      "invalid-value",
+      `--adapter expects 'web' | 'fake' | 'cli' | 'windows' | 'android', got '${adapter}'`,
+    );
   }
   const urlRaw = parsed.flags["--url"];
   if (urlRaw !== undefined && adapter !== "web") {
     throw new CliError("invalid-value", "--url is only valid with --adapter web");
+  }
+  const targetRaw = parsed.flags["--target"];
+  if (targetRaw !== undefined && adapter === "web") {
+    throw new CliError("invalid-value", "--target is not valid with --adapter web (use --url)");
   }
   return {
     adapter,
@@ -84,6 +100,7 @@ export function parseHuntRequest(parsed: ParsedInvocation): HuntRequest {
       urlRaw === undefined || typeof urlRaw !== "string"
         ? undefined
         : validateTargetUrl(urlRaw),
+    target: typeof targetRaw === "string" ? targetRaw : undefined,
     seed: intFlag(parsed.flags, "--seed", 7),
     maxActions: intFlag(parsed.flags, "--max-actions", 200),
     maxMinutes: intFlag(parsed.flags, "--max-minutes", 10),
@@ -254,7 +271,53 @@ async function runWebHunt(
   };
 }
 
-/* ------------------------------------------------------------------- *
+/**
+ * SPEC-009 W4: native (non-web) hunts share the fake walker's proven loop
+ * shape but drive ANY adapter through its DECLARED vocabulary via
+ * runNativeHunt. Without a platform-faithful replay driver (web/seeded-mock
+ * only today), native findings stay CANDIDATE — recorded, never confirmed.
+ */
+async function runNativeHuntCommand(
+  run: RunController,
+  store: Store,
+  req: HuntRequest,
+  base: string,
+  progress: ProgressFn,
+): Promise<HuntRunResult> {
+  void base;
+  const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
+  const result = await runNativeHunt(
+    { run, findingEngine },
+    {
+      seed: req.seed,
+      maxActions: req.maxActions,
+      maxWallMs: req.maxMinutes * 60_000,
+      maxFindings: req.maxFindings,
+      noveltyPlateauLimit: 40,
+    },
+  );
+  progress(`native hunt stopped: ${result.stoppedReason}`);
+  return {
+    runId: result.runId,
+    seed: result.seed,
+    stoppedReason: result.stoppedReason,
+    actionsExecuted: result.actionsExecuted,
+    statesVisited: result.statesVisited,
+    resets: 0,
+    anomalyCount: result.anomalies,
+    findings: result.findings,
+    evidenceBundles: result.evidenceBundles,
+    findingOutcomes: result.findingOutcomes.map((o) => ({
+      classKey: o.classKey,
+      outcome: o.outcome,
+      ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      ...(o.findingId !== undefined ? { findingId: o.findingId } : {}),
+    })),
+    warnings: result.warnings,
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * Fake hunt: deterministic seeded walk over the fake adapter's state   *
  * machine. The generic inventory cannot drive the fake vocabulary      *
  * (openForm/fillField/submit), so the walker drives it directly and    *
@@ -578,14 +641,37 @@ export async function huntCommand(
     // lifecycle create itself, and the web adapter bin reads this env var as
     // its constructor-level default target.
     const webTarget = req.adapter === "web" && req.targetUrl !== undefined;
+    const isNative =
+      req.adapter === "cli" || req.adapter === "windows" || req.adapter === "android";
     const spawnSpec = webTarget
       ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
       : adapterSpawn(req.adapter);
+    let createOptions: Record<string, unknown> | undefined;
+    let spawnEnvDelta: NodeJS.ProcessEnv | undefined;
+    if (isNative) {
+      if (req.adapter === "windows" && req.target !== undefined) {
+        createOptions = { titleContains: req.target, timeoutMs: 30000 };
+      } else if (req.adapter === "android") {
+        // Default to Android Settings: an independently developed, always-
+        // present target on any AVD; --target overrides.
+        createOptions = { launchPackage: req.target ?? "com.android.settings" };
+        spawnEnvDelta = { INSPECTOR_ANDROID_LAUNCH_PACKAGE: req.target ?? "com.android.settings" };
+      } else if (req.adapter === "cli") {
+        spawnEnvDelta = {
+          // Real ConPTY is required for a genuine TUI exploration proof.
+          INSPECTOR_PTY: "real",
+          ...(req.target !== undefined ? { INSPECTOR_CLI_PROGRAM: req.target } : {}),
+          INSPECTOR_CLI_CWD: join(base, "pty-cwd"),
+        };
+      }
+    }
     try {
       run = await mgr.startRun({
         ...spawnSpec,
         // Persisted so runs resume re-creates the SAME target, never the default.
         ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
+        ...(createOptions ? { createOptions } : {}),
+        ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
       });
     } catch (e) {
       throw remapWorkspaceConflict(e);
@@ -594,7 +680,9 @@ export async function huntCommand(
     const result =
       req.adapter === "web"
         ? await runWebHunt(run, store, req, base, ctx.progress)
-        : await runFakeHunt(run, store, req, ctx.progress);
+        : isNative
+          ? await runNativeHuntCommand(run, store, req, base, ctx.progress)
+          : await runFakeHunt(run, store, req, ctx.progress);
 
     const bundlePaths = writeEvidenceBundles(base, result.runId, result.evidenceBundles);
     const errorOutcomes = result.findingOutcomes.filter((o) => o.outcome === "error");

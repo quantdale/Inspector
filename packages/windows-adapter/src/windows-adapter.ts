@@ -29,6 +29,25 @@ export const WINDOWS_CAPABILITIES: CapabilityDoc = {
     lifecycle: ["create", "reset", "close"],
     faults: ["crash"],
     coverage: [],
+    // SPEC-009 W1: semantic vocabulary. click maps to UIA InvokePattern,
+    // fill maps to ValuePattern SetValue; targets are addressed by UIA
+    // runtime id (mock backends use their stable control ids).
+    vocabulary: [
+      {
+        kind: "click",
+        targetScheme: "uia-runtime-id",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "InvokePattern.Invoke on an invokable control",
+      },
+      {
+        kind: "fill",
+        targetScheme: "uia-runtime-id",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "ValuePattern.SetValue on an edit control",
+      },
+    ],
   },
 };
 
@@ -82,13 +101,37 @@ export class WindowsAdapterHandler implements AdapterHandler {
     options?: Record<string, unknown>;
   }): Promise<{ ok: boolean; window?: { pid: number; title: string } }> {
     switch (params.op) {
-      case "create":
+      case "create": {
+        // Optional targeted attach: when the operator names a window (title
+        // substring or pid) and the backend supports window ops, attach to
+        // THAT window so exploration cannot drift onto an unrelated one.
+        const createOpts = params.options ?? {};
+        const winOps = this.backend as Partial<UiaBackendWindowOps>;
+        const titleContains =
+          typeof createOpts.titleContains === "string"
+            ? createOpts.titleContains
+            : undefined;
+        const pid = typeof createOpts.pid === "number" ? createOpts.pid : undefined;
+        if ((titleContains !== undefined || pid !== undefined) && typeof winOps.waitForWindow === "function") {
+          const win = await winOps.waitForWindow({
+            pid,
+            titleContains,
+            timeoutMs:
+              typeof createOpts.timeoutMs === "number"
+                ? createOpts.timeoutMs
+                : undefined,
+          });
+          if (typeof (this.backend as { attach?: unknown }).attach === "function") {
+            await (this.backend as unknown as { attach(p: { pid?: number }): Promise<void> }).attach({ pid: win.pid });
+          }
+        }
         // Probe the backend so create fails for a dead UIA client instead of
         // reporting a successfully created environment that cannot be sensed.
         await this.backend.tree();
         this.created = true;
         this.applyAttribution(params.options);
         return { ok: true };
+      }
       case "reset":
         await this.backend.reset();
         this.created = true;
@@ -119,6 +162,47 @@ export class WindowsAdapterHandler implements AdapterHandler {
   async observe(params: { observe?: string[] } = {}): Promise<Observation> {
     if (!this.created) throw new Error("environment not created");
     void params;
+    // Rich path: when the backend exposes pattern-level detail (real UIA),
+    // project it so the explorer can distinguish invokable/toggleable/editable
+    // controls instead of guessing from control type alone.
+    const rich = this.backend as Partial<{ richTree(): Promise<{ pid?: number; nodes: Array<import("./types.js").UiaNode & { patterns?: string[]; automationId?: string; name?: string }> }> }>;
+    if (typeof rich.richTree === "function") {
+      const tree = await rich.richTree();
+      const uiTree = tree.nodes.map((n) => {
+        const label = n.name ?? n.text ?? "";
+        return {
+          tag: "control",
+          role:
+            n.type === "Button" ? "button" : n.type === "Edit" ? "input" : "text",
+          name: label || n.id,
+          id: n.id,
+          hidden: false,
+          disabled: !n.enabled,
+          value:
+            n.type === "Edit"
+              ? (isSensitiveKey(n.automationId || n.id) ? REDACTED : label)
+              : undefined,
+          text: n.type === "Edit" ? undefined : label,
+          ...(Array.isArray(n.patterns) && n.patterns.length > 0
+            ? { patterns: n.patterns }
+            : {}),
+        };
+      });
+      return {
+        id: newId("obs"),
+        runId: this.runId,
+        environmentId: this.environmentId,
+        sequence: this.seq++,
+        source: "adapter-windows-uia",
+        capturedAt: new Date().toISOString(),
+        summary: {
+          url: `windows://pid/${tree.pid ?? "unknown"}`,
+          title: tree.nodes[0]?.text ?? "",
+          uiTree,
+          storage: {},
+        },
+      };
+    }
     const nodes = await this.backend.tree();
     const uiTree = nodes.map((n) => ({
       tag: "control",

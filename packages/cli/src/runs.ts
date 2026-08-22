@@ -11,6 +11,9 @@ import { adapterSpawn, openWorkspace, remapWorkspaceConflict, type AdapterSpawnS
 export function spawnForStoredAdapter(adapter: string | null): AdapterSpawnSpec | null {
   if (adapter === "adapter-fake") return adapterSpawn("fake");
   if (adapter === "web-playwright") return adapterSpawn("web");
+  if (adapter === "cli-pty") return adapterSpawn("cli");
+  if (adapter === "windows-uia") return adapterSpawn("windows");
+  if (adapter === "android-uiautomator") return adapterSpawn("android");
   return null;
 }
 

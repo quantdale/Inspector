@@ -41,6 +41,32 @@ export const ANDROID_CAPABILITIES: CapabilityDoc = {
     lifecycle: ["create", "reset", "close"],
     faults: ["crash"],
     coverage: [],
+    // SPEC-009 W1: semantic vocabulary. Targets are addressed by the short
+    // resource-id (after ":id/"). BACK is a plain keyevent; lifecycle
+    // restart/kill stays OUT of the autonomous vocabulary.
+    vocabulary: [
+      {
+        kind: "click",
+        targetScheme: "android-resource-id",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "Tap the center of an id-bearing visible element",
+      },
+      {
+        kind: "fill",
+        targetScheme: "android-resource-id",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "Tap an edit field then type a value",
+      },
+      {
+        kind: "press",
+        targetScheme: "android-resource-id",
+        risk: "interact",
+        autonomousEligible: true,
+        description: "Keyevent; BACK (4) is the explorer-sanctioned value",
+      },
+    ],
   },
 };
 

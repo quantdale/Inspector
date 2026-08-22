@@ -186,7 +186,14 @@ export class MockUiaBackend implements UiaBackend, UiaBackendWindowOps {
       enabled: n.enabled,
       offscreen: false,
       rect: null,
-      patterns: [],
+      // Honest mock patterns mirroring what real UIA reports for these
+      // control types: Buttons are invokable, Edits expose ValuePattern.
+      patterns:
+        n.type === "Button"
+          ? ["InvokePatternIdentifiers.Pattern"]
+          : n.type === "Edit"
+            ? ["ValuePatternIdentifiers.Pattern"]
+            : [],
     }));
   }
 
