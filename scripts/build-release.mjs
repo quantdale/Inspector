@@ -86,7 +86,12 @@ const meta = {
   version,
   description:
     "Inspector: autonomous, durable, typed environment inspection and defect discovery (CLI distribution).",
-  license: "MIT",
+  // License TRUTH (Phase 9): the repository grants NO license (see README
+  // 'License': no open-source license selected, all rights reserved). The
+  // artifact must never claim MIT or any other grant. UNLICENSED is npm's
+  // factual designation for a package that does not grant usage rights.
+  license: "UNLICENSED",
+  private: true,
   type: "module",
   engines: { node: ">=22" },
   bin: { inspector: "bundle/inspector-cli.js" },
