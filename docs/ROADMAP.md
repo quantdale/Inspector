@@ -30,7 +30,8 @@ Deliverables:
 
 Exit gate: a deterministic fake environment executes typed observe/action loops, persists ordered events, survives crash/restart, classifies unknown action outcomes safely, and passes specification acceptance tests.
 
-Current status: **ACTIVE — implementation not yet started; begin F0.**
+Current status: **COMPLETE** (M0–M7 all COMPLETE; see `docs/STATUS.md` and
+`.inspector/state/campaign.yaml` for the authoritative ledger).
 
 ## M1 — Web sensing and acting
 

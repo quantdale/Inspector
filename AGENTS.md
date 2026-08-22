@@ -4,7 +4,10 @@ This file is the operating contract for autonomous coding agents working on Insp
 
 ## Campaign mode
 
-The repository is currently in **IMPLEMENTATION CAMPAIGN** mode.
+The repository is currently in **RC1_FIELD_VALIDATION (GA readiness)** mode:
+field-validating the RC1 release candidate, producing a GA go/no-go decision,
+and then continuing product development. The implementation campaign itself is
+COMPLETE (M0–M7; M8 iOS `DEFERRED_ENVIRONMENT`).
 
 The intent is unattended forward development: continue implementing the roadmap without waiting for routine human approval. Deep audits, broad refactors whose only purpose is cleanup, exhaustive fuzzing, and other hardening-only work belong to a separately invoked hardening campaign.
 
