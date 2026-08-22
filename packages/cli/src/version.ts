@@ -5,18 +5,27 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Resolve the Inspector version from package.json at runtime (relative to this
- * source file), preferring the repository root manifest and falling back to
- * this package's own manifest. Never throws: an unreadable tree yields a
- * dev placeholder instead of failing `--version`.
+ * Resolve the Inspector version at runtime.
+ *
+ * Precedence is deliberate:
+ * 1. The build-stamped `inspector-version.txt` sitting next to the bundled
+ *    entry — the authoritative version of an installed artifact. It MUST be
+ *    consulted first: ambient package.json files above/beside the install
+ *    location (a consumer's own manifest, a global prefix root) would
+ *    otherwise be picked up and report a foreign version.
+ * 2. The repository root manifest (dev checkout, three directories up).
+ * 3. This package's own manifest (source-tree fallback).
+ *
+ * Never throws: an unreadable tree yields a dev placeholder instead of
+ * failing `--version`.
  */
 export function resolveVersion(): string {
   for (const candidate of [
-    join(here, "..", "..", "..", "package.json"),
-    join(here, "..", "package.json"),
     // Installed artifact: the build stamps the release version next to the
     // bundles; absent in dev checkouts.
     join(here, "inspector-version.txt"),
+    join(here, "..", "..", "..", "package.json"),
+    join(here, "..", "package.json"),
   ]) {
     try {
       if (candidate.endsWith(".txt")) {
