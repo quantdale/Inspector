@@ -360,3 +360,37 @@ Modified:
 - Gates after fixes: lint 0 errors (4 pre-existing warnings); typecheck
   exit 0; unit 474 passed / 3 skipped; window-classification + cli +
   real-uia integration green post-fix.
+
+### Finalization session (Phase 21-23)
+
+- Phase 8 (version coherence) DEFECT FOUND AND FIXED during artifact install
+  proof: resolveVersion() probed ambient package.json files before the
+  stamped version file, so an installed artifact reported the CONSUMER's
+  manifest version ('1.0.0'). Stamped inspector-version.txt is now
+  authoritative; regression coverage in packages/cli/src/version.test.ts.
+- Phase 9 (license truth): repository grants NO license (README explicit);
+  generated artifact metadata corrected from false 'MIT' claim to
+  UNLICENSED + private. Dependency licenses inventoried: 48 prod packages,
+  all permissive, zero copyleft.
+- Phase 11-16 proofs from the INSTALLED tarball outside the source tree:
+  install 49 prod deps / 0 vulnerabilities; --version coherent; doctor all
+  core probes PASS from bundle layout; fake hunt + interrupted-run resume
+  (15,674 steps preserved); REAL web hunt against independent Backbone
+  TodoMVC via Chromium (120 actions / 29 states / clean shutdown);
+  upgrade proof on genuine pre-RC dogfood state (2.4MB runs.db readable,
+  CONFIRMED findings shown, new hunt succeeds); uninstall clean with zero
+  orphan processes/locks.
+- Install-flow defect fixed: folder-form `npm install -g <dir>` skips prod
+  dependencies on current npm; builder now emits the npm tarball itself and
+  INSTALL.txt prescribes the tarball flow.
+- Phase 17: pnpm audit --prod CLEAN (0 known vulnerabilities); dev-toolchain
+  findings (vitest/vite/esbuild) reviewed and classified non-blocking.
+- Phase 18: CycloneDX 1.6 SBOM generated from the installed tree
+  (.inspector/rc-work/rc1-sbom.cdx.json).
+- Phase 19 reproducibility QUALIFIED PASS: two independent clean clones @
+  frozen lockfile — tarball byte-identical; zip extracted contents identical
+  (18/18), archive metadata differs.
+- Docs finalized: RELEASE-NOTES-RC1.md (FINAL), STATUS.md, README unchanged
+  (already accurate), RC1-RELEASE-MANIFEST.md created.
+- Remaining: full exact-SHA gate rerun on this finalization commit, then
+  tag v0.1.0-rc.1 at HEAD and push; final state commit records tag_status.

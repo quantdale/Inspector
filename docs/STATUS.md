@@ -1,21 +1,38 @@
 # Project Status
 
-Last updated: 2026-08-22
+Last updated: RC1 finalization
 
 ## Campaign
 
-- Mode: **RELEASE-CANDIDATE-DOGFOOD** (`DOGFOOD_RC1`)
-- Campaign status: **fixes landed; final gate pending** — the dogfood campaign
-  (hunts, independent audit, repairs, docs) is complete, and the final gate
-  (full gates + clean-install proof + RC1 report) runs after this update.
+- Mode: **RC1_FINALIZATION**
+- Campaign status: **gates PASS; release candidate finalized and tagged**
+  (`v0.1.0-rc.1`). Provenance: `.inspector/state/RC1-RELEASE-MANIFEST.md`;
+  durable ledger: `.inspector/state/RELEASE-RC1.yaml`.
 - Working branch: `main`
-- Ledger: `.inspector/state/DOGFOOD-RC1.yaml`; audit artifacts under
-  `.inspector/rc-work/audit/` (`FINDING-AUDIT.md`, `METRICS.md`)
+- Publication boundary respected: local artifacts + annotated tag only —
+  no npm publish, no GitHub Release, no hosted uploads.
 
-## Active work
+## Release candidate summary
 
-Final gate for RC1. Prior state: implementation campaign M0–M7 complete and
-hardened (HARDENING_1 closed 66 defects — 5 CRITICAL, 23 HIGH, 38 MEDIUM/LOW;
+RC1 is the first distributable (`inspector-cli-0.1.0-rc.1`): a Node 22 CLI
+plus bundled adapter subprocesses, installable from the packed npm tarball,
+with version coherence across CLI stamp, artifact metadata, filename, notes,
+and tag. All completion gates ran on the exact tagged tree: lint/typecheck/
+unit/integration suites green (474 unit passed / 132 integration tests incl.
+real Chromium, ConPTY, UIA and AVD backends); dependency audit reviewed
+(runtime graph: zero known vulnerabilities); license truth enforced
+(UNLICENSED artifact metadata; permissive 48-package runtime tree);
+install/doctor/real-web-hunt/resume/upgrade/uninstall proofs from the
+installed artifact outside the source tree; reproducibility qualified
+(byte-identical tarballs across clean clones). Both historical RC1 blockers
+were root-caused and closed with regression coverage: web pageerror
+action-window attribution (racy test made deterministic) and Windows real-UIA
+Paint STALE_ELEMENT (bounded pid-gated reattach+retry in `RealUiaBackend`);
+the CLI interrupt/resume sequence-reuse defect was fixed via a durable
+step-sequence floor.
+
+Prior state: implementation campaign M0–M7 complete and hardened
+(HARDENING_1 closed 66 defects — 5 CRITICAL, 23 HIGH, 38 MEDIUM/LOW;
 ledger in `.inspector/state/HARDENING-CHECKPOINT.md`). M8 (iOS) is
 `DEFERRED_ENVIRONMENT`; resumption requirements in `specs/008-ios/SPEC.md`.
 

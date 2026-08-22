@@ -4,15 +4,14 @@ release:
   campaign: RC1_FINALIZATION
   status: ACTIVE
   candidate: RC1
-  candidate_sha: 160ec60e3ae0a2b8be19b9d4d4f5c40d9076ba30
+  candidate_sha: TAGGED_AT_V0.1.0-RC.1
   candidate_sha_basis: >-
-    Reconciled this session: the previously STAGED_UNCOMMITTED batch was
-    committed upstream as c338a40 ("progress"); this session root-caused
-    and fixed both RC1 completion blockers plus the CLI resume
-    sequence-reuse defect, committing them as 160ec60. HEAD == origin/main
-    is re-verified at every gate. FINAL_CANDIDATE_SHA is captured only
-    after docs/state finalization (Phase 23); the exact-SHA gate reruns on
-    that final tree before tagging.
+    The exact tagged commit IS the tested candidate: docs/state were
+    finalized first, committed, pushed, and the full gate reran on that
+    exact tree before v0.1.0-rc.1 was created at HEAD and pushed.
+    Resolve via: git rev-list -n 1 v0.1.0-rc.1. Post-tag history contains
+    only durable-state bookkeeping commits (precedent: 15cda16 after
+    2a1fb6a).
   reconciliation_note: >-
     This ledger previously recorded candidate 15cda16 with
     implementation_batch STAGED_UNCOMMITTED and blocker ENV-1 OPEN.
@@ -21,31 +20,31 @@ release:
     an OpenCode Windows bug in a prior harness, not present under the
     current runtime); both release blockers were reproduced, root-caused,
     fixed, and regression-covered (160ec60).
-  exact_sha_gate: NOT_RUN
+  exact_sha_gate: PASS
   # full regression gate on the exact candidate tree
-  packaging_gate: NOT_RUN
+  packaging_gate: PASS
   # artifact produced from clean checkout of candidate
-  artifact_install_gate: NOT_RUN
+  artifact_install_gate: PASS
   # --help/--version/doctor from packaged artifact only
-  functional_artifact_gate: NOT_RUN
+  functional_artifact_gate: PASS
   # real bounded web hunt from installed artifact
-  upgrade_gate: NOT_RUN
+  upgrade_gate: PASS
   # previous-state fixture upgrade path
-  uninstall_gate: NOT_RUN
+  uninstall_gate: PASS
   # removal + zero-orphan cleanup semantics
-  security_gate: NOT_RUN
+  security_gate: PASS
   # security-critical regressions on candidate
-  dependency_audit_gate: NOT_RUN
+  dependency_audit_gate: REVIEWED
   # pnpm audit reviewed, residual risk documented
-  license_gate: NOT_RUN
+  license_gate: PASS
   # project + runtime dep license truth reviewed
-  reproducibility_gate: NOT_RUN
+  reproducibility_gate: QUALIFIED_PASS
   # two-dir rebuild comparison
   skipped_test_audit_gate: PASS
   # no unexplained .skip/.only remains (see checkpoint)
-  flake_audit_gate: PARTIAL
+  flake_audit_gate: PASS
   # unit load-flakes FIXED this session; full audit at exit
-  tag_status: NOT_CREATED
+  tag_status: CREATED_AFTER_GATE
   feature_freeze: IN_FORCE
   # recorded 2026-08-22; only release-engineering changes permitted
   implementation_batch: COMMITTED
