@@ -4,70 +4,116 @@ release:
   campaign: RC1_FINALIZATION
   status: ACTIVE
   candidate: RC1
-  candidate_sha: 15cda16421dffec69b988f578f9dba6168e449c6
+  candidate_sha: 160ec60e3ae0a2b8be19b9d4d4f5c40d9076ba30
   candidate_sha_basis: >-
-    HEAD == origin/main at campaign start (2026-08-22). SHA ambiguity from the
-    dogfood report resolved: 15cda16 ("state: record RC1 verified commit ...")
-    is a linear descendant of the verified 2a1fb6a and changes ONLY
-    .inspector/state/campaign.yaml and docs/DOGFOOD-RC1-REPORT.md (state/docs
-    checkpoint; merge-base(2a1fb6a,15cda16)==2a1fb6a). No production code or
-    tests changed between them. 15cda16 is therefore the authoritative
-    starting candidate revision. Any release-blocker fix creates a NEW
-    candidate SHA; final gates rerun on the final SHA before tagging.
-  exact_sha_gate: NOT_RUN          # full regression gate on the exact candidate tree
-  packaging_gate: NOT_RUN          # artifact produced from clean checkout of candidate
-  artifact_install_gate: NOT_RUN   # --help/--version/doctor from packaged artifact only
-  functional_artifact_gate: NOT_RUN # real bounded web hunt from installed artifact
-  upgrade_gate: NOT_RUN            # previous-state fixture upgrade path
-  uninstall_gate: NOT_RUN          # removal + zero-orphan cleanup semantics
-  security_gate: NOT_RUN           # security-critical regressions on candidate
-  dependency_audit_gate: NOT_RUN   # pnpm audit reviewed, residual risk documented
-  license_gate: NOT_RUN            # runtime dep license inventory reviewed
-  reproducibility_gate: NOT_RUN    # two-dir rebuild comparison
-  skipped_test_audit_gate: NOT_RUN # no unexplained .skip/.only remains
-  flake_audit_gate: NOT_RUN        # environmental flakes classified
+    Reconciled this session: the previously STAGED_UNCOMMITTED batch was
+    committed upstream as c338a40 ("progress"); this session root-caused
+    and fixed both RC1 completion blockers plus the CLI resume
+    sequence-reuse defect, committing them as 160ec60. HEAD == origin/main
+    is re-verified at every gate. FINAL_CANDIDATE_SHA is captured only
+    after docs/state finalization (Phase 23); the exact-SHA gate reruns on
+    that final tree before tagging.
+  reconciliation_note: >-
+    This ledger previously recorded candidate 15cda16 with
+    implementation_batch STAGED_UNCOMMITTED and blocker ENV-1 OPEN.
+    Repository reality superseded all three: c338a40 landed the staged
+    batch; this session's shell works (ENV-1 CLOSED - the old failure was
+    an OpenCode Windows bug in a prior harness, not present under the
+    current runtime); both release blockers were reproduced, root-caused,
+    fixed, and regression-covered (160ec60).
+  exact_sha_gate: NOT_RUN
+  # full regression gate on the exact candidate tree
+  packaging_gate: NOT_RUN
+  # artifact produced from clean checkout of candidate
+  artifact_install_gate: NOT_RUN
+  # --help/--version/doctor from packaged artifact only
+  functional_artifact_gate: NOT_RUN
+  # real bounded web hunt from installed artifact
+  upgrade_gate: NOT_RUN
+  # previous-state fixture upgrade path
+  uninstall_gate: NOT_RUN
+  # removal + zero-orphan cleanup semantics
+  security_gate: NOT_RUN
+  # security-critical regressions on candidate
+  dependency_audit_gate: NOT_RUN
+  # pnpm audit reviewed, residual risk documented
+  license_gate: NOT_RUN
+  # project + runtime dep license truth reviewed
+  reproducibility_gate: NOT_RUN
+  # two-dir rebuild comparison
+  skipped_test_audit_gate: PASS
+  # no unexplained .skip/.only remains (see checkpoint)
+  flake_audit_gate: PARTIAL
+  # unit load-flakes FIXED this session; full audit at exit
   tag_status: NOT_CREATED
-  feature_freeze: IN_FORCE         # recorded 2026-08-22; only release-engineering changes permitted
-  implementation_batch: STAGED_UNCOMMITTED  # REL-FIX-1 + PACK-FIX-1/2 + build tooling; code-complete, UNVERIFIED (ENV-1)
-  next_candidate_basis: >-
-    Next candidate SHA = post-commit HEAD of the staged implementation batch;
-    final gate (Phase 30) reruns on that exact tree before any tag.
-  publish_status: NOT_AUTHORIZED   # never publish without explicit operator authorization
-  version_scheme: TBD              # decided by Phase 5 audit (semver pre-release expected)
+  feature_freeze: IN_FORCE
+  # recorded 2026-08-22; only release-engineering changes permitted
+  implementation_batch: COMMITTED
+  # c338a40 ("progress") audited; blocker fixes in 160ec60
+  publish_status: NOT_AUTHORIZED
+  # never publish without explicit operator authorization
+  version_scheme: >-
+    Workspace manifests stay 0.1.0/private; the shipped artifact reports
+    0.1.0-rc.1 via the packaging definition (stamped inspector-version.txt
+    + generated meta package.json). Coherence verified across
+    --version/artifact filename/notes/tag before tagging.
   artifact_dir: dist-release/
+  # generated, gitignored (Phase 3 policy decision)
   environment:
     node: v22.23.2
     pnpm: 9.15.9
     os: Windows 11 (MINGW64_NT-10.0-26200 x86_64)
     git: git version 2.55.0.windows.3
 
-# Completed campaigns below are historical record only — DO NOT reopen.
-implementation_status: COMPLETE   # M0-M7 complete; M8 DEFERRED_ENVIRONMENT (unchanged)
-hardening_1_status: COMPLETE      # .inspector/state/HARDENING-CHECKPOINT.md
-dogfood_rc1_status: COMPLETE      # verified_commit 2a1fb6a; see campaign.yaml dogfood block
-
 blockers:
   - id: ENV-1
     opened: "2026-08-22"
+    closed: "this session"
     kind: environment
     detail: >-
-      Shell/tool bridge failure: every bash/devcontainer invocation fails
-      pre-execution with 'The "paths[0]" property must be of type string,
-      got undefined' (reproduced from a fresh subagent context). Gates,
-      git mutations, packaging, and install proofs are deferred; read-only
-      audit phases continue via file tools.
-    remedy: >-
-      Upstream OpenCode Windows bug (anomalyco/opencode#17458 class) — not
-      locally patchable. Recovery staged: restart opencode once so the staged
-      `shimshell` recovery tool loads (global + project tool dirs), then run
-      the catch-up runbook via shimshell; optional escalation: wire
-      plugin/bash-fix.ts into opencode.jsonc or upgrade opencode when the
-      upstream fix ships.
+      CLOSED: shell/tool bridge fully functional in the current runtime.
+      The recorded failure ('paths[0]' ERR_INVALID_ARG_TYPE in every bash
+      invocation) was an OpenCode Windows bug in the prior harness
+      process; the current session executes commands normally. No remedy
+      required.
+  - id: WEB-K1
+    opened: "2026-08-22"
+    closed: "this session"
+    kind: test-determinism
+    detail: >-
+      CLOSED: pageerror-during-failing-action classification. Root cause
+      was a racy TEST (crash timer 25ms vs act-entry latency), not a
+      product defect - when the crash landed pre-window it was correctly
+      unattributed per the K2 discipline. Test made deterministic (crash
+      at 2s inside a ~10.5s click window); product code unchanged.
+      Evidence: failed once in rc-work final-integration.log; green 3x
+      isolated + full-suite green on c338a40; post-fix green 5x isolated
+      + suite-load green.
+  - id: WIN-UIA-PAINT
+    opened: "2026-08-22"
+    closed: "this session"
+    kind: product-lifecycle
+    detail: >-
+      CLOSED: real UIA Paint 'STALE_ELEMENT: attached window is gone'.
+      Root cause: Win11 Paint rehosts/destroys its top-level HWND
+      mid-session while the pid stays alive; cached-window ops then fail.
+      Product fix in RealUiaBackend: one bounded reattach+retry for
+      ROOT-level staleness only, gated on pid liveness + surviving
+      top-level window; element-level staleness never retried; dead
+      targets stay DEAD_WINDOW. Regression coverage:
+      windows.stale-window.test.ts. Post-fix: real-Paint integration
+      green repeatedly incl. suite load.
+
 notes:
   - >-
-    Release engineering only: blockers/packaging/install/upgrade/uninstall/
-    security/license/reproducibility/docs fixes. No new features, no new
-    hardening campaign, no M8 work.
+    Release engineering only: blockers/packaging/install/upgrade/
+    uninstall/security/license/reproducibility/docs fixes. No new
+    features, no new hardening campaign, no M8 work.
   - >-
     Publication boundary: local artifacts + tag push only. No npm publish,
     no GitHub Release, no hosted uploads.
+
+# Completed campaigns below are historical record only — DO NOT reopen.
+implementation_status: COMPLETE
+hardening_1_status: COMPLETE
+dogfood_rc1_status: COMPLETE

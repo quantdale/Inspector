@@ -204,6 +204,7 @@ the same root cause. Every changed file was re-read and manually reviewed.
 Verification debt lands in the catch-up runbook below.
 
 New files:
+
 - `packages/adapter-sdk/src/bin-resolve.ts` — `pickAdapterBinFile` (pure 3-tier
   layout decision: bundled sibling -> compiled .js -> ts source) +
   `resolveAdapterBin` (adds node command; absolute tsx loader for source picks)
@@ -217,6 +218,7 @@ New files:
 - `docs/RELEASE-NOTES-RC1.md` (DRAFT)
 
 Modified:
+
 - 6 adapter indexes now resolve their bin through the shared resolver
   (adapter-fake/-web/-cli/-windows/-android/-electron), replacing hard-wired
   `--import tsx <here>/bin.ts`
@@ -307,3 +309,54 @@ Modified:
   completed read-only (sections above); identified PACK-FIX-1/2 release-
   scoped code items (shared adapter-bin resolver; workspace/doctor path
   decoupling from checkout layout).
+
+## Session continuation log — RC1 resume (blockers closed)
+
+### Reconciliation and blocker-fix session
+
+- Rehydrated per AGENTS.md order. HEAD == origin/main == c338a40 ("progress");
+  branch topology clean (local main only; origin/main + origin/HEAD only).
+  Working tree clean at start.
+- STALE LEDGER RECONCILED: the implementation batch recorded as
+  STAGED_UNCOMMITTED is COMMITTED as c338a40. ENV-1 CLOSED — the shell/tool
+  bridge works in the current runtime (the old failure was an OpenCode
+  Windows bug in the prior harness process). RELEASE-RC1.yaml rewritten to
+  reality; candidate_sha advanced to the blocker-fix commit.
+- c338a40 AUDITED (Phase 2): bin-resolve 3-tier layout pick preserves dev
+  tsx behavior; six adapter indexes + workspace.ts route through it; doctor
+  probes lazy/layout-safe; version resolution gains stamped artifact file;
+  manifests add previously-undeclared workspace deps (declaration-only);
+  lockfile regenerated accordingly; eslint ignores .opencode agent tooling.
+  No runtime weakening found — source-tier spawn behavior is byte-equivalent
+  to the prior hard-coded path.
+- FULL INTEGRATION SUITE on c338a40 (pre-fix baseline): 27 files / 132 tests
+  ALL GREEN in this environment. The two recorded blockers are intermittent,
+  not deterministic — but were reproduced during targeted rechecks:
+  - WEB-K1 reproduced under back-to-back load context (historical evidence
+    rc-work/final-integration.log); root cause = racy test construction
+    (crash timer 25ms vs act-entry latency). FIXED deterministically;
+    product classification code unchanged (K2 discipline already correct).
+  - WIN-UIA-PAINT root-caused as Win11 Paint HWND rehost mid-session with
+    pid alive. Product fix: bounded single reattach+retry for ROOT-level
+    staleness only, pid-liveness gated; element staleness never retried;
+    dead targets stay DEAD_WINDOW. New regression file
+    windows.stale-window.test.ts (8 cases).
+- CLI INTERRUPT/RESUME RACE (Phase 6) REPRODUCED (~1-in-3 full-file runs)
+  and ROOT-CAUSED: kill between commitStep(N) and checkpoint write leaves
+  checkpoint stepSeq lagging durable steps; resume reused a persisted
+  sequence -> UNIQUE(run_id, sequence) failure on re-observation.
+  FIXED: Store.maxRunStepSequence() is the authoritative floor for
+  RunController step sequencing. Regressions: hardening C5b, store H10b.
+  Post-fix: full cli.integration.test.ts green 4x consecutive.
+- UNIT LOAD FLAKES (Phase 20 class): worktree.hardening (git ops),
+  channel-fuzz (child channels), web.target-url (cold Chromium init)
+  exceeded 5s defaults under unbounded fork fan-out. FIXED via calibrated
+  unit config (testTimeout 15s, maxForks 6) + explicit 30s initialize
+  budget in target-url test. All green isolated AND under load post-fix.
+- GENERATED ARTIFACT POLICY (Phase 3): dist-release/ UNTRACKED + gitignored.
+  Committing bundles broke `pnpm lint` outright (239 no-undef errors from
+  generated JS) — tracked artifacts are anti-policy. Artifacts regenerate
+  from the exact tagged SHA; provenance lives here and in release docs.
+- Gates after fixes: lint 0 errors (4 pre-existing warnings); typecheck
+  exit 0; unit 474 passed / 3 skipped; window-classification + cli +
+  real-uia integration green post-fix.
