@@ -1,7 +1,12 @@
-import { Store, type ActionRecord } from "@inspector/store-sqlite";
-import { ArtifactStore } from "@inspector/artifact-store";
+import type { Store, ActionRecord } from "@inspector/store-sqlite";
+import type { ArtifactStore } from "@inspector/artifact-store";
 import { AdapterClient } from "@inspector/adapter-sdk";
-import { PolicyEngine, DEFAULT_POLICY, type Policy, type PolicyDecision } from "./policy.js";
+import {
+  PolicyEngine,
+  DEFAULT_POLICY,
+  type Policy,
+  type PolicyDecision,
+} from "./policy.js";
 import { parseActionOutcome, parseAdapterObservation } from "./validation.js";
 import { newId, type ActionOutcomeStatus } from "@inspector/protocol";
 import type {
@@ -89,6 +94,14 @@ export class RunController {
         this.stepSeq = 0;
       }
     }
+    // Sequence numbers are monotonic per run across restarts. The checkpoint
+    // is written AFTER each step commits, so a hard kill between the two
+    // leaves the checkpoint lagging the durable step table; trusting it alone
+    // would reuse an occupied sequence and violate UNIQUE(run_id, sequence)
+    // on the resumed run's first observation (observed as resume failures on
+    // Windows). The step table is authoritative for the floor.
+    const persistedMax = store.maxRunStepSequence(ctx.runId);
+    if (persistedMax > this.stepSeq) this.stepSeq = persistedMax;
     // Budgets survive restarts: a fresh engine must inherit the durable
     // action count instead of starting from zero.
     this.engine.seedActionCount(store.countRunActions(ctx.runId));
@@ -164,11 +177,18 @@ export class RunController {
 
     let rawOutcome: unknown;
     try {
-      rawOutcome = await this.ctx.adapter.request("act", { action }, action.deadlineMs);
+      rawOutcome = await this.ctx.adapter.request(
+        "act",
+        { action },
+        action.deadlineMs,
+      );
     } catch (err) {
       // Adapter crash / deadline exceeded: leave the action pending for recovery.
       this.checkpoint();
-      return { kind: "adapter-error", error: err instanceof Error ? err.message : String(err) };
+      return {
+        kind: "adapter-error",
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
 
     // ADR 0002: validate the outcome before any persistence; on failure the
@@ -291,7 +311,9 @@ export class RunManager {
     if (!opened.allowed) {
       this.store.setRunStatus(runId, "failed");
       this.store.setEnvironmentStatus(envId, "failed");
-      throw new Error(opened.reason ?? "environment concurrency budget exceeded");
+      throw new Error(
+        opened.reason ?? "environment concurrency budget exceeded",
+      );
     }
     let adapter: AdapterClient | null = null;
     try {
@@ -334,7 +356,11 @@ export class RunManager {
    */
   async resumeRun(
     runId: string,
-    opts: { adapterCommand: string; adapterArgs?: string[]; adapterEnv?: NodeJS.ProcessEnv },
+    opts: {
+      adapterCommand: string;
+      adapterArgs?: string[];
+      adapterEnv?: NodeJS.ProcessEnv;
+    },
   ): Promise<RunController> {
     const run = this.store.getRun(runId);
     if (!run) throw new Error(`run not found: ${runId}`);
@@ -344,7 +370,9 @@ export class RunManager {
     if (!env) throw new Error(`no environment for run: ${runId}`);
     const opened = this.engine.openEnvironment();
     if (!opened.allowed) {
-      throw new Error(opened.reason ?? "environment concurrency budget exceeded");
+      throw new Error(
+        opened.reason ?? "environment concurrency budget exceeded",
+      );
     }
     let adapter: AdapterClient | null = null;
     try {
@@ -354,12 +382,17 @@ export class RunManager {
         env: opts.adapterEnv,
       });
       const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
-      const controller = new RunController(this.store, this.artifactStore, this.engine, {
-        runId,
-        envId: env.id,
-        adapter,
-        caps,
-      });
+      const controller = new RunController(
+        this.store,
+        this.artifactStore,
+        this.engine,
+        {
+          runId,
+          envId: env.id,
+          adapter,
+          caps,
+        },
+      );
       const inFlight = this.store.markInFlightUnknown(runId);
       for (let i = 0; i < inFlight.length; i++) {
         await controller.observe(["state"]);

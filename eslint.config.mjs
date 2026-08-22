@@ -8,6 +8,9 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/*.config.ts",
       "coverage/**",
+      // Generated release output (scripts/build-release.mjs) is bundled JS,
+      // not Inspector source; it lives out of Git and must never be linted.
+      "dist-release/**",
       // Vendored dogfood-target checkouts and RC working artifacts are not
       // Inspector source; never lint them.
       ".inspector/**",

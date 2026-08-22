@@ -34,5 +34,15 @@ export default defineConfig({
     exclude: ["**/*.integration.test.ts", "**/node_modules/**", "**/dist/**"],
     environment: "node",
     pool: "forks",
+    // Spawn-heavy unit tests (git worktree CLI, headless Chromium, fuzz
+    // child channels) exceed the 5s default per-test budget when the whole
+    // suite forks in parallel on Windows: each fork competes for CPU and a
+    // single git/chromium operation chain can blow its own budget. Calibrated
+    // for that contention (not per-test inflation, assertions untouched);
+    // every affected file also passes isolated.
+    testTimeout: 15000,
+    // Cap fork fan-out so process-spawn-heavy files keep scheduling headroom
+    // (12 logical cores; unbounded forking oversubscribes them).
+    poolOptions: { forks: { minForks: 2, maxForks: 6 } },
   },
 });

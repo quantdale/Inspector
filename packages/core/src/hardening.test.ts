@@ -6,8 +6,16 @@ import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
 import { Store } from "@inspector/store-sqlite";
 import { ArtifactStore } from "@inspector/artifact-store";
-import { AdapterClient, AdapterServer, type AdapterHandler } from "@inspector/adapter-sdk";
-import { ProtocolError, type Action, type CapabilityDoc } from "@inspector/protocol";
+import {
+  AdapterClient,
+  AdapterServer,
+  type AdapterHandler,
+} from "@inspector/adapter-sdk";
+import {
+  ProtocolError,
+  type Action,
+  type CapabilityDoc,
+} from "@inspector/protocol";
 import { RunManager, RunController } from "./run-manager.js";
 import { PolicyEngine, type Policy } from "./policy.js";
 
@@ -42,12 +50,22 @@ afterEach(async () => {
 const caps: CapabilityDoc = {
   protocolVersion: "0.1",
   adapter: "mock",
-  capabilities: { observe: ["state"], act: ["noop"], lifecycle: ["create", "reset", "close"] },
+  capabilities: {
+    observe: ["state"],
+    act: ["noop"],
+    lifecycle: ["create", "reset", "close"],
+  },
 };
 
 const basePolicy: Policy = {
   name: "hardening",
-  capabilities: { observe: true, interact: true, mutate_test_state: false, modify_source: false, publish: false },
+  capabilities: {
+    observe: true,
+    interact: true,
+    mutate_test_state: false,
+    modify_source: false,
+    publish: false,
+  },
   budgets: {
     wall_clock_minutes: 60,
     max_actions: 2000,
@@ -60,7 +78,15 @@ const basePolicy: Policy = {
 };
 
 function act(id: string, kind = "noop"): Action {
-  return { id, runId: "runH", environmentId: "envH", kind, risk: "interact", deadlineMs: 5000, idempotency: "safe-retry" };
+  return {
+    id,
+    runId: "runH",
+    environmentId: "envH",
+    kind,
+    risk: "interact",
+    deadlineMs: 5000,
+    idempotency: "safe-retry",
+  };
 }
 
 interface MockKnobs {
@@ -88,7 +114,8 @@ function mockHandler(knobs: MockKnobs = {}): MockHandler {
     },
     async observe() {
       seq += 1;
-      if (knobs.observeResult !== undefined) return knobs.observeResult as never;
+      if (knobs.observeResult !== undefined)
+        return knobs.observeResult as never;
       return {
         id: knobs.fixedObserveId ?? `mock_obs_${seq}`,
         runId: "runH",
@@ -145,7 +172,12 @@ let runCounter = 0;
 async function hardeningController(
   knobs: MockKnobs = {},
   engine = new PolicyEngine(basePolicy),
-): Promise<{ controller: RunController; handler: MockHandler; runId: string; envId: string }> {
+): Promise<{
+  controller: RunController;
+  handler: MockHandler;
+  runId: string;
+  envId: string;
+}> {
   runCounter += 1;
   const runId = `runH${runCounter}`;
   const envId = `envH${runCounter}`;
@@ -191,13 +223,19 @@ describe("core hardening wave 2", () => {
     expect(first.kind).toBe("outcome");
     const second = await controller.submitAction(act("h_dup"));
     expect(second.kind).toBe("outcome");
-    expect((second as { outcome: { status: string } }).outcome.status).toBe("success");
+    expect((second as { outcome: { status: string } }).outcome.status).toBe(
+      "success",
+    );
     expect(handler.actCalls).toBe(1); // no blind resend
-    const count = store!.raw.prepare(`SELECT COUNT(*) AS c FROM actions WHERE id = ?`).get("h_dup") as {
+    const count = store!.raw
+      .prepare(`SELECT COUNT(*) AS c FROM actions WHERE id = ?`)
+      .get("h_dup") as {
       c: number;
     };
     expect(count.c).toBe(1);
-    const steps = store!.getRunSteps(runId).filter((s) => s.action?.id === "h_dup");
+    const steps = store!
+      .getRunSteps(runId)
+      .filter((s) => s.action?.id === "h_dup");
     expect(steps).toHaveLength(1);
     await controller.close();
   });
@@ -205,13 +243,21 @@ describe("core hardening wave 2", () => {
   it("C3 (D3): a fresh engine cannot evade max_actions by restarting from durable state", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const firstEngine = new PolicyEngine({ ...basePolicy, budgets: { ...basePolicy.budgets, max_actions: 1 } });
+    const firstEngine = new PolicyEngine({
+      ...basePolicy,
+      budgets: { ...basePolicy.budgets, max_actions: 1 },
+    });
     const first = await hardeningController({}, firstEngine);
-    expect((await first.controller.submitAction(act("h_b1"))).kind).toBe("outcome");
+    expect((await first.controller.submitAction(act("h_b1"))).kind).toBe(
+      "outcome",
+    );
     await first.controller.close();
 
     // New process: brand-new engine over the SAME durable run.
-    const secondEngine = new PolicyEngine({ ...basePolicy, budgets: { ...basePolicy.budgets, max_actions: 1 } });
+    const secondEngine = new PolicyEngine({
+      ...basePolicy,
+      budgets: { ...basePolicy.budgets, max_actions: 1 },
+    });
     const client = inProcessAdapter(mockHandler());
     const second = new RunController(store!, artifacts!, secondEngine, {
       runId: first.runId,
@@ -221,7 +267,9 @@ describe("core hardening wave 2", () => {
     });
     const retry = await second.submitAction(act("h_b2"));
     expect(retry.kind).toBe("rejected");
-    expect((retry as { decision: { code: string } }).decision.code).toBe("BUDGET_EXHAUSTED");
+    expect((retry as { decision: { code: string } }).decision.code).toBe(
+      "BUDGET_EXHAUSTED",
+    );
     expect(secondEngine.counters.actions).toBe(1); // seeded from durable state
     await second.close();
   });
@@ -230,7 +278,10 @@ describe("core hardening wave 2", () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
     const engine = new PolicyEngine(basePolicy);
-    const { controller, runId } = await hardeningController({ artifactBytes: 4096 }, engine);
+    const { controller, runId } = await hardeningController(
+      { artifactBytes: 4096 },
+      engine,
+    );
     const action = { ...act("h_art"), runId };
     await controller.submitAction(action);
     expect(engine.counters.artifactBytes).toBe(4096);
@@ -271,17 +322,79 @@ describe("core hardening wave 2", () => {
 
     const handler = mockHandler();
     const client = inProcessAdapter(handler);
-    const controller = new RunController(s, artifacts!, new PolicyEngine(basePolicy), {
-      runId: "runTie",
-      envId: "envTie",
-      adapter: client,
-      caps,
-    });
+    const controller = new RunController(
+      s,
+      artifacts!,
+      new PolicyEngine(basePolicy),
+      {
+        runId: "runTie",
+        envId: "envTie",
+        adapter: client,
+        caps,
+      },
+    );
     // Restoring the stale stepSeq (1) would collide with UNIQUE(run_id,sequence).
     const result = await controller.submitAction(act("h_after_tie"));
     expect(result.kind).toBe("outcome");
     const sequences = s.getRunSteps("runTie").map((b) => b.step.sequence);
     expect(sequences).toEqual([1, 2, 3]);
+    await controller.close();
+  });
+
+  it("C5b (D5): a checkpoint lagging committed steps cannot cause sequence reuse on resume", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const s = store!;
+    s.createRun({ id: "runLag" });
+    s.createEnvironment({ id: "envLag", runId: "runLag", adapter: "mock" });
+    // Three durably committed steps, but the newest checkpoint claims only
+    // 1: a hard kill can land between the step transaction and the
+    // checkpoint write, leaving the payload lagging the step table.
+    for (let i = 1; i <= 3; i++) {
+      s.commitStep({
+        stepId: `step_lag_${i}`,
+        runId: "runLag",
+        environmentId: "envLag",
+        sequence: i,
+        action: {
+          id: `act_lag_${i}`,
+          kind: "noop",
+          risk: "interact",
+          deadlineMs: 5000,
+          idempotency: "safe-retry",
+          status: "success",
+        },
+        observations: [],
+      });
+    }
+    const insert = s.raw.prepare(
+      `INSERT INTO checkpoints(id, run_id, step_id, created_at, payload_json) VALUES(?, ?, NULL, ?, ?)`,
+    );
+    insert.run(
+      "ck_lag",
+      "runLag",
+      new Date().toISOString(),
+      JSON.stringify({ stepSeq: 1 }),
+    );
+
+    const handler = mockHandler();
+    const client = inProcessAdapter(handler);
+    const controller = new RunController(
+      s,
+      artifacts!,
+      new PolicyEngine(basePolicy),
+      {
+        runId: "runLag",
+        envId: "envLag",
+        adapter: client,
+        caps,
+      },
+    );
+    // Restoring the lagging stepSeq (1) would persist sequence 2 next and hit
+    // UNIQUE(run_id, sequence): exactly the intermittent CLI resume failure.
+    await expect(controller.observe(["state"])).resolves.toBeTruthy();
+    const sequences = s.getRunSteps("runLag").map((b) => b.step.sequence);
+    expect(sequences).toEqual([1, 2, 3, 4]);
     await controller.close();
   });
 
@@ -297,7 +410,9 @@ describe("core hardening wave 2", () => {
     const runs = store!.listRuns();
     expect(runs).toHaveLength(1);
     expect(runs[0]!.status).toBe("failed");
-    const envs = store!.raw.prepare(`SELECT * FROM environments`).all() as Array<{ status: string }>;
+    const envs = store!.raw
+      .prepare(`SELECT * FROM environments`)
+      .all() as Array<{ status: string }>;
     expect(envs).toHaveLength(1);
     expect(envs[0]!.status).toBe("failed");
   });
@@ -312,7 +427,9 @@ describe("core hardening wave 2", () => {
       adapterArgs: [miniAdapter],
     });
     expect(store.getRun(run.runId)?.adapter).toBe("fixture-mini");
-    expect(store.getEnvironment(run.environmentId)?.adapter).toBe("fixture-mini");
+    expect(store.getEnvironment(run.environmentId)?.adapter).toBe(
+      "fixture-mini",
+    );
     await run.close();
     expect(store.getRun(run.runId)?.status).toBe("closed");
     expect(store.getEnvironment(run.environmentId)?.status).toBe("closed");
@@ -321,7 +438,9 @@ describe("core hardening wave 2", () => {
   it("C8 (D7): teardown failure records failed/crashed instead of a clean close", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId, envId } = await hardeningController({ failLifecycleClose: true });
+    const { controller, runId, envId } = await hardeningController({
+      failLifecycleClose: true,
+    });
     await expect(controller.close()).resolves.toBeUndefined();
     expect(store!.getRun(runId)?.status).toBe("failed");
     expect(store!.getEnvironment(envId)?.status).toBe("crashed");
@@ -330,21 +449,26 @@ describe("core hardening wave 2", () => {
   it("C9 (D8): a hostile repeated observation id cannot corrupt the step transaction", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId } = await hardeningController({ fixedObserveId: "obs_hostile" });
+    const { controller, runId } = await hardeningController({
+      fixedObserveId: "obs_hostile",
+    });
     await controller.observe(["state"]);
     await controller.observe(["state"]);
     const steps = store!.getRunSteps(runId);
     expect(steps).toHaveLength(2);
     const ids = steps.map((b) => b.observations[0]!.id);
     expect(new Set(ids).size).toBe(2); // collision regenerated deterministically
-    for (const id of ids) expect(id).toMatch(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
+    for (const id of ids)
+      expect(id).toMatch(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
     await controller.close();
   });
 
   it("C10 (D11): malformed observations are rejected with ProtocolError and leave no partial step", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId } = await hardeningController({ observeResult: { nonsense: true } });
+    const { controller, runId } = await hardeningController({
+      observeResult: { nonsense: true },
+    });
     await expect(controller.observe(["state"])).rejects.toMatchObject({
       name: "ProtocolError",
       code: "VALIDATION",
@@ -356,7 +480,9 @@ describe("core hardening wave 2", () => {
   it("C11 (D11): malformed action outcomes are rejected before persistence; action stays recoverable", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId } = await hardeningController({ actResult: { totally: "malformed" } });
+    const { controller, runId } = await hardeningController({
+      actResult: { totally: "malformed" },
+    });
     await expect(controller.submitAction(act("h_bad"))).rejects.toMatchObject({
       name: "ProtocolError",
       code: "VALIDATION",
@@ -370,17 +496,26 @@ describe("core hardening wave 2", () => {
   it("C12 (D11): validation failures do not consume step sequence numbers", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId, envId } = await hardeningController({ observeResult: { nonsense: true } });
-    await expect(controller.observe(["state"])).rejects.toBeInstanceOf(ProtocolError);
+    const { controller, runId, envId } = await hardeningController({
+      observeResult: { nonsense: true },
+    });
+    await expect(controller.observe(["state"])).rejects.toBeInstanceOf(
+      ProtocolError,
+    );
     // A subsequent well-formed observation continues at sequence 1.
     const good = mockHandler();
     const client = inProcessAdapter(good);
-    const recovered = new RunController(store!, artifacts!, new PolicyEngine(basePolicy), {
-      runId,
-      envId,
-      adapter: client,
-      caps,
-    });
+    const recovered = new RunController(
+      store!,
+      artifacts!,
+      new PolicyEngine(basePolicy),
+      {
+        runId,
+        envId,
+        adapter: client,
+        caps,
+      },
+    );
     await recovered.observe(["state"]);
     expect(store!.getRunSteps(runId).map((b) => b.step.sequence)).toEqual([1]);
     await recovered.close();
@@ -397,8 +532,15 @@ describe("core hardening wave 2", () => {
       { runId: "runF", revision: "rev7", adapter: "adapter-fake" },
     );
     engine.transition(finding, "CONFIRMED");
-    finding.minimization = { probes: 4, removals: 1, verifiedReproduction: true };
-    engine.transition(finding, "MINIMIZED", { reason: "minimized to 3 steps", actor: "test" });
+    finding.minimization = {
+      probes: 4,
+      removals: 1,
+      verifiedReproduction: true,
+    };
+    engine.transition(finding, "MINIMIZED", {
+      reason: "minimized to 3 steps",
+      actor: "test",
+    });
 
     // Reopen the same database and read the record back.
     store!.close();

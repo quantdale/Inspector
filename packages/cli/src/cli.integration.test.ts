@@ -415,7 +415,10 @@ describe("cli", () => {
 
     // Resume re-attaches, re-observes, and reports an honest final state.
     const resumed = await runCli(["runs", "resume", interruptedId!], dir);
-    expect(resumed.code).toBe(0);
+    expect(
+      resumed.code,
+      `resume failed (stderr: ${resumed.stderr} stdout: ${resumed.stdout})`,
+    ).toBe(0);
     expect(resumed.stdout).toContain(`resumed ${interruptedId}`);
     expect(resumed.stdout).toContain("final status:");
   }, 90000);

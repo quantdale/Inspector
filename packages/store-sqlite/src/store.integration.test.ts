@@ -137,12 +137,16 @@ describe("hardening wave 2: sqlite store", () => {
     first.close();
     for (let i = 0; i < 3; i++) {
       const store = Store.open(path);
-      const rows = store.raw.prepare(`SELECT version FROM schema_version`).all() as Array<{
+      const rows = store.raw
+        .prepare(`SELECT version FROM schema_version`)
+        .all() as Array<{
         version: number;
       }>;
       expect(rows).toHaveLength(1);
       expect(rows[0]!.version).toBe(MIGRATIONS.length);
-      const cols = store.raw.prepare(`PRAGMA table_info(schema_version)`).all() as Array<{
+      const cols = store.raw
+        .prepare(`PRAGMA table_info(schema_version)`)
+        .all() as Array<{
         name: string;
         pk: number;
       }>;
@@ -218,10 +222,14 @@ describe("hardening wave 2: sqlite store", () => {
       idempotency: "never-retry",
     };
     store.insertPendingAction({ ...base, id: "act_i1" });
-    expect(() => store.insertPendingAction({ ...base, id: "act_i2" })).toThrow(/idempotency/i);
+    expect(() => store.insertPendingAction({ ...base, id: "act_i2" })).toThrow(
+      /idempotency/i,
+    );
     // Once the first action is decided, the key becomes reusable.
     store.finalizeAction("act_i1", { status: "success" });
-    expect(() => store.insertPendingAction({ ...base, id: "act_i2" })).not.toThrow();
+    expect(() =>
+      store.insertPendingAction({ ...base, id: "act_i2" }),
+    ).not.toThrow();
     store.close();
   });
 
@@ -241,7 +249,9 @@ describe("hardening wave 2: sqlite store", () => {
       idempotency: "safe-retry",
     });
     const original = "2000-01-01T00:00:00.000Z";
-    store.raw.prepare(`UPDATE actions SET requested_at = ? WHERE id = ?`).run(original, "act_ts");
+    store.raw
+      .prepare(`UPDATE actions SET requested_at = ? WHERE id = ?`)
+      .run(original, "act_ts");
     store.commitStep({
       stepId: "step_ts",
       runId,
@@ -268,7 +278,9 @@ describe("hardening wave 2: sqlite store", () => {
   it("H6 (D10): opens configure a busy_timeout so concurrent processes retry", () => {
     const path = tmpDb();
     const store = Store.open(path);
-    const timeout = store.raw.pragma("busy_timeout", { simple: true }) as number;
+    const timeout = store.raw.pragma("busy_timeout", {
+      simple: true,
+    }) as number;
     expect(timeout).toBeGreaterThanOrEqual(1000);
     store.close();
   });
@@ -278,7 +290,11 @@ describe("hardening wave 2: sqlite store", () => {
     const store = Store.open(path);
     const runId = "run_multi";
     store.createRun({ id: runId });
-    store.createEnvironment({ id: "env_multi", runId, adapter: "adapter-fake" });
+    store.createEnvironment({
+      id: "env_multi",
+      runId,
+      adapter: "adapter-fake",
+    });
     store.insertPendingAction({
       id: "act_lost_once",
       runId,
@@ -318,8 +334,18 @@ describe("hardening wave 2: sqlite store", () => {
       createdAt: at,
       updatedAt: at,
       signature: "PAGE_ERROR",
-      minimizationJson: JSON.stringify({ probes: 5, removals: 2, verifiedReproduction: true }),
-      lastTransitionJson: JSON.stringify({ from: "CANDIDATE", to: "CONFIRMED", at, reason: "r", actor: "test" }),
+      minimizationJson: JSON.stringify({
+        probes: 5,
+        removals: 2,
+        verifiedReproduction: true,
+      }),
+      lastTransitionJson: JSON.stringify({
+        from: "CANDIDATE",
+        to: "CONFIRMED",
+        at,
+        reason: "r",
+        actor: "test",
+      }),
       adapter: "adapter-fake",
     };
     {
@@ -337,10 +363,17 @@ describe("hardening wave 2: sqlite store", () => {
       removals: 2,
       verifiedReproduction: true,
     });
-    expect(JSON.parse(got!.lastTransitionJson!)).toMatchObject({ from: "CANDIDATE", to: "CONFIRMED" });
+    expect(JSON.parse(got!.lastTransitionJson!)).toMatchObject({
+      from: "CANDIDATE",
+      to: "CONFIRMED",
+    });
     expect(got!.adapter).toBe("adapter-fake");
     // Updates persist the extended fields too.
-    reopened.putFinding({ ...record, signature: "IMPOSSIBLE_STATE", status: "RESOLVED" as const });
+    reopened.putFinding({
+      ...record,
+      signature: "IMPOSSIBLE_STATE",
+      status: "RESOLVED" as const,
+    });
     expect(reopened.getFinding("find_rt")?.signature).toBe("IMPOSSIBLE_STATE");
     reopened.close();
   });
@@ -375,11 +408,16 @@ describe("hardening wave 2: sqlite store", () => {
     store.close();
   });
 
-  it("H10 (D3): countRunActions counts every admitted action regardless of status", () => {    const path = tmpDb();
+  it("H10 (D3): countRunActions counts every admitted action regardless of status", () => {
+    const path = tmpDb();
     const store = Store.open(path);
     const runId = "run_count";
     store.createRun({ id: runId });
-    store.createEnvironment({ id: "env_count", runId, adapter: "adapter-fake" });
+    store.createEnvironment({
+      id: "env_count",
+      runId,
+      adapter: "adapter-fake",
+    });
     store.commitStep({
       stepId: "step_c1",
       runId,
@@ -408,10 +446,42 @@ describe("hardening wave 2: sqlite store", () => {
     expect(store.countRunActions("run_missing")).toBe(0);
     store.close();
   });
+
+  it("H10b (D5): maxRunStepSequence returns the durable floor for resume sequencing", () => {
+    const path = tmpDb();
+    const store = Store.open(path);
+    const runId = "run_seq";
+    store.createRun({ id: runId });
+    store.createEnvironment({ id: "env_seq", runId, adapter: "adapter-fake" });
+    expect(store.maxRunStepSequence(runId)).toBe(0);
+    expect(store.maxRunStepSequence("run_missing")).toBe(0);
+    for (const seq of [1, 5, 3]) {
+      store.commitStep({
+        stepId: `step_seq_${seq}`,
+        runId,
+        environmentId: "env_seq",
+        sequence: seq,
+        action: {
+          id: `act_seq_${seq}`,
+          kind: "click",
+          risk: "interact",
+          deadlineMs: 5000,
+          idempotency: "safe-retry",
+          status: "success",
+        },
+        observations: [],
+      });
+    }
+    expect(store.maxRunStepSequence(runId)).toBe(5);
+    store.close();
+  });
 });
 
 describe("oracle evaluation records", () => {
-  function evalRecord(i: number, overrides: Partial<OracleEvaluationRecord> = {}): OracleEvaluationRecord {
+  function evalRecord(
+    i: number,
+    overrides: Partial<OracleEvaluationRecord> = {},
+  ): OracleEvaluationRecord {
     return {
       id: `oev_${i}`,
       runId: "run_oe",
@@ -448,18 +518,20 @@ describe("oracle evaluation records", () => {
       expect(listed[1]!.confidence).toBeCloseTo(0.9);
       expect(listed[1]!.oracleClass).toBe("invariant");
       // By-run listing covers the same rows.
-      expect(store.listOracleEvaluationsForRun("run_oe").map((r) => r.id)).toEqual([
-        "oev_1",
-        "oev_2",
-        "oev_3",
-      ]);
+      expect(
+        store.listOracleEvaluationsForRun("run_oe").map((r) => r.id),
+      ).toEqual(["oev_1", "oev_2", "oev_3"]);
       store.close();
     }
     // Restart durability: the full history is readable after reopen.
     const reopened = Store.open(path);
     const rows = reopened.listOracleEvaluationsForFinding("find_oe");
     expect(rows).toHaveLength(3);
-    expect(rows.map((r) => r.oracleId)).toEqual(["target-failure", "page-error", "target-failure"]);
+    expect(rows.map((r) => r.oracleId)).toEqual([
+      "target-failure",
+      "page-error",
+      "target-failure",
+    ]);
     expect(rows.every((r) => r.version === "oracle-eval/1")).toBe(true);
     expect(rows[2]!.phase).toBe("reproduce");
     reopened.close();
@@ -471,11 +543,22 @@ describe("oracle evaluation records", () => {
     // Minimize-phase baseline probe: not yet attached to a finding (nullable
     // provenance) — findable by run, not by finding id.
     store.putOracleEvaluation(
-      evalRecord(4, { phase: "minimize", findingId: null, subjectKey: "a1>a3" }),
+      evalRecord(4, {
+        phase: "minimize",
+        findingId: null,
+        subjectKey: "a1>a3",
+      }),
     );
     // Repair-verify row attached to the finding even when other fields are null.
     store.putOracleEvaluation(
-      evalRecord(5, { phase: "repair-verify", runId: null, oracleKind: null, oracleStrength: null, oracleClass: null, confidence: null }),
+      evalRecord(5, {
+        phase: "repair-verify",
+        runId: null,
+        oracleKind: null,
+        oracleStrength: null,
+        oracleClass: null,
+        confidence: null,
+      }),
     );
     const byRun = store.listOracleEvaluationsForRun("run_oe");
     expect(byRun.map((r) => r.phase)).toEqual(["minimize"]);

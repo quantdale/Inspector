@@ -20,14 +20,19 @@ import { WebAdapterHandler } from "./web-adapter.js";
 
 const ART_BASE = join(tmpdir(), "inspector-web-window");
 
-function act(id: string, kind: string, input?: Record<string, unknown>): Action {
+function act(
+  id: string,
+  kind: string,
+  input?: Record<string, unknown>,
+  deadlineMs = 6000,
+): Action {
   return {
     id,
     runId: "run",
     environmentId: "env",
     kind,
     risk: "interact",
-    deadlineMs: 6000,
+    deadlineMs,
     idempotency: "safe-retry",
     input,
   } as Action;
@@ -48,21 +53,30 @@ async function fresh(seedHtml: string): Promise<WebAdapterHandler> {
 }
 
 describe("web hardening: pageerror action-window attribution", () => {
+  // Deterministic construction: the crash fires ~2s AFTER load, i.e. well
+  // after act() entry (typical entry latency <100ms even under heavy suite
+  // load) and ~8.5s BEFORE the click's Playwright timeout (deadline 12000 ->
+  // timeout 10500ms). Both margins are orders of magnitude above observed
+  // scheduler jitter, so the pageerror reliably lands INSIDE the failing
+  // action's attribution window. The earlier 25ms timer raced act()-entry
+  // latency under full-suite load: when the crash landed before the window
+  // opened it was correctly NOT attributed (the K2 discipline) and the test
+  // misread its own race as a product defect.
   it("K1: pageerror arriving DURING a failing action classifies TARGET_FAILURE", async () => {
     const h = await fresh(`<!doctype html><html><body><script>
-      // Crash fires shortly after load, i.e. while the upcoming click on the
-      // missing element is still waiting for its Playwright timeout.
-      setTimeout(function () { throw new Error('ConcurrentCrash'); }, 25);
+      // Crash fires while the click on the missing element is still waiting
+      // for its Playwright timeout.
+      setTimeout(function () { throw new Error('ConcurrentCrash'); }, 2000);
     </script></body></html>`);
 
     const outcome = await h.act({
-      action: act("k1", "click", { selector: "#does-not-exist" }),
+      action: act("k1", "click", { selector: "#does-not-exist" }, 12000),
     });
 
     expect(outcome.status).toBe("target-failure");
     expect(outcome.error?.code).toBe("TARGET_FAILURE");
     expect(outcome.error?.message).toContain("ConcurrentCrash");
-  }, 20000);
+  }, 30000);
 
   it("K2: a pageerror from BEFORE the action window stays ACTION_FAILED", async () => {
     const h = await fresh(`<!doctype html><html><body><script>

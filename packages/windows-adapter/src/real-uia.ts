@@ -6,7 +6,7 @@ import type {
   WaitForWindowParams,
 } from "./types.js";
 import { WindowsBackendError } from "./types.js";
-import { PowerShellUiaBridge } from "./uia-bridge.js";
+import type { PowerShellUiaBridge } from "./uia-bridge.js";
 
 /** Rich semantic node as reported by the PowerShell UIA bridge. */
 export interface UiaRichNode {
@@ -44,6 +44,16 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
   constructor(private readonly bridge: PowerShellUiaBridge) {}
 
   /**
+   * Root-level staleness thrown by the bridge when the CACHED window handle
+   * died mid-operation (the HWND was destroyed/rehosted underneath us).
+   * Distinct from element-level staleness ('runtime id not found in current
+   * tree'), which must never be retried: the fresh tree honestly no longer
+   * contains that control.
+   */
+  private static readonly STALE_WINDOW_GONE =
+    /^STALE_ELEMENT: attached window is gone$/;
+
+  /**
    * Node count of the last accepted (non-collapsed) tree for this attached
    * session; null until a first successful enumeration. Reset on attach and
    * detach so each session's baseline starts fresh.
@@ -55,7 +65,10 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
   }
 
   /** Attach to a top-level window by pid or title substring. */
-  async attach(params: { pid?: number; titleContains?: string }): Promise<void> {
+  async attach(params: {
+    pid?: number;
+    titleContains?: string;
+  }): Promise<void> {
     this.lastGoodNodeCount = null;
     await this.bridge.request("attach", params);
   }
@@ -104,10 +117,30 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
     try {
       tree = await this.bridge.request<UiaRichTree>("tree");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/bridge timeout/i.test(msg)) throw e;
-      // Bounded fallback: enumerate from the desktop root scoped to the pid.
-      tree = await this.bridge.request<UiaRichTree>("treeDesktop", { pid: status.pid });
+      const msg = (e instanceof Error ? e.message : String(e)).trim();
+      if (/bridge timeout/i.test(msg)) {
+        // Bounded fallback: enumerate from the desktop root scoped to the pid.
+        tree = await this.bridge.request<UiaRichTree>("treeDesktop", {
+          pid: status.pid,
+        });
+      } else if (RealUiaBackend.STALE_WINDOW_GONE.test(msg)) {
+        // The cached HWND died mid-enumeration although the pid was verified
+        // alive moments ago (rehost transition). One bounded reattach + one
+        // re-enumeration; failure re-raises the ORIGINAL staleness so a
+        // genuinely dead target still surfaces as STALE_ELEMENT.
+        try {
+          await this.reattachToLiveWindow(status.pid);
+          const fresh = await this.bridge.request<UiaRichTree>("tree");
+          // attach() reset the baseline, so the collapse heuristic below is
+          // inert here; mark the recovery explicitly instead.
+          this.lastGoodNodeCount = fresh.nodes.length;
+          return { ...fresh, reattached: true };
+        } catch {
+          throw e;
+        }
+      } else {
+        throw e;
+      }
     }
     if (this.isRehostCollapse(tree.nodes.length)) {
       const prev = this.lastGoodNodeCount ?? 0;
@@ -141,21 +174,72 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
   }
 
   /**
+   * Re-resolve the process's current main top-level window and attach to it.
+   * Throws when the pid no longer owns any enumerable top-level window (the
+   * rehost consumed the last HWND or the process exited).
+   */
+  private async reattachToLiveWindow(pid: number): Promise<void> {
+    const windows = await this.listWindows();
+    if (!windows.some((w) => w.pid === pid)) {
+      throw new Error(`no top-level window remains for pid ${pid}`);
+    }
+    await this.attach({ pid });
+  }
+
+  /**
+   * Root-level staleness recovery for element-scoped operations.
+   *
+   * Win11 packaged apps (Paint) can destroy/rehost their top-level HWND
+   * mid-session while the process stays alive; the next bridge op then fails
+   * with 'STALE_ELEMENT: attached window is gone' even though exploration
+   * could honestly continue against the new window. Semantics:
+   *
+   * - ONLY root-level staleness triggers recovery; element-level staleness
+   *   ('runtime id not found in current tree') and all other errors pass
+   *   through untouched.
+   * - Recovery requires the owning PROCESS to still be alive AND to still
+   *   own an enumerable top-level window; otherwise the original error is
+   *   re-raised (a dead window is never resurrected or suppressed).
+   * - Exactly ONE reattach + retry per operation, bounded like the existing
+   *   rehost-collapse path -- never a blind retry loop.
+   */
+  private async withStaleWindowRetry<T>(op: () => Promise<T>): Promise<T> {
+    try {
+      return await op();
+    } catch (e) {
+      const msg = (e instanceof Error ? e.message : String(e)).trim();
+      if (!RealUiaBackend.STALE_WINDOW_GONE.test(msg)) throw e;
+      let status: { alive: boolean; pid: number };
+      try {
+        status = await this.windowStatus();
+      } catch {
+        throw e; // bridge itself is failing; original staleness stands
+      }
+      if (!status.alive || status.pid === 0) throw e; // dead target stays honest
+      try {
+        await this.reattachToLiveWindow(status.pid);
+      } catch {
+        throw e; // no live window remains -> staleness is the truth
+      }
+      return op();
+    }
+  }
+
+  /**
    * One bounded reattach attempt: resolve the process's current top-level
    * window, re-attach (the bridge re-resolves the pid's main window from the
    * desktop root), and re-enumerate. ~3s total budget.
    */
   private async attemptReattach(pid: number): Promise<UiaRichTree> {
     const budget = new Promise<never>((_, reject) => {
-      const t = setTimeout(() => reject(new Error("reattach budget (3000ms) exceeded")), 3000);
+      const t = setTimeout(
+        () => reject(new Error("reattach budget (3000ms) exceeded")),
+        3000,
+      );
       t.unref?.();
     });
     const work = (async () => {
-      const windows = await this.listWindows();
-      if (!windows.some((w) => w.pid === pid)) {
-        throw new Error(`no top-level window remains for pid ${pid}`);
-      }
-      await this.attach({ pid });
+      await this.reattachToLiveWindow(pid);
       return this.bridge.request<UiaRichTree>("tree");
     })();
     return Promise.race([work, budget]);
@@ -189,9 +273,9 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
         throw new WindowsBackendError(
           "WINDOW_NOT_FOUND",
           `no top-level window matching ` +
-            `${params.pid !== undefined ? `pid=${params.pid}` : ""}` +
+            `${params.pid === undefined ? "" : `pid=${params.pid}`}` +
             `${params.pid !== undefined && params.titleContains ? " " : ""}` +
-            `${params.titleContains !== undefined ? `title~="${params.titleContains}"` : ""}` +
+            `${params.titleContains === undefined ? "" : `title~="${params.titleContains}"`}` +
             ` within ${requested}ms`,
         );
       }
@@ -200,37 +284,60 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
   }
 
   async invoke(rid: string): Promise<void> {
-    await this.bridge.request("invoke", { rid });
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("invoke", { rid }),
+    );
   }
 
   async toggle(rid: string): Promise<void> {
-    await this.bridge.request("toggle", { rid });
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("toggle", { rid }),
+    );
   }
 
-  async expandCollapse(rid: string, action: "expand" | "collapse"): Promise<void> {
-    await this.bridge.request("expandCollapse", { rid, action });
+  async expandCollapse(
+    rid: string,
+    action: "expand" | "collapse",
+  ): Promise<void> {
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("expandCollapse", { rid, action }),
+    );
   }
 
   async setValue(rid: string, value: string): Promise<void> {
-    await this.bridge.request("setValue", { rid, value });
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("setValue", { rid, value }),
+    );
   }
 
   async select(rid: string): Promise<void> {
-    await this.bridge.request("select", { rid });
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("select", { rid }),
+    );
   }
 
   async readValue(rid: string): Promise<string> {
-    const r = await this.bridge.request<{ value: string }>("readValue", { rid });
+    const r = await this.withStaleWindowRetry(() =>
+      this.bridge.request<{ value: string }>("readValue", {
+        rid,
+      }),
+    );
     return r.value;
   }
 
   async readToggleState(rid: string): Promise<string> {
-    const r = await this.bridge.request<{ state: string }>("readToggleState", { rid });
+    const r = await this.withStaleWindowRetry(() =>
+      this.bridge.request<{ state: string }>("readToggleState", {
+        rid,
+      }),
+    );
     return r.state;
   }
 
   async closeWindow(): Promise<void> {
-    await this.bridge.request("closeWindow");
+    await this.withStaleWindowRetry(() =>
+      this.bridge.request("closeWindow"),
+    );
   }
 
   /** Liveness of the attached window and its owning process. */
@@ -254,16 +361,27 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.includes("NO_ATTACHED_WINDOW")) throw e;
       const windows = await this.listWindows();
-      const target = windows.find((w) => w.title.trim().length > 0) ?? windows[0];
+      const target =
+        windows.find((w) => w.title.trim().length > 0) ?? windows[0];
       if (!target) throw new Error("no enumerable top-level window");
       await this.attach({ pid: target.pid });
       tree = await this.richTree();
     }
     return tree.nodes
-      .filter((n) => n.type === "Button" || n.type === "Edit" || n.type === "Text" || n.type === "Document")
+      .filter(
+        (n) =>
+          n.type === "Button" ||
+          n.type === "Edit" ||
+          n.type === "Text" ||
+          n.type === "Document",
+      )
       .map((n) => ({
         id: n.id,
-        type: (n.type === "Button" ? "Button" : n.type === "Text" ? "Text" : "Edit") as UiaNode["type"],
+        type: (n.type === "Button"
+          ? "Button"
+          : n.type === "Text"
+            ? "Text"
+            : "Edit") as UiaNode["type"],
         text: n.name,
         enabled: n.enabled,
       }));

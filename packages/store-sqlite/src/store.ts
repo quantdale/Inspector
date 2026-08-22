@@ -1,4 +1,4 @@
-import { type Database } from "better-sqlite3";
+import type { Database } from "better-sqlite3";
 import { openStore } from "./migrations.js";
 
 export type ActionStatus =
@@ -137,9 +137,23 @@ export class DuplicateActionIdempotencyError extends Error {
 }
 
 export interface StepBundle {
-  step: { id: string; sequence: number; actionId: string | null; status: StepStatus };
+  step: {
+    id: string;
+    sequence: number;
+    actionId: string | null;
+    status: StepStatus;
+  };
   action: ActionRecord | null;
-  observations: Array<ObservationRecord & { artifacts: Array<{ sha256: string; mime: string; size: number; path: string }> }>;
+  observations: Array<
+    ObservationRecord & {
+      artifacts: Array<{
+        sha256: string;
+        mime: string;
+        size: number;
+        path: string;
+      }>;
+    }
+  >;
 }
 
 /** Maps snake_case findings columns onto the camelCase FindingRecord shape. */
@@ -164,7 +178,12 @@ export class Store {
     this.db.close();
   }
 
-  createRun(input: { id: string; adapter?: string; policy?: unknown; meta?: unknown }): RunRecord {
+  createRun(input: {
+    id: string;
+    adapter?: string;
+    policy?: unknown;
+    meta?: unknown;
+  }): RunRecord {
     const now = new Date().toISOString();
     this.db
       .prepare(
@@ -182,7 +201,9 @@ export class Store {
   }
 
   getRun(id: string): RunRecord | undefined {
-    return this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(id) as RunRecord | undefined;
+    return this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(id) as
+      | RunRecord
+      | undefined;
   }
 
   listRuns(limit = 100): RunRecord[] {
@@ -195,7 +216,11 @@ export class Store {
     this.db.prepare(`UPDATE runs SET status = ? WHERE id = ?`).run(status, id);
   }
 
-  createEnvironment(input: { id: string; runId: string; adapter: string }): EnvironmentRecord {
+  createEnvironment(input: {
+    id: string;
+    runId: string;
+    adapter: string;
+  }): EnvironmentRecord {
     const now = new Date().toISOString();
     this.db
       .prepare(
@@ -240,7 +265,12 @@ export class Store {
       source: string;
       capturedAt: string;
       summary: unknown;
-      artifacts?: Array<{ sha256: string; mime: string; size: number; path: string }>;
+      artifacts?: Array<{
+        sha256: string;
+        mime: string;
+        size: number;
+        path: string;
+      }>;
     }>;
   }): void {
     const tx = this.db.transaction(() => {
@@ -369,7 +399,12 @@ export class Store {
 
   finalizeAction(
     id: string,
-    outcome: { status: ActionStatus; stateAfter?: string | null; errorCode?: string | null; error?: unknown | null },
+    outcome: {
+      status: ActionStatus;
+      stateAfter?: string | null;
+      errorCode?: string | null;
+      error?: unknown | null;
+    },
   ): void {
     this.db
       .prepare(
@@ -387,7 +422,9 @@ export class Store {
   }
 
   getAction(id: string): ActionRecord | undefined {
-    return this.db.prepare(`SELECT * FROM actions WHERE id = ?`).get(id) as ActionRecord | undefined;
+    return this.db.prepare(`SELECT * FROM actions WHERE id = ?`).get(id) as
+      | ActionRecord
+      | undefined;
   }
 
   /**
@@ -400,7 +437,9 @@ export class Store {
    */
   markInFlightUnknown(runId: string): ActionRecord[] {
     const newlyLost = this.db
-      .prepare(`SELECT * FROM actions WHERE run_id = ? AND status = 'pending' ORDER BY requested_at`)
+      .prepare(
+        `SELECT * FROM actions WHERE run_id = ? AND status = 'pending' ORDER BY requested_at`,
+      )
       .all(runId) as ActionRecord[];
     const tx = this.db.transaction((ids: string[]) => {
       const stmt = this.db.prepare(
@@ -414,7 +453,9 @@ export class Store {
 
   getInFlightActions(runId: string): ActionRecord[] {
     return this.db
-      .prepare(`SELECT * FROM actions WHERE run_id = ? AND status IN ('pending', 'unknown') ORDER BY requested_at`)
+      .prepare(
+        `SELECT * FROM actions WHERE run_id = ? AND status IN ('pending', 'unknown') ORDER BY requested_at`,
+      )
       .all(runId) as ActionRecord[];
   }
 
@@ -427,36 +468,68 @@ export class Store {
     return row.c;
   }
 
+  /** Highest durably committed step sequence for a run (0 when none). The
+   * authoritative floor for the next sequence number after a restart: the
+   * checkpoint payload can lag the last committed step when a process dies
+   * between the step transaction and the checkpoint write, and reusing a
+   * persisted sequence violates UNIQUE(steps.run_id, steps.sequence). */
+  maxRunStepSequence(runId: string): number {
+    const row = this.db
+      .prepare(`SELECT MAX(sequence) AS m FROM steps WHERE run_id = ?`)
+      .get(runId) as { m: number | null };
+    return row.m ?? 0;
+  }
+
   /** True when an observation with this id is already persisted. */
   observationExists(id: string): boolean {
     return (
-      this.db.prepare(`SELECT 1 FROM observations WHERE id = ?`).get(id) !== undefined
+      this.db.prepare(`SELECT 1 FROM observations WHERE id = ?`).get(id) !==
+      undefined
     );
   }
 
   setEnvironmentStatus(id: string, status: string): void {
-    this.db.prepare(`UPDATE environments SET status = ? WHERE id = ?`).run(status, id);
+    this.db
+      .prepare(`UPDATE environments SET status = ? WHERE id = ?`)
+      .run(status, id);
   }
 
   /** Record the adapter's self-reported identity on its run and environment
    * rows once initialize has answered. */
   recordAdapterIdentity(runId: string, envId: string, adapter: string): void {
     const tx = this.db.transaction(() => {
-      this.db.prepare(`UPDATE runs SET adapter = ? WHERE id = ?`).run(adapter, runId);
-      this.db.prepare(`UPDATE environments SET adapter = ? WHERE id = ?`).run(adapter, envId);
+      this.db
+        .prepare(`UPDATE runs SET adapter = ? WHERE id = ?`)
+        .run(adapter, runId);
+      this.db
+        .prepare(`UPDATE environments SET adapter = ? WHERE id = ?`)
+        .run(adapter, envId);
     });
     tx();
   }
 
-  writeCheckpoint(input: { id: string; runId: string; stepId?: string | null; payload: unknown }): CheckpointRecord {
+  writeCheckpoint(input: {
+    id: string;
+    runId: string;
+    stepId?: string | null;
+    payload: unknown;
+  }): CheckpointRecord {
     const now = new Date().toISOString();
     this.db
       .prepare(
         `INSERT INTO checkpoints(id, run_id, step_id, created_at, payload_json)
          VALUES(?, ?, ?, ?, ?)`,
       )
-      .run(input.id, input.runId, input.stepId ?? null, now, JSON.stringify(input.payload));
-    return this.db.prepare(`SELECT * FROM checkpoints WHERE id = ?`).get(input.id) as CheckpointRecord;
+      .run(
+        input.id,
+        input.runId,
+        input.stepId ?? null,
+        now,
+        JSON.stringify(input.payload),
+      );
+    return this.db
+      .prepare(`SELECT * FROM checkpoints WHERE id = ?`)
+      .get(input.id) as CheckpointRecord;
   }
 
   getLatestCheckpoint(runId: string): CheckpointRecord | undefined {
@@ -464,17 +537,30 @@ export class Store {
     // millisecond; ordering by created_at alone could restore a stale
     // stepSeq and violate UNIQUE(run_id, sequence) on the next commit.
     return this.db
-      .prepare(`SELECT * FROM checkpoints WHERE run_id = ? ORDER BY rowid DESC LIMIT 1`)
+      .prepare(
+        `SELECT * FROM checkpoints WHERE run_id = ? ORDER BY rowid DESC LIMIT 1`,
+      )
       .get(runId) as CheckpointRecord | undefined;
   }
 
   getCheckpoint(id: string): CheckpointRecord | undefined {
-    return this.db.prepare(`SELECT * FROM checkpoints WHERE id = ?`).get(id) as CheckpointRecord | undefined;
+    return this.db.prepare(`SELECT * FROM checkpoints WHERE id = ?`).get(id) as
+      | CheckpointRecord
+      | undefined;
   }
 
   getStepObservations(
     stepId: string,
-  ): Array<ObservationRecord & { artifacts: Array<{ sha256: string; mime: string; size: number; path: string }> }> {
+  ): Array<
+    ObservationRecord & {
+      artifacts: Array<{
+        sha256: string;
+        mime: string;
+        size: number;
+        path: string;
+      }>;
+    }
+  > {
     const obs = this.db
       .prepare(`SELECT * FROM observations WHERE step_id = ? ORDER BY sequence`)
       .all(stepId) as ObservationRecord[];
@@ -483,7 +569,12 @@ export class Store {
     );
     return obs.map((o) => ({
       ...o,
-      artifacts: getArtifacts.all(o.id) as Array<{ sha256: string; mime: string; size: number; path: string }>,
+      artifacts: getArtifacts.all(o.id) as Array<{
+        sha256: string;
+        mime: string;
+        size: number;
+        path: string;
+      }>,
     }));
   }
 
@@ -500,7 +591,12 @@ export class Store {
       source: string;
       capturedAt: string;
       summary: unknown;
-      artifacts?: Array<{ sha256: string; mime: string; size: number; path: string }>;
+      artifacts?: Array<{
+        sha256: string;
+        mime: string;
+        size: number;
+        path: string;
+      }>;
     }>;
   }): void {
     const tx = this.db.transaction(() => {
@@ -509,7 +605,13 @@ export class Store {
           `INSERT INTO steps(id, run_id, environment_id, sequence, action_id, status, created_at)
            VALUES(?, ?, ?, ?, NULL, 'committed', ?)`,
         )
-        .run(input.stepId, input.runId, input.environmentId, input.sequence, new Date().toISOString());
+        .run(
+          input.stepId,
+          input.runId,
+          input.environmentId,
+          input.sequence,
+          new Date().toISOString(),
+        );
       const insertObs = this.db.prepare(
         `INSERT INTO observations(id, run_id, environment_id, step_id, sequence, source, captured_at, summary_json)
          VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -551,10 +653,17 @@ export class Store {
     }>;
     return steps.map((s) => {
       const action = s.action_id
-        ? (this.db.prepare(`SELECT * FROM actions WHERE id = ?`).get(s.action_id) as ActionRecord)
+        ? (this.db
+            .prepare(`SELECT * FROM actions WHERE id = ?`)
+            .get(s.action_id) as ActionRecord)
         : null;
       return {
-        step: { id: s.id, sequence: s.sequence, actionId: s.action_id, status: s.status },
+        step: {
+          id: s.id,
+          sequence: s.sequence,
+          actionId: s.action_id,
+          status: s.status,
+        },
         action,
         observations: this.getStepObservations(s.id),
       };
@@ -605,9 +714,9 @@ export class Store {
   }
 
   getFinding(id: string): FindingRecord | undefined {
-    return this.db
-      .prepare(`${FINDING_SELECT} WHERE id = ?`)
-      .get(id) as FindingRecord | undefined;
+    return this.db.prepare(`${FINDING_SELECT} WHERE id = ?`).get(id) as
+      | FindingRecord
+      | undefined;
   }
 
   listFindings(limit = 100): FindingRecord[] {
@@ -659,16 +768,24 @@ export class Store {
    * same-millisecond ties). */
   listOracleEvaluationsForFinding(findingId: string): OracleEvaluationRecord[] {
     const rows = this.db
-      .prepare(`${this.selectOracleEvaluations("WHERE finding_id = ?")} ORDER BY created_at, rowid`)
-      .all(findingId) as Array<Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }>;
+      .prepare(
+        `${this.selectOracleEvaluations("WHERE finding_id = ?")} ORDER BY created_at, rowid`,
+      )
+      .all(findingId) as Array<
+      Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }
+    >;
     return rows.map((r) => ({ ...r, reproduced: r.reproduced !== 0 }));
   }
 
   /** Evaluation history for a whole run in insertion order. */
   listOracleEvaluationsForRun(runId: string): OracleEvaluationRecord[] {
     const rows = this.db
-      .prepare(`${this.selectOracleEvaluations("WHERE run_id = ?")} ORDER BY created_at, rowid`)
-      .all(runId) as Array<Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }>;
+      .prepare(
+        `${this.selectOracleEvaluations("WHERE run_id = ?")} ORDER BY created_at, rowid`,
+      )
+      .all(runId) as Array<
+      Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }
+    >;
     return rows.map((r) => ({ ...r, reproduced: r.reproduced !== 0 }));
   }
 }

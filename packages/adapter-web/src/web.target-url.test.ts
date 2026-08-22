@@ -56,10 +56,7 @@ function startApp(): Promise<{ server: Server; origin: string }> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       const path = (req.url ?? "/").split("?")[0];
-      const body =
-        path === "/page2.html"
-          ? PAGE2
-          : PAGE_INDEX;
+      const body = path === "/page2.html" ? PAGE2 : PAGE_INDEX;
       res.writeHead(200, { "content-type": "text/html" });
       res.end(body);
     });
@@ -85,7 +82,9 @@ async function closeClient(): Promise<void> {
   }
 }
 
-async function startWeb(env: Record<string, string> = {}): Promise<AdapterClient> {
+async function startWeb(
+  env: Record<string, string> = {},
+): Promise<AdapterClient> {
   return AdapterClient.spawn({
     command: process.execPath,
     args: ["--import", "tsx", webBin],
@@ -93,8 +92,21 @@ async function startWeb(env: Record<string, string> = {}): Promise<AdapterClient
   });
 }
 
-function act(id: string, kind: string, input?: Record<string, unknown>): Action {
-  return { id, runId: "run", environmentId: "env", kind, risk: "interact", deadlineMs: 10000, idempotency: "safe-retry", input };
+function act(
+  id: string,
+  kind: string,
+  input?: Record<string, unknown>,
+): Action {
+  return {
+    id,
+    runId: "run",
+    environmentId: "env",
+    kind,
+    risk: "interact",
+    deadlineMs: 10000,
+    idempotency: "safe-retry",
+    input,
+  };
 }
 
 describe("web adapter external targetUrl", () => {
@@ -102,7 +114,9 @@ describe("web adapter external targetUrl", () => {
     const app = await startApp();
     apps.push(app);
     client = await startWeb();
-    await client.request("initialize", {});
+    // Cold adapter start (tsx compile + Playwright import) contends with
+    // the rest of the unit suite; match the lifecycle call's budget.
+    await client.request("initialize", {}, 30000);
     await client.request(
       "lifecycle",
       { op: "create", options: { targetUrl: `${app.origin}/` } },
@@ -112,7 +126,9 @@ describe("web adapter external targetUrl", () => {
       "observe",
       { observe: ["url", "title", "uiTree"] },
       20000,
-    )) as { summary: { url: string; title: string; uiTree: Array<{ id: string }> } };
+    )) as {
+      summary: { url: string; title: string; uiTree: Array<{ id: string }> };
+    };
     expect(obs.summary.url).toBe(`${app.origin}/`);
     expect(obs.summary.title).toBe("Dogfood App");
     expect(obs.summary.uiTree.some((e) => e.id === "go")).toBe(true);
@@ -123,19 +139,51 @@ describe("web adapter external targetUrl", () => {
     const app = await startApp();
     apps.push(app);
     client = await startWeb();
-    await client.request("lifecycle", { op: "create", options: { targetUrl: `${app.origin}/` } }, 30000);
-    await client.request("act", { action: act("t1", "fill", { selector: "#name", value: "inspector" }) }, 15000);
-    await client.request("act", { action: act("t2", "click", { selector: "#go" }) }, 15000);
-    const obs = (await client.request("observe", { observe: ["url", "uiTree", "storage"] }, 20000)) as {
-      summary: { url: string; uiTree: Array<{ id: string; text?: string }>; storage: Record<string, string> };
+    await client.request(
+      "lifecycle",
+      { op: "create", options: { targetUrl: `${app.origin}/` } },
+      30000,
+    );
+    await client.request(
+      "act",
+      { action: act("t1", "fill", { selector: "#name", value: "inspector" }) },
+      15000,
+    );
+    await client.request(
+      "act",
+      { action: act("t2", "click", { selector: "#go" }) },
+      15000,
+    );
+    const obs = (await client.request(
+      "observe",
+      { observe: ["url", "uiTree", "storage"] },
+      20000,
+    )) as {
+      summary: {
+        url: string;
+        uiTree: Array<{ id: string; text?: string }>;
+        storage: Record<string, string>;
+      };
     };
     expect(obs.summary.url).toBe(`${app.origin}/page2.html`);
     expect(obs.summary.storage["df-name"]).toBe("inspector");
     expect(obs.summary.uiTree.some((e) => e.id === "stateBtn")).toBe(true);
     // Client-side state mutation via click.
-    await client.request("act", { action: act("t3", "click", { selector: "#stateBtn" }) }, 15000);
-    await client.request("act", { action: act("t4", "click", { selector: "#stateBtn" }) }, 15000);
-    const obs2 = (await client.request("observe", { observe: ["storage"] }, 20000)) as {
+    await client.request(
+      "act",
+      { action: act("t3", "click", { selector: "#stateBtn" }) },
+      15000,
+    );
+    await client.request(
+      "act",
+      { action: act("t4", "click", { selector: "#stateBtn" }) },
+      15000,
+    );
+    const obs2 = (await client.request(
+      "observe",
+      { observe: ["storage"] },
+      20000,
+    )) as {
       summary: { storage: Record<string, string> };
     };
     expect(obs2.summary.storage["df-count"]).toBe("2");
@@ -146,8 +194,16 @@ describe("web adapter external targetUrl", () => {
     const app = await startApp();
     apps.push(app);
     client = await startWeb();
-    await client.request("lifecycle", { op: "create", options: { targetUrl: `${app.origin}/page2.html` } }, 30000);
-    const outcome = (await client.request("act", { action: act("e1", "click", { selector: "#errorBtn" }) }, 15000)) as {
+    await client.request(
+      "lifecycle",
+      { op: "create", options: { targetUrl: `${app.origin}/page2.html` } },
+      30000,
+    );
+    const outcome = (await client.request(
+      "act",
+      { action: act("e1", "click", { selector: "#errorBtn" }) },
+      15000,
+    )) as {
       status: string;
       error?: { code: string };
     };
@@ -161,18 +217,36 @@ describe("web adapter external targetUrl", () => {
     const appB = await startApp();
     apps.push(appA, appB);
     client = await startWeb();
-    await client.request("lifecycle", { op: "create", options: { targetUrl: `${appA.origin}/` } }, 30000);
+    await client.request(
+      "lifecycle",
+      { op: "create", options: { targetUrl: `${appA.origin}/` } },
+      30000,
+    );
     // Navigation to another (even localhost) origin is denied.
     await expect(
-      client.request("act", { action: act("o1", "navigate", { value: `${appB.origin}/` }) }, 15000),
+      client.request(
+        "act",
+        { action: act("o1", "navigate", { value: `${appB.origin}/` }) },
+        15000,
+      ),
     ).rejects.toThrow(/CAPABILITY_DENIED/);
     // Remote origins remain denied too.
     await expect(
-      client.request("act", { action: act("o2", "navigate", { value: "https://evil.example.com/" }) }, 15000),
+      client.request(
+        "act",
+        {
+          action: act("o2", "navigate", { value: "https://evil.example.com/" }),
+        },
+        15000,
+      ),
     ).rejects.toThrow(/CAPABILITY_DENIED/);
     // And remote targetUrls are rejected outright at create.
     await expect(
-      client.request("lifecycle", { op: "create", options: { targetUrl: "https://example.com/" } }, 30000),
+      client.request(
+        "lifecycle",
+        { op: "create", options: { targetUrl: "https://example.com/" } },
+        30000,
+      ),
     ).rejects.toThrow(/localhost/i);
     await closeClient();
   }, 90000);
@@ -181,10 +255,22 @@ describe("web adapter external targetUrl", () => {
     const app = await startApp();
     apps.push(app);
     client = await startWeb();
-    await client.request("lifecycle", { op: "create", options: { targetUrl: `${app.origin}/page2.html` } }, 30000);
-    await client.request("act", { action: act("r1", "click", { selector: "#stateBtn" }) }, 15000);
+    await client.request(
+      "lifecycle",
+      { op: "create", options: { targetUrl: `${app.origin}/page2.html` } },
+      30000,
+    );
+    await client.request(
+      "act",
+      { action: act("r1", "click", { selector: "#stateBtn" }) },
+      15000,
+    );
     await client.request("lifecycle", { op: "reset" }, 15000);
-    const obs = (await client.request("observe", { observe: ["url", "storage"] }, 20000)) as {
+    const obs = (await client.request(
+      "observe",
+      { observe: ["url", "storage"] },
+      20000,
+    )) as {
       summary: { url: string; storage: Record<string, string> };
     };
     expect(obs.summary.url).toBe(`${app.origin}/page2.html`);
@@ -193,9 +279,15 @@ describe("web adapter external targetUrl", () => {
     // Honest reset: kill the server, reset must report ok:false.
     await closeClient();
     client = await startWeb();
-    await client.request("lifecycle", { op: "create", options: { targetUrl: `${app.origin}/page2.html` } }, 30000);
+    await client.request(
+      "lifecycle",
+      { op: "create", options: { targetUrl: `${app.origin}/page2.html` } },
+      30000,
+    );
     app.server.close();
-    const res = (await client.request("lifecycle", { op: "reset" }, 30000)) as { ok: boolean };
+    const res = (await client.request("lifecycle", { op: "reset" }, 30000)) as {
+      ok: boolean;
+    };
     expect(res.ok).toBe(false);
     await closeClient();
   }, 120000);
@@ -203,7 +295,11 @@ describe("web adapter external targetUrl", () => {
   it("absence of targetUrl keeps seeded behavior unchanged", async () => {
     client = await startWeb();
     await client.request("lifecycle", { op: "create" }, 30000);
-    const obs = (await client.request("observe", { observe: ["url", "title", "uiTree"] }, 20000)) as {
+    const obs = (await client.request(
+      "observe",
+      { observe: ["url", "title", "uiTree"] },
+      20000,
+    )) as {
       summary: { title: string; uiTree: Array<{ id: string }> };
     };
     expect(obs.summary.title).toBe("SeedBank");
