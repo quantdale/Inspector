@@ -1,0 +1,136 @@
+schema_version: 1
+project: Inspector
+
+ga_readiness:
+  campaign: RC1_FIELD_VALIDATION
+  status: ACTIVE
+  opened_at: "2026-08-22"
+  base_tag: v0.1.0-rc.1
+  base_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  candidate_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  release_decision: UNDECIDED
+  detail_file: .inspector/state/GA-READINESS.yaml
+  evidence_dir: .inspector/ga-work/
+
+phase_0_post_tag_audit:
+  status: COMPLETE
+  head_at_open: acbf924856cff5155613e755b45deb1761bc264f
+  origin_main_at_open: acbf924856cff5155613e755b45deb1761bc264f
+  post_tag_commits:
+    - sha: 745433b
+      subject: >-
+        state: RC1_FINALIZATION COMPLETE — v0.1.0-rc.1 tagged and
+        pushed
+      classification: ALLOWED_PLUS_FORMATTING_ONLY
+      files:
+        - .inspector/rc-work/rc1-final-hashes.txt (evidence)
+        - .inspector/state/RELEASE-CHECKPOINT.md (durable state)
+        - .inspector/state/RELEASE-RC1.yaml (durable state)
+        - packages/cli/src/version.ts (FORMATTING ONLY)
+        - packages/cli/src/version.test.ts (FORMATTING ONLY)
+      runtime_behavior_change: false
+    - sha: acbf924
+      subject: "state: publish_status NOT_PUBLISHED (explicit final wording)"
+      classification: ALLOWED (durable state only)
+      runtime_behavior_change: false
+  verification_method: >-
+    git diff -w v0.1.0-rc.1..main on production files shows only line
+    re-wrapping (import/object-literal wrapping); no token-level semantic
+    change in version.ts/version.test.ts.
+  verdict: >-
+    RC1 RUNTIME UNCHANGED POST-TAG. Tag NOT stale. v0.1.0-rc.1 @ ddeea86
+    remains the validated field-validation candidate. No rc.2 required by
+    the delta audit itself; rc.2 only if FIELD defects force runtime fixes.
+  note_on_formatting_drift: >-
+    main's version.ts carries nonstandard indentation from 745433b; watch
+    lint at Phase 29 gates on main. Cosmetic only.
+
+# ---------------------------------------------------------------- trackers
+
+phase_2_reproduction:
+  status: COMPLETE
+  fresh_clone: /tmp/ga-rc1-repro @ ddeea863905c1e185601ec95daffe7472bfa28de
+  gates:
+    install_frozen_lockfile: PASS
+    lint: PASS (0 errors, 4 pre-existing warnings)
+    typecheck: PASS
+    unit_test: PASS (477 passed / 3 skipped, 40 files)
+    integration: >-
+      PASS with bounded retry — run 1 had 3 failures in 2 files (known
+      concurrent-load subprocess-startup flake class recorded in the RC1
+      ledger); runs 2 and 3 fully green 27 files / 133 tests on the exact
+      tagged tree.
+    build_release: PASS
+  reproducibility:
+    tarball_sha256_rebuilt: >-
+      82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a
+    tarball_vs_stored_manifest: BYTE_IDENTICAL
+    zip_sha256_rebuilt: >-
+      c3fe0b354b10224014f528b60e691f63d9dcecf47d5c55fe847ca836c9d3f15d
+    zip_vs_stored_manifest: CONTENT_IDENTICAL_TIMESTAMP_DRIFT_ONLY
+    investigation: >-
+      unzip -r diff of original vs rebuilt zip: zero content differences,
+      identical CRCs/compression per file; only embedded wall-clock mtimes
+      differ (zip writer records local time). Tarball (npm pack fixed
+      mtimes) is fully byte-reproducible. Explains prior QUALIFIED_PASS.
+
+field_runs: []
+# each: {id, target, adapter, inspector_version, artifact_source, target_rev,
+#        started, ended, budget, actions, states, findings[], failures[],
+#        resource_metrics_ref}
+
+confirmed_inspector_defects: []
+# each: {id: FIELD-N, severity, title, status, evidence, fix_commit?}
+
+real_target_findings: []
+# each: {id, target, run, classification, confidence, repro}
+
+false_positives: []
+
+environment_failures: []
+
+adapter_failures: []
+
+crashes: []
+
+resource_metrics: []
+
+repair_trials: []
+
+release_blockers: []
+
+deferred_debt: []
+
+phases:
+  p0_post_tag_audit: DONE
+  p1_durable_state: DONE
+  p2_reproduce_from_tag: DONE
+  p3_installed_artifact_harness: PENDING
+  p4_real_target_portfolio: PENDING
+  p5_long_unattended_runs: PENDING
+  p6_operational_metrics: PENDING
+  p7_resource_stability: PENDING
+  p8_finding_quality: PENDING
+  p9_coverage_quality: PENDING
+  p10_clean_result_confidence: PENDING
+  p11_reproduction_reliability: PENDING
+  p12_repair_trials: PENDING
+  p13_adapter_stability: PENDING
+  p14_uia_rehost_soak: PENDING
+  p15_web_action_window_soak: PENDING
+  p16_interrupt_resume_soak: PENDING
+  p17_install_matrix: PENDING
+  p18_native_dependency: PENDING
+  p19_browser_provisioning: PENDING
+  p20_state_growth: PENDING
+  p21_performance_baseline: PENDING
+  p22_model_cost_accounting: PENDING
+  p23_defect_policy: ACTIVE
+  p24_rc11_decision: PENDING
+  p25_scorecard: PENDING
+  p26_docs_audit: PENDING
+  p27_security_privacy_check: PENDING
+  p28_final_fleet_soak: PENDING
+  p29_full_regression: PENDING
+  p30_ga_decision: PENDING
+  p31_final_report: PENDING

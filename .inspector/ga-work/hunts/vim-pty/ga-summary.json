@@ -1,0 +1,106 @@
+{
+  "sessions": 3,
+  "stepsPerSession": 80,
+  "sessionSummaries": [
+    {
+      "session": 0,
+      "interactions": 88,
+      "novelScreens": 88,
+      "nonSuccessActions": [],
+      "ctrlCStatus": "success",
+      "ctrlCError": null,
+      "killProbe": {},
+      "closeResult": {
+        "ok": true
+      },
+      "closeError": null,
+      "aliveAfterClose": false
+    },
+    {
+      "session": 1,
+      "interactions": 88,
+      "novelScreens": 73,
+      "nonSuccessActions": [],
+      "ctrlCStatus": "success",
+      "ctrlCError": null,
+      "killProbe": {},
+      "closeResult": {
+        "ok": true
+      },
+      "closeError": null,
+      "aliveAfterClose": false
+    },
+    {
+      "session": 2,
+      "interactions": 89,
+      "novelScreens": 89,
+      "nonSuccessActions": [
+        [
+          88,
+          "act-after-external-kill",
+          "target-failure",
+          {
+            "code": "ACTION_FAILED",
+            "message": "session not alive"
+          }
+        ]
+      ],
+      "ctrlCStatus": "success",
+      "ctrlCError": null,
+      "killProbe": {
+        "pid": "122976",
+        "alivePollsMs300": [
+          true,
+          true,
+          true,
+          false
+        ],
+        "aliveAfter": false,
+        "postKillStatus": "target-failure",
+        "postKillError": {
+          "code": "ACTION_FAILED",
+          "message": "session not alive"
+        }
+      },
+      "closeResult": {
+        "ok": true
+      },
+      "closeError": null,
+      "aliveAfterClose": false
+    }
+  ],
+  "resources": [
+    {
+      "tag": "boot",
+      "rssMB": 71.2,
+      "heapUsedMB": 14.4,
+      "vimProcesses": 0,
+      "openHandlesApprox": 0,
+      "requestsApprox": 2
+    },
+    {
+      "tag": "after-session-0",
+      "rssMB": 76.1,
+      "heapUsedMB": 11.1,
+      "vimProcesses": 1,
+      "openHandlesApprox": 5,
+      "requestsApprox": 0
+    },
+    {
+      "tag": "after-session-1",
+      "rssMB": 77.4,
+      "heapUsedMB": 10.6,
+      "vimProcesses": 1,
+      "openHandlesApprox": 6,
+      "requestsApprox": 0
+    },
+    {
+      "tag": "after-session-2",
+      "rssMB": 77.5,
+      "heapUsedMB": 11,
+      "vimProcesses": 0,
+      "openHandlesApprox": 4,
+      "requestsApprox": 0
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "cyclesTotal": 2,
+  "cyclesFatal": 0,
+  "interactionsTotal": 38,
+  "successTotal": 34,
+  "failureTotal": 4,
+  "reattachEventsTotal": 0,
+  "killProbes": [
+    {
+      "target": "notepad",
+      "cycle": 1,
+      "killed": true,
+      "statusAfterKill": {
+        "alive": false,
+        "pid": 132944
+      },
+      "opAfterKillError": "WindowsBackendError: attached pid 132944 is not running; refusing to return a stale tree"
+    }
+  ],
+  "resources": [
+    {
+      "afterCycle": "notepad#0",
+      "rssMB": 61,
+      "powershellProcesses": 9
+    },
+    {
+      "afterCycle": "notepad#1",
+      "rssMB": 61.1,
+      "powershellProcesses": 9
+    }
+  ],
+  "cycles": [
+    {
+      "target": "notepad",
+      "cycle": 0,
+      "pid": 114480,
+      "attachedVia": "named-pid",
+      "treeNodesFirst": 38,
+      "interactions": 25,
+      "successes": 23,
+      "failures": [
+        {
+          "rid": "42-20056548-4-143",
+          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
+        },
+        {
+          "rid": "42-8719022-4-158",
+          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
+        }
+      ],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false
+    },
+    {
+      "target": "notepad",
+      "cycle": 1,
+      "pid": 132944,
+      "attachedVia": "named-pid",
+      "treeNodesFirst": 47,
+      "interactions": 13,
+      "successes": 11,
+      "failures": [
+        {
+          "rid": "42-11144554-4-147",
+          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
+        },
+        {
+          "rid": "42-21563884-4-159",
+          "error": "Error: Exception calling \"Invoke\" with \"0\" argument(s): \"Specified cast is not valid.\""
+        }
+      ],
+      "reattachEvents": 0,
+      "closeOk": true,
+      "residualProcessKilled": false,
+      "killProbe": {
+        "killed": true,
+        "statusAfterKill": {
+          "alive": false,
+          "pid": 132944
+        },
+        "opAfterKillError": "WindowsBackendError: attached pid 132944 is not running; refusing to return a stale tree"
+      }
+    }
+  ]
+}

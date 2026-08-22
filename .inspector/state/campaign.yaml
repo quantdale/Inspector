@@ -227,7 +227,8 @@ hardening:
       coverage. Full ledger with evidence in
       .inspector/state/HARDENING-CHECKPOINT.md. Zero unresolved
       Critical/High defects remain.
-  last_verified_commit: HEAD (HARDENING_1 final commit; gate run on this exact tree)
+  last_verified_commit: >-
+    HEAD (HARDENING_1 final commit; gate run on this exact tree)
   last_full_gate: >-
     FINAL EXIT GATE PASS: pnpm install --frozen-lockfile OK; lint 0
     errors (5 pre-existing warnings); typecheck exit 0; unit 387 passed
@@ -272,7 +273,8 @@ dogfood:
   verified_commit: 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff
   gate_result: PASS
   gate_evidence: >-
-    Phase 32 on 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff tree: install/lint/typecheck OK; unit 460 passed /
+    Phase 32 on 2a1fb6a71324a1a1d2e3ad63153c2d99a7f8a6ff tree:
+    install/lint/typecheck OK; unit 460 passed /
     3 skipped; integration all 27 files' suites green across two full runs
     with one environmental startup-flake per run (windows real-UIA Paint,
     explore determinism init), each file verified green in isolation
@@ -313,7 +315,9 @@ dogfood:
       createOptions channel
     - real PTY backend via @lydell/node-pty (packages/cli-adapter)
     - real Windows UIA backend via PowerShell bridge (packages/windows-adapter)
-    - real ADB backend incl. emulator boot/liveness verification (packages/android)
+    - >-
+      real ADB backend incl. emulator boot/liveness verification
+      (packages/android)
     - CLI hunt/findings/runs-resume/doctor capability surface (packages/cli)
 
 stop_conditions:
@@ -328,3 +332,21 @@ stop_conditions:
   - deterministic_gate_failure_with_no_safe_forward_path
 
 next_milestone_after_completion: null
+
+ga_readiness:
+  campaign: RC1_FIELD_VALIDATION
+  status: ACTIVE
+  opened_at: "2026-08-22"
+  base_tag: v0.1.0-rc.1
+  base_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  candidate_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  release_decision: UNDECIDED
+  detail_file: .inspector/state/GA-READINESS.yaml
+  evidence_dir: .inspector/ga-work/
+  post_tag_audit: >-
+    COMPLETE — ddeea86..acbf924 contains only durable-state/evidence commits
+    plus formatting-only edits to packages/cli/src/version{,.test}.ts (git
+    diff -w verified, no semantic change). RC1 runtime unchanged; tag NOT
+    stale.
+  note: >-
+    Historical blocks above are completed-campaign records — DO NOT mutate.
