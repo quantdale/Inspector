@@ -30,9 +30,14 @@ const EVIDENCE_DIR = join(here, "..", "p3-installed-artifact");
 mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 const EXPECTED_TGZ_SHA256 =
-  "82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a"; // phase_2 rebuilt-from-tag hash
-const TGZ = join(REPO_ROOT, "dist-release", "inspector-cli-0.1.0-rc.1.tgz");
-const VERSION = "0.1.0-rc.1";
+  process.env.GA_EXPECTED_TGZ_SHA256 ??
+  "dc16434aae1c42053a5f65746b217ea8ad8ce52f97d57f4dfff27d7ce22f1263"; // GA rc.2 rebuild from fixed tree
+const TGZ = join(
+  REPO_ROOT,
+  "dist-release",
+  `inspector-cli-${process.env.GA_RELEASE_VERSION ?? "0.1.0-rc.2"}.tgz`,
+);
+const VERSION = process.env.GA_RELEASE_VERSION ?? "0.1.0-rc.2";
 const npmBin = process.platform === "win32" ? "npm.cmd" : "npm";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -109,7 +114,11 @@ const record = (name, ok, detail) => {
 // 1. tarball integrity -------------------------------------------------------
 if (!existsSync(TGZ)) throw new Error(`release tarball missing: ${TGZ}`);
 const tgzSha = sha256File(TGZ);
-record("tarball-sha256-matches-phase2-rebuild", tgzSha === EXPECTED_TGZ_SHA256, { tgzSha });
+record(
+  "tarball-sha256-matches-recorded",
+  tgzSha === EXPECTED_TGZ_SHA256,
+  { tgzSha, note: "GA rc.2 candidate rebuilt from fixed tree; provenance in GA-READINESS.yaml" },
+);
 
 // 2. extract + fingerprint ---------------------------------------------------
 const extractDir = mkdtempSync(join(tmpdir(), "ga-p3-extract-"));

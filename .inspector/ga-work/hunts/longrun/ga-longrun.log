@@ -1,0 +1,11 @@
+C:\Users\Michael Roy\AppData\Roaming\npm\node_modules\inspector-cli\node_modules\better-sqlite3\lib\database.js:65
+		throw new TypeError('Cannot open database because the directory does not exist');
+		      ^
+
+TypeError: Cannot open database because the directory does not exist
+    at new Database (C:\Users\Michael Roy\AppData\Roaming\npm\node_modules\inspector-cli\node_modules\better-sqlite3\lib\database.js:65:9)
+    at checkpoint (file:///C:/Users/Michael%20Roy/Documents/Inspector/.inspector/ga-work/hunts/longrun/ga-longrun.mjs:62:14)
+    at file:///C:/Users/Michael%20Roy/Documents/Inspector/.inspector/ga-work/hunts/longrun/ga-longrun.mjs:105:22
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+Node.js v22.23.2

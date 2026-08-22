@@ -1,0 +1,611 @@
+{
+  "summary": {
+    "inspectorEntry": "C:\\Users\\Michael Roy\\AppData\\Roaming\\npm\\node_modules\\inspector-cli\\bundle\\inspector-cli.js",
+    "targetUrl": "http://127.0.0.1:65175/",
+    "cycles": 14,
+    "resumed": 11,
+    "rejected": 3,
+    "integrityFailures": 0,
+    "uniqueConstraintErrors": 0,
+    "busyOrLockErrors": 0,
+    "cleanupFailures": 0,
+    "terminalGuard": {
+      "label": "terminal-guard",
+      "finalHuntStatus": "closed",
+      "resumeExit": 1,
+      "honestRejection": true,
+      "reason": "run run_93a9a5e2e7ab4c4f8b9e342b7c36f96e already closed; there is nothing to resume"
+    },
+    "verdict": "PASS"
+  },
+  "rows": [
+    {
+      "label": "kill@4000ms#0",
+      "delayMs": 4000,
+      "seed": 5,
+      "startedAt": "2026-08-22T19:12:52.943Z",
+      "endedAt": "2026-08-22T19:12:59.998Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_68c5c7ff09684179b1e4e6d932edf3df",
+            "status": "created"
+          }
+        ],
+        "steps": 0,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 0,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 1,
+      "resumeClass": "rejected",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_68c5c7ff09684179b1e4e6d932edf3df",
+            "status": "created"
+          }
+        ],
+        "steps": 0,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 0,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "cannot determine the original adapter kind for run run_68c5c7ff09684179b1e4e6d932edf3df (recorded adapter: 'node.exe'); refusing to guess",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@6000ms#1",
+      "delayMs": 6000,
+      "seed": 6,
+      "startedAt": "2026-08-22T19:13:00.005Z",
+      "endedAt": "2026-08-22T19:13:09.695Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_d3125000710744d0a45211c776aa542d",
+            "status": "created"
+          }
+        ],
+        "steps": 37,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 19,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_d3125000710744d0a45211c776aa542d",
+            "status": "closed"
+          }
+        ],
+        "steps": 39,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 19,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 39, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@8000ms#2",
+      "delayMs": 8000,
+      "seed": 7,
+      "startedAt": "2026-08-22T19:13:09.696Z",
+      "endedAt": "2026-08-22T19:13:21.851Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_3f7d650d87f84a8db7c0d913ab21df82",
+            "status": "created"
+          }
+        ],
+        "steps": 39,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 20,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_3f7d650d87f84a8db7c0d913ab21df82",
+            "status": "closed"
+          }
+        ],
+        "steps": 41,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 20,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 41, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@10000ms#3",
+      "delayMs": 10000,
+      "seed": 8,
+      "startedAt": "2026-08-22T19:13:21.852Z",
+      "endedAt": "2026-08-22T19:13:34.693Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5e17e921a6eb4c9e92fd3ed461686ece",
+            "status": "failed"
+          }
+        ],
+        "steps": 61,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 31,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 1,
+      "resumeClass": "rejected",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5e17e921a6eb4c9e92fd3ed461686ece",
+            "status": "failed"
+          }
+        ],
+        "steps": 61,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 31,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "run run_5e17e921a6eb4c9e92fd3ed461686ece already failed; there is nothing to resume",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@12000ms#4",
+      "delayMs": 12000,
+      "seed": 9,
+      "startedAt": "2026-08-22T19:13:34.694Z",
+      "endedAt": "2026-08-22T19:13:52.112Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_0c391836db824c2c9c554c5d8c6ec2cf",
+            "status": "created"
+          }
+        ],
+        "steps": 90,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 45,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_0c391836db824c2c9c554c5d8c6ec2cf",
+            "status": "closed"
+          }
+        ],
+        "steps": 91,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 45,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 91, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@16000ms#5",
+      "delayMs": 16000,
+      "seed": 10,
+      "startedAt": "2026-08-22T19:13:52.113Z",
+      "endedAt": "2026-08-22T19:14:12.165Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_888b90a7efee44c094dc403b14eca554",
+            "status": "created"
+          }
+        ],
+        "steps": 155,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 77,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_888b90a7efee44c094dc403b14eca554",
+            "status": "closed"
+          }
+        ],
+        "steps": 157,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 77,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 157, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@8000ms#6",
+      "delayMs": 8000,
+      "seed": 11,
+      "startedAt": "2026-08-22T19:14:12.166Z",
+      "endedAt": "2026-08-22T19:14:26.611Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_3ab5aa03695e47d399e1e3ee8ff8aa29",
+            "status": "created"
+          }
+        ],
+        "steps": 64,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 32,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_3ab5aa03695e47d399e1e3ee8ff8aa29",
+            "status": "closed"
+          }
+        ],
+        "steps": 65,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 32,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 65, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@12000ms#7",
+      "delayMs": 12000,
+      "seed": 12,
+      "startedAt": "2026-08-22T19:14:26.612Z",
+      "endedAt": "2026-08-22T19:14:41.752Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_340c7f4309fa4fec879b2d49dc069332",
+            "status": "created"
+          }
+        ],
+        "steps": 99,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 50,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_340c7f4309fa4fec879b2d49dc069332",
+            "status": "closed"
+          }
+        ],
+        "steps": 101,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 50,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 101, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@8000ms#8",
+      "delayMs": 8000,
+      "seed": 13,
+      "startedAt": "2026-08-22T19:14:41.754Z",
+      "endedAt": "2026-08-22T19:14:53.912Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_10acd83fc48949938a7a2cf71b6e5979",
+            "status": "created"
+          }
+        ],
+        "steps": 61,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 31,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_10acd83fc48949938a7a2cf71b6e5979",
+            "status": "closed"
+          }
+        ],
+        "steps": 63,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 31,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 63, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@12000ms#9",
+      "delayMs": 12000,
+      "seed": 14,
+      "startedAt": "2026-08-22T19:14:53.913Z",
+      "endedAt": "2026-08-22T19:15:08.352Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5dc707872b6d47b3975c33e85d383214",
+            "status": "failed"
+          }
+        ],
+        "steps": 86,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 44,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 1,
+      "resumeClass": "rejected",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5dc707872b6d47b3975c33e85d383214",
+            "status": "failed"
+          }
+        ],
+        "steps": 86,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 44,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "run run_5dc707872b6d47b3975c33e85d383214 already failed; there is nothing to resume",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@8000ms#10",
+      "delayMs": 8000,
+      "seed": 15,
+      "startedAt": "2026-08-22T19:15:08.354Z",
+      "endedAt": "2026-08-22T19:15:20.873Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_72ba057571fe412d81b20358515cdb81",
+            "status": "created"
+          }
+        ],
+        "steps": 53,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 27,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_72ba057571fe412d81b20358515cdb81",
+            "status": "closed"
+          }
+        ],
+        "steps": 55,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 27,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 55, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@12000ms#11",
+      "delayMs": 12000,
+      "seed": 16,
+      "startedAt": "2026-08-22T19:15:20.874Z",
+      "endedAt": "2026-08-22T19:15:36.616Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_da834a2c5eef47c99089329c2443070d",
+            "status": "created"
+          }
+        ],
+        "steps": 77,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 39,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_da834a2c5eef47c99089329c2443070d",
+            "status": "closed"
+          }
+        ],
+        "steps": 79,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 39,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 79, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@8000ms#12",
+      "delayMs": 8000,
+      "seed": 17,
+      "startedAt": "2026-08-22T19:15:36.617Z",
+      "endedAt": "2026-08-22T19:15:48.592Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5bc72ea7df1d4d2da0e7f78c819b3e67",
+            "status": "created"
+          }
+        ],
+        "steps": 53,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 27,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_5bc72ea7df1d4d2da0e7f78c819b3e67",
+            "status": "closed"
+          }
+        ],
+        "steps": 55,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 27,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 55, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    },
+    {
+      "label": "kill@12000ms#13",
+      "delayMs": 12000,
+      "seed": 18,
+      "startedAt": "2026-08-22T19:15:48.594Z",
+      "endedAt": "2026-08-22T19:16:04.854Z",
+      "killedWhileRunning": true,
+      "killStatus": 0,
+      "killedState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_eac856c053494b64bb912106d0021acf",
+            "status": "created"
+          }
+        ],
+        "steps": 90,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 45,
+        "duplicateActionIds": 0
+      },
+      "resumeExit": 0,
+      "resumeClass": "resumed",
+      "uniqueConstraintError": false,
+      "busyOrLockError": false,
+      "postResumeState": {
+        "runCount": 1,
+        "runs": [
+          {
+            "id": "run_eac856c053494b64bb912106d0021acf",
+            "status": "closed"
+          }
+        ],
+        "steps": 91,
+        "sequencesStrictlyIncreasing": true,
+        "actions": 45,
+        "duplicateActionIds": 0
+      },
+      "integrityOk": true,
+      "resumeReasonSample": "  \"stepsRecorded\": 91, |   \"finalStatus\": \"created\" | }",
+      "cleanupOk": true
+    }
+  ]
+}

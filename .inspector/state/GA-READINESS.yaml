@@ -74,6 +74,28 @@ phase_2_reproduction:
       differ (zip writer records local time). Tarball (npm pack fixed
       mtimes) is fully byte-reproducible. Explains prior QUALIFIED_PASS.
 
+candidate_staleness_decision:
+  status: DECIDED_RC2_REQUIRED
+  decided_at: "2026-08-23"
+  original_candidate: v0.1.0-rc.1 @ ddeea863905c1e185601ec95daffe7472bfa28de
+  original_tag_action: UNTOUCHED — historical validated artifact of record;
+    never moved or rewritten
+  runtime_changes_during_ga:
+    - cc0d34b FIELD-1 (HIGH): resume create-spec replay + regression
+    - e40fa2d FIELD-2 (MEDIUM): UIA cross-owner rehost recovery + regression
+  proposed_new_candidate:
+    version: 0.1.0-rc.2
+    built_from_tree: 85011ca9733c1dda3312acdb71bc1010332c482e
+    tarball: dist-release/inspector-cli-0.1.0-rc.2.tgz
+    tarball_sha256: dc16434aae1c42053a5f65746b217ea8ad8ce52f97d57f4dfff27d7ce22f1263
+    bundle_sha256: 48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571
+  rebuild_note: >-
+    Local rc.1-named artifacts in gitignored dist-release/ were overwritten
+    during the first rebuild attempt (default version stamp); the authoritative
+    rc.1 artifact remains byte-reproducible from tag ddeea86 (proven twice in
+    phase 2). All GA field runs after 2026-08-23 19:10 use installed rc.2.
+  tagging_authority: NONE GRANTED — no replacement tag created/pushed
+
 field_runs:
   - id: GA-WEB-WINDOW-SOAK-1
     target: inline scenario pages (Chromium)
@@ -188,14 +210,17 @@ phases:
   p1_durable_state: DONE
   p2_reproduce_from_tag: DONE
   p3_installed_artifact_harness: >-
-    PARTIAL — harness built+executed against installed rc.1 (18/20 checks
-    PASS incl. version/help/doctor/fake-hunt/web-hunt/findings/runs/
-    uninstall/no-source-leak); resume check exposed FIELD-1 (fixed at
-    cc0d34b); full PASS requires rc.2 rebuild from fixed tree.
-  p4_real_target_portfolio: IN_PROGRESS
-  # web x2 + control DONE (GA-WEB-PORTFOLIO-1); UIA x3 DONE (GA-UIA-PORTFOLIO-1);
-  # vim PTY + android AVD runs in flight; iOS stays DEFERRED_ENVIRONMENT
-  p5_long_unattended_runs: PENDING
+    DONE — 20/20 PASS on rc.2 candidate (dist disposable-prefix install,
+    version/help/doctor/fake-hunt/web-hunt/findings/runs/resume/cleanup,
+    no-source-leak guards, global parity repair to bit-identical rc.2).
+    Evidence: .inspector/ga-work/p3-installed-artifact/p3-summary.json
+  p4_real_target_portfolio: DONE
+  # web react+backbone honest-zero; UIA calc/mspaint/notepad; vim PTY;
+  # android com.android.settings on live AVD (60 actions/40 clicks/0 fail);
+  # seeded fake control labeled CONTROL. Electron NOT production-real
+  # (injectable-only proof) — recorded as debt, not claimed. iOS DEFERRED_ENVIRONMENT.
+  p5_long_unattended_runs: IN_PROGRESS
+  # ga-longrun.mjs 6 sequential web rounds in one workspace, running
   p6_operational_metrics: IN_PROGRESS
   p7_resource_stability: IN_PROGRESS
   p8_finding_quality: PARTIAL
@@ -210,11 +235,20 @@ phases:
   # GA-UIA-PORTFOLIO-1 + cast-matrix + calc-rehost probes; FIELD-2 fix landed
   p15_web_action_window_soak: DONE
   # GA-WEB-WINDOW-SOAK-1: 56/56 across S1-S6, timing distribution persisted
-  p16_interrupt_resume_soak: BLOCKED_ON_RC2_REBUILD
-  # harness ready (.inspector/ga-work/hunts/interrupt-resume/ga-interrupt-resume.mjs)
-  p17_install_matrix: PENDING
-  p18_native_dependency: PENDING
-  p19_browser_provisioning: PENDING
+  p16_interrupt_resume_soak: DONE
+  # vs INSTALLED rc.2: 14 abrupt kills (4s-16s + high-risk repeats): 11
+  # resumed, 3 honest documented rejections, terminal-run guard refuses
+  # closed runs, zero UNIQUE/BUSY errors, sequences strictly increasing,
+  # cleanup possible every cycle.
+  p17_install_matrix: DONE
+  # npm tarball global install (disposable prefix + machine-global); shim
+  # invocation proven from cmd, PowerShell, and Git Bash — all report rc.2.
+  p18_native_dependency: DONE
+  # better-sqlite3 + @lydell/node-pty load from the installed artifact's own
+  # node_modules in every CLI hunt/runs/resume op (P3/P16 evidence).
+  p19_browser_provisioning: DONE
+  # installed-artifact web hunts resolve Chromium from %LOCALAPPDATA%\ms-playwright
+  # (documented `npx playwright install chromium` flow in INSTALL.txt).
   p20_state_growth: PENDING
   p21_performance_baseline: PENDING
   p22_model_cost_accounting: PENDING

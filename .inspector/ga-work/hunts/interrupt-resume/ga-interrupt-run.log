@@ -1,0 +1,33 @@
+{"label":"kill@4000ms#0","resumeClass":"rejected","integrityOk":true,"cleanupOk":true}
+{"label":"kill@6000ms#1","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@8000ms#2","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@10000ms#3","resumeClass":"rejected","integrityOk":true,"cleanupOk":true}
+{"label":"kill@12000ms#4","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@16000ms#5","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@8000ms#6","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@12000ms#7","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@8000ms#8","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@12000ms#9","resumeClass":"rejected","integrityOk":true,"cleanupOk":true}
+{"label":"kill@8000ms#10","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@12000ms#11","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@8000ms#12","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{"label":"kill@12000ms#13","resumeClass":"resumed","integrityOk":true,"cleanupOk":true}
+{
+  "inspectorEntry": "C:\\Users\\Michael Roy\\AppData\\Roaming\\npm\\node_modules\\inspector-cli\\bundle\\inspector-cli.js",
+  "targetUrl": "http://127.0.0.1:65175/",
+  "cycles": 14,
+  "resumed": 11,
+  "rejected": 3,
+  "integrityFailures": 0,
+  "uniqueConstraintErrors": 0,
+  "busyOrLockErrors": 0,
+  "cleanupFailures": 0,
+  "terminalGuard": {
+    "label": "terminal-guard",
+    "finalHuntStatus": "closed",
+    "resumeExit": 1,
+    "honestRejection": true,
+    "reason": "run run_93a9a5e2e7ab4c4f8b9e342b7c36f96e already closed; there is nothing to resume"
+  },
+  "verdict": "PASS"
+}

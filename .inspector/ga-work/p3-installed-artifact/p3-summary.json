@@ -1,26 +1,32 @@
 {
-  "startedAt": "2026-08-22T15:51:43.317Z",
-  "tarball": "C:\\Users\\Michael Roy\\Documents\\Inspector\\dist-release\\inspector-cli-0.1.0-rc.1.tgz",
-  "tarballSha256": "82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a",
-  "bundleSha256": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
-  "installedPrefixBundleSha256": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
+  "startedAt": "2026-08-22T19:12:35.094Z",
+  "tarball": "C:\\Users\\Michael Roy\\Documents\\Inspector\\dist-release\\inspector-cli-0.1.0-rc.2.tgz",
+  "tarballSha256": "dc16434aae1c42053a5f65746b217ea8ad8ce52f97d57f4dfff27d7ce22f1263",
+  "bundleSha256": "48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571",
+  "installedPrefixBundleSha256": "48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571",
   "globalParity": {
-    "checked": false
+    "checked": true,
+    "version": "0.1.0-rc.1",
+    "bundleSha": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
+    "repairedFromTarball": true,
+    "versionAfterRepair": "0.1.0-rc.2",
+    "bundleShaAfterRepair": "48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571"
   },
-  "targetUrl": "http://127.0.0.1:61343/",
+  "targetUrl": "http://127.0.0.1:50407/",
   "steps": [
     {
-      "name": "tarball-sha256-matches-phase2-rebuild",
+      "name": "tarball-sha256-matches-recorded",
       "ok": true,
       "detail": {
-        "tgzSha": "82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a"
+        "tgzSha": "dc16434aae1c42053a5f65746b217ea8ad8ce52f97d57f4dfff27d7ce22f1263",
+        "note": "GA rc.2 candidate rebuilt from fixed tree; provenance in GA-READINESS.yaml"
       }
     },
     {
       "name": "artifact-version-coherent",
       "ok": true,
       "detail": {
-        "pkgVersion": "0.1.0-rc.1"
+        "pkgVersion": "0.1.0-rc.2"
       }
     },
     {
@@ -28,7 +34,7 @@
       "ok": true,
       "detail": {
         "bundle": "bundle/inspector-cli.js",
-        "bundleSha": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7"
+        "bundleSha": "48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571"
       }
     },
     {
@@ -50,7 +56,7 @@
       "name": "--version-reports-rc1",
       "ok": true,
       "detail": {
-        "out": "0.1.0-rc.1"
+        "out": "0.1.0-rc.2"
       }
     },
     {
@@ -71,7 +77,7 @@
       "name": "fake-hunt-exit-0",
       "ok": true,
       "detail": {
-        "tail": "h\": \"C:\\\\Users\\\\MICHAE~1\\\\AppData\\\\Local\\\\Temp\\\\ga-p3-fake-iO1O40\\\\.inspector\\\\bundles\\\\run_5fc61ae715e74f879d8506dd4712fb32\\\\find_62b6b42bd8f64eed809649e5ab44792f.json\"\n    }\n  ],\n  \"warnings\": []\n}\n"
+        "tail": "h\": \"C:\\\\Users\\\\MICHAE~1\\\\AppData\\\\Local\\\\Temp\\\\ga-p3-fake-n4QGwl\\\\.inspector\\\\bundles\\\\run_bed1bb19a0fc430e9a7ca75ea4a7d216\\\\find_55c330f392524681b8d13b1ba3aad525.json\"\n    }\n  ],\n  \"warnings\": []\n}\n"
       }
     },
     {
@@ -83,14 +89,14 @@
       "name": "findings-list-runs-on-fake-ws",
       "ok": true,
       "detail": {
-        "head": "[\n  {\n    \"id\": \"find_62b6b42bd8f64eed809649e5ab44792f\",\n    \"runId\": \"run_5fc61ae715e74f879d8506dd4712fb32\",\n    \"statu"
+        "head": "[\n  {\n    \"id\": \"find_55c330f392524681b8d13b1ba3aad525\",\n    \"runId\": \"run_bed1bb19a0fc430e9a7ca75ea4a7d216\",\n    \"statu"
       }
     },
     {
       "name": "runs-list-shows-run",
       "ok": true,
       "detail": {
-        "head": "[\n  {\n    \"id\": \"run_5fc61ae715e74f879d8506dd4712fb32\",\n    \"status\": \"closed\",\n    \"createdAt\": \"2026-08-22T15:51:13.945Z\",\n    \"adapter\": \"adapter-fake\"\n  }\n]"
+        "head": "[\n  {\n    \"id\": \"run_bed1bb19a0fc430e9a7ca75ea4a7d216\",\n    \"status\": \"closed\",\n    \"createdAt\": \"2026-08-22T19:11:39.291Z\",\n    \"adapter\": \"adapter-fake\"\n  }\n]"
       }
     },
     {
@@ -121,10 +127,10 @@
     },
     {
       "name": "interrupted-run-resume-honest",
-      "ok": false,
+      "ok": true,
       "detail": {
-        "exit": 1,
-        "tail": "974d3c80b213de275d6294\",\n  \"adapter\": \"web-playwright\",\n  \"reattached\": false,\n  \"observeError\": \"environment not created\",\n  \"observation\": null,\n  \"stepsRecorded\": 105,\n  \"finalStatus\": \"created\"\n}\n"
+        "exit": 0,
+        "tail": " \"disabled\": false,\n        \"text\": \"clear\"\n      }\n    ],\n    \"consoleErrors\": [],\n    \"pageErrors\": [],\n    \"network\": [],\n    \"storage\": {}\n  },\n  \"stepsRecorded\": 69,\n  \"finalStatus\": \"created\"\n}\n"
       }
     },
     {
@@ -132,16 +138,18 @@
       "ok": true
     },
     {
-      "name": "global-install-parity",
-      "ok": false,
+      "name": "global-install-parity-after-repair",
+      "ok": true,
       "detail": {
-        "reason": "no global install found"
+        "checked": true,
+        "version": "0.1.0-rc.1",
+        "bundleSha": "3352195a1c48bdb872f09ee77c8a61e5d2e1fa8b3d1615f221f9d9a2b4a8fef7",
+        "repairedFromTarball": true,
+        "versionAfterRepair": "0.1.0-rc.2",
+        "bundleShaAfterRepair": "48b67d4e41529b2c9573ea47d5a72f13d3af225d09883914837a1fc222039571"
       }
     }
   ],
-  "verdict": "FAIL",
-  "failures": [
-    "interrupted-run-resume-honest",
-    "global-install-parity"
-  ]
+  "verdict": "PASS",
+  "failures": []
 }
