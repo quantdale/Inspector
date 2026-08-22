@@ -1,0 +1,2 @@
+[31m   [31m×[31m P3: overflow boundary property[2m > [22moverflow fires exactly when a partial line exceeds maxLineBytes; framing recovers[33m 5025[2mms[22m[31m[39m
+[31m[1m[7m FAIL [27m[22m[39m packages/adapter-sdk/src/channel-fuzz.test.ts[2m > [22mP3: overflow boundary property[2m > [22moverflow fires exactly when a partial line exceeds maxLineBytes; framing recovers

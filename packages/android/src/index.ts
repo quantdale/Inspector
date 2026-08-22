@@ -6,10 +6,9 @@ export * from "./uiautomator.js";
 export * from "./android-adapter.js";
 export * from "./replay.js";
 
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { resolveAdapterBin } from "@inspector/adapter-sdk";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const androidBin = resolveAdapterBin(import.meta.url, "inspector-adapter-android.js", "bin");
 
 /** Spawn descriptor for running the android adapter as a JSON-RPC subprocess. */
 export function androidAdapterSpawn(): {
@@ -18,8 +17,8 @@ export function androidAdapterSpawn(): {
   adapterEnv: NodeJS.ProcessEnv;
 } {
   return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", join(here, "bin.ts")],
+    adapterCommand: androidBin.command,
+    adapterArgs: androidBin.args,
     adapterEnv: { ...process.env },
   };
 }

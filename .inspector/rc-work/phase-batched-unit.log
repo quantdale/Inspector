@@ -1,0 +1,99 @@
+
+> inspector@0.1.0 test C:\Users\Michael Roy\Documents\Inspector
+> vitest run --passWithNoTests
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/Michael Roy/Documents/Inspector[39m
+
+ [32m✓[39m packages/protocol/src/protocol.test.ts [2m([22m[2m36 tests[22m[2m)[22m[90m 33[2mms[22m[39m
+ [32m✓[39m packages/explore/src/fingerprint-property.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 558[2mms[22m[39m
+ [32m✓[39m packages/artifact-store/src/hardening.test.ts [2m([22m[2m53 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[33m 602[2mms[22m[39m
+   [33m[2m✓[22m[39m path policy (D1)[2m > [22mstill accepts legitimate caller inputs [33m398[2mms[22m[39m
+ [32m✓[39m packages/finding/src/oracle-fpfn.hardening.test.ts [2m([22m[2m23 tests[22m[2m)[22m[90m 32[2mms[22m[39m
+ [32m✓[39m packages/android/src/android.hardening.test.ts [2m([22m[2m18 tests[22m[2m)[22m[90m 61[2mms[22m[39m
+ [32m✓[39m packages/core/src/hardening.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 565[2mms[22m[39m
+[90mstderr[2m | packages/finding/src/finding.test.ts[2m > [22m[2moracle evaluation provenance records[2m > [22m[2mcontains evaluation-persistence failures without breaking the pipeline
+[22m[39m[finding-engine] failed to persist oracle evaluation records: simulated disk failure
+[finding-engine] failed to persist oracle evaluation records: simulated disk failure
+
+ [32m✓[39m packages/finding/src/finding.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 559[2mms[22m[39m
+ [32m✓[39m packages/explore/src/explore.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 21[2mms[22m[39m
+ [32m✓[39m packages/adapter-sdk/src/jsonrpc.hardening.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 194[2mms[22m[39m
+ [32m✓[39m packages/adapter-sdk/src/transport.hardening.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 1710[2mms[22m[39m
+   [33m[2m✓[22m[39m client: listener hygiene (defect 4)[2m > [22mkeeps proc close-listener count stable across 50 requests [33m429[2mms[22m[39m
+ [32m✓[39m packages/repair/src/path-policy-property.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 35[2mms[22m[39m
+ [32m✓[39m packages/finding/src/minimize-property.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 129[2mms[22m[39m
+ [32m✓[39m packages/cli-adapter/src/cli.hardening.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+ [32m✓[39m packages/windows-adapter/src/windows.rehost.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+ [32m✓[39m packages/explore/src/explore.hardening.test.ts [2m([22m[2m36 tests[22m[2m)[22m[33m 1031[2mms[22m[39m
+   [33m[2m✓[22m[39m D10 torture fixtures[2m > [22mdelayed/transient UI completes within the wall budget [33m753[2mms[22m[39m
+ [32m✓[39m packages/finding/src/statemachine-matrix.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 198[2mms[22m[39m
+[90mstderr[2m | packages/scale/src/scale.hardening.test.ts[2m > [22m[2mD5: per-item failure containment and cleanup[2m > [22m[2man adapter throw is contained: durable failure record, lease released, run continues
+[22m[39m[scale] item item-1 failed: adapter exploded
+
+[90mstderr[2m | packages/scale/src/scale.hardening.test.ts[2m > [22m[2mD5: per-item failure containment and cleanup[2m > [22m[2mwork done before a crash stays durable: findings persist even when the item fails
+[22m[39m[scale] item item-1 failed: crash after ingest
+[scale] item item-2 failed: crash after ingest
+[scale] item item-3 failed: crash after ingest
+[scale] item item-4 failed: crash after ingest
+
+ [32m✓[39m packages/scale/src/scale.hardening.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 2568[2mms[22m[39m
+   [33m[2m✓[22m[39m D1: cross-instance state must be serialized through a durable lock[2m > [22ma second campaign instance over one stateDir never re-executes completed items [33m306[2mms[22m[39m
+   [33m[2m✓[22m[39m D4: stop stays durable but resume unbricks the campaign[2m > [22mremote stop persists across restart until an operator resumes [33m523[2mms[22m[39m
+   [33m[2m✓[22m[39m D5: per-item failure containment and cleanup[2m > [22man adapter throw is contained: durable failure record, lease released, run continues [33m464[2mms[22m[39m
+   [33m[2m✓[22m[39m D5: per-item failure containment and cleanup[2m > [22mwork done before a crash stays durable: findings persist even when the item fails [33m469[2mms[22m[39m
+ [32m✓[39m packages/oracle/src/oracle.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m packages/windows-adapter/src/windows.hardening.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 36[2mms[22m[39m
+ [32m✓[39m packages/android/src/android.pidof.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+ [32m✓[39m packages/android/src/android.lifecycle.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 29[2mms[22m[39m
+ [32m✓[39m packages/adapter-sdk/src/redaction.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+ [32m✓[39m packages/scale/src/scale.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 63[2mms[22m[39m
+ [32m✓[39m packages/cli/src/args.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 12[2mms[22m[39m
+ [32m✓[39m packages/repair/src/regression.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+ [32m✓[39m packages/windows-adapter/src/windows.liveness.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1894[2mms[22m[39m
+   [33m[2m✓[22m[39m waitForWindow polling[2m > [22mresolves once the window appears after several polls [33m534[2mms[22m[39m
+   [33m[2m✓[22m[39m waitForWindow polling[2m > [22mthrows typed WINDOW_NOT_FOUND on timeout [33m812[2mms[22m[39m
+   [33m[2m✓[22m[39m mock backend equivalent semantics[2m > [22mwaitForWindow resolves for the seeded window and times out otherwise [33m530[2mms[22m[39m
+ [32m✓[39m packages/cli/src/workspace.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 30[2mms[22m[39m
+ [32m✓[39m packages/artifact-store/src/artifact-store.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 104[2mms[22m[39m
+ [32m✓[39m packages/adapter-sdk/src/bin-resolve.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 28[2mms[22m[39m
+ [32m✓[39m packages/adapter-sdk/src/channel-fuzz.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4234[2mms[22m[39m
+   [33m[2m✓[22m[39m P2: random garbage resistance[2m > [22mraw binary garbage never throws and ends with the channel closed or typed errors [33m1806[2mms[22m[39m
+   [33m[2m✓[22m[39m P3: overflow boundary property[2m > [22moverflow fires exactly when a partial line exceeds maxLineBytes; framing recovers [33m2123[2mms[22m[39m
+ [32m✓[39m packages/core/src/policy.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+[90mstderr[2m | packages/windows-adapter/src/backend-selection.test.ts[2m > [22m[2mwindows backend selection[2m > [22m[2mthe mock backend stays default-usable without any environment setup
+[22m[39mINSPECTOR_WINDOWS_BACKEND=auto: real UIA unavailable (probe failed); falling back to the injectable mock backend
+
+ [32m✓[39m packages/windows-adapter/src/backend-selection.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.create-failure.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 45[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.hardening.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 58[2mms[22m[39m
+ [32m✓[39m packages/electron-adapter/src/electron.hardening.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 3020[2mms[22m[39m
+   [33m[2m✓[22m[39m electron hardening: attribution threading (D8)[2m > [22mthreads real run/environment ids from lifecycle options into the underlying handler [33m2999[2mms[22m[39m
+ [32m✓[39m packages/repair/src/worktree.hardening.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 5822[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD1: writeFile rejects traversal outside the worktree and nothing lands outside [33m966[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD1: readFile rejects traversal outside the worktree [33m1008[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD1: rejects absolute, drive-letter, UNC and .git targets; main repo untouched [33m1116[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD1: legitimate relative paths still round-trip (no overblocking) [33m874[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD2: still refuses a dirty repository [33m422[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mD5: dispose removes the whole temp base dir (no orphaned directories) [33m714[2mms[22m[39m
+   [33m[2m✓[22m[39m RepairWorkspace hardening[2m > [22mreports the detached HEAD commit of the worktree [33m665[2mms[22m[39m
+ [32m✓[39m packages/artifact-store/src/property.hardening.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 9469[2mms[22m[39m
+   [33m[2m✓[22m[39m artifact-store round-trip property (seeded)[2m > [22mwrite→read round-trips 250 random buffers; meta matches disk truth [33m4702[2mms[22m[39m
+   [33m[2m✓[22m[39m artifact-store round-trip property (seeded)[2m > [22mdedup identity: same content+runId+name maps to one file, never a second copy [33m2598[2mms[22m[39m
+   [33m[2m✓[22m[39m artifact-store round-trip property (seeded)[2m > [22mdistinct content never collides onto the same sha or path [33m610[2mms[22m[39m
+   [33m[2m✓[22m[39m artifact-store corruption detection property[2m > [22mverify/read detect ANY single-byte flip in stored content [33m906[2mms[22m[39m
+   [33m[2m✓[22m[39m artifact-store traversal-rejection property[2m > [22mlegal generated names/runIds are NEVER rejected (no overblocking) [33m620[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.target-url.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 18633[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22mcreate with targetUrl navigates and observe returns real page data [33m7431[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22mact clicks/types work against the external page [33m2270[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22mintentional app error surfaces as target-failure / pageErrors [33m1552[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22morigin policy denies a second localhost origin when targetUrl is set [33m1266[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22mreset clears storage and restores the target baseline; unreachable target reports failure [33m4820[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter external targetUrl[2m > [22mabsence of targetUrl keeps seeded behavior unchanged [33m1291[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m38 passed[39m[22m[90m (38)[39m
+[2m      Tests [22m [1m[32m465 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (468)[39m
+[2m   Start at [22m 12:31:44
+[2m   Duration [22m 21.47s[2m (transform 6.40s, setup 0ms, collect 20.32s, tests 51.92s, environment 14ms, prepare 11.80s)[22m
+

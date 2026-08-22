@@ -1,0 +1,25 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/Michael Roy/Documents/Inspector[39m
+
+ [32m✓[39m packages/cli/src/cli.integration.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 48815[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor passes on a clean checkout [33m2155[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor reports structured probes with remediation hints [33m2037[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mrejects unknown flags with a named error on stderr [33m1386[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints the version from the root package.json [33m2986[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints general and per-command help [33m2987[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mruns a non-interactive fake demonstration and records the run [33m4401[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22msays 'no runs recorded' instead of printing nothing [33m1250[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mcreates a durable workspace directory [33m2007[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mlists and shows seeded findings [33m6030[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mhunts autonomously against the fake adapter end-to-end [33m4058[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mrefuses to resume a closed run and resumes an interrupted one [33m6328[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mresolves $INSPECTOR_WORKSPACE when --workspace is absent [33m1885[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mwarns on stderr when the resolved workspace is a repository root [33m4566[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mkeeps two concurrent hunts in two workspaces fully isolated [33m6736[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m   Start at [22m 12:43:05
+[2m   Duration [22m 49.90s[2m (transform 209ms, setup 0ms, collect 202ms, tests 48.81s, environment 0ms, prepare 362ms)[22m
+

@@ -1,9 +1,8 @@
 export * from "./electron-adapter.js";
 
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { resolveAdapterBin } from "@inspector/adapter-sdk";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const electronBin = resolveAdapterBin(import.meta.url, "inspector-adapter-electron.js", "bin");
 
 /** Spawn descriptor for running the Electron adapter as a JSON-RPC subprocess. */
 export function electronAdapterSpawn(): {
@@ -12,8 +11,8 @@ export function electronAdapterSpawn(): {
   adapterEnv: NodeJS.ProcessEnv;
 } {
   return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", join(here, "bin.ts")],
+    adapterCommand: electronBin.command,
+    adapterArgs: electronBin.args,
     adapterEnv: { ...process.env },
   };
 }

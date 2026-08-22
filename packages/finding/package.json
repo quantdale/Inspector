@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@inspector/protocol": "workspace:*",
-    "@inspector/adapter-fake": "workspace:*"
+    "@inspector/adapter-fake": "workspace:*",
+    "@inspector/store-sqlite": "workspace:*"
   }
 }

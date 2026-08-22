@@ -8,6 +8,15 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/artifact-store": "workspace:*",
+    "@inspector/core": "workspace:*",
+    "@inspector/explore": "workspace:*",
+    "@inspector/finding": "workspace:*",
+    "@inspector/protocol": "workspace:*",
+    "@inspector/store-sqlite": "workspace:*"
+  },
   "bin": {
     "inspector": "src/bin.ts"
   }

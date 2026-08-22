@@ -12,6 +12,8 @@ export default tseslint.config(
       // Inspector source; never lint them.
       ".inspector/**",
       "dogfood/**",
+      // Agent-session tooling is not Inspector source.
+      ".opencode/**",
     ],
   },
   js.configs.recommended,

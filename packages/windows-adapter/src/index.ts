@@ -5,10 +5,9 @@ export * from "./uia-bridge.js";
 export * from "./real-uia.js";
 export * from "./selection.js";
 
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { resolveAdapterBin } from "@inspector/adapter-sdk";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const winBin = resolveAdapterBin(import.meta.url, "inspector-adapter-windows.js", "bin");
 
 /** Spawn descriptor for running the Windows adapter as a JSON-RPC subprocess. */
 export function windowsAdapterSpawn(): {
@@ -17,8 +16,8 @@ export function windowsAdapterSpawn(): {
   adapterEnv: NodeJS.ProcessEnv;
 } {
   return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", join(here, "bin.ts")],
+    adapterCommand: winBin.command,
+    adapterArgs: winBin.args,
     adapterEnv: { ...process.env },
   };
 }

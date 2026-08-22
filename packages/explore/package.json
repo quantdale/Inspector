@@ -13,6 +13,7 @@
     "@inspector/core": "workspace:*",
     "@inspector/finding": "workspace:*",
     "@inspector/adapter-web": "workspace:*",
-    "@inspector/adapter-fake": "workspace:*"
+    "@inspector/adapter-fake": "workspace:*",
+    "@inspector/store-sqlite": "workspace:*"
   }
 }

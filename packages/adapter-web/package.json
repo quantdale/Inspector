@@ -9,6 +9,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/artifact-store": "workspace:*",
+    "@inspector/protocol": "workspace:*",
     "playwright": "^1.49.1"
   }
 }

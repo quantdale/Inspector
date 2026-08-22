@@ -1,0 +1,47 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/Michael Roy/Documents/Inspector[39m
+
+ [31m❯[39m packages/cli/src/cli.integration.test.ts [2m([22m[2m14 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 40069[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor passes on a clean checkout [33m1627[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor reports structured probes with remediation hints [33m1636[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mrejects unknown flags with a named error on stderr [33m1120[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints the version from the root package.json [33m2158[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints general and per-command help [33m2593[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mruns a non-interactive fake demonstration and records the run [33m4452[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22msays 'no runs recorded' instead of printing nothing [33m1309[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mcreates a durable workspace directory [33m1818[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mlists and shows seeded findings [33m4952[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mhunts autonomously against the fake adapter end-to-end [33m4326[2mms[22m[39m
+[31m   [31m×[31m cli[2m > [22mrefuses to resume a closed run and resumes an interrupted one[33m 5182[2mms[22m[31m[39m
+[31m     → expected undefined to be truthy[39m
+   [33m[2m✓[22m[39m cli[2m > [22mresolves $INSPECTOR_WORKSPACE when --workspace is absent [33m1504[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mwarns on stderr when the resolved workspace is a repository root [33m3024[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mkeeps two concurrent hunts in two workspaces fully isolated [33m4366[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m packages/cli/src/cli.integration.test.ts[2m > [22mcli[2m > [22mrefuses to resume a closed run and resumes an interrupted one
+[31m[1mAssertionError[22m: expected undefined to be truthy[39m
+
+[32m- Expected:[39m 
+true
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m packages/cli/src/cli.integration.test.ts:[2m340:27[22m[39m
+    [90m338| [39m      wsStore[33m.[39m[34mclose[39m()[33m;[39m
+    [90m339| [39m    }
+    [90m340| [39m    [34mexpect[39m(interruptedId)[33m.[39m[34mtoBeTruthy[39m()[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m341| [39m
+    [90m342| [39m    [90m// Resume re-attaches, re-observes, and reports an honest final st[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m13 passed[39m[22m[90m (14)[39m
+[2m   Start at [22m 12:39:26
+[2m   Duration [22m 40.85s[2m (transform 97ms, setup 0ms, collect 133ms, tests 40.07s, environment 0ms, prepare 153ms)[22m
+

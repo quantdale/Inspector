@@ -2,21 +2,22 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
-import { pathToFileURL } from "node:url";
-import { createRequire } from "node:module";
 import { Store } from "@inspector/store-sqlite";
 import { ArtifactStore } from "@inspector/artifact-store";
+import { resolveAdapterBin, type AdapterBinRef } from "@inspector/adapter-sdk";
 import { CliError } from "./args.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fakeBin = join(here, "..", "..", "adapter-fake", "src", "bin.ts");
-const webBin = join(here, "..", "..", "adapter-web", "src", "bin.ts");
-// Workspace tsconfig so tsx can resolve @inspector/* even when the CLI (and
-// thus its adapter subprocesses) run with a cwd outside the repository.
+// Workspace tsconfig so a dev-mode tsx subprocess can resolve @inspector/*
+// even when the CLI (and thus its adapter subprocesses) run with a cwd
+// outside the repository.
 const repoTsconfig = join(here, "..", "..", "..", "tsconfig.json");
-// Absolute tsx entry so `--import` resolves even when the process cwd is
-// outside the repository (bare 'tsx' would resolve from cwd's node_modules).
-const tsxImportUrl = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
+
+function adapterBin(name: "web" | "fake"): AdapterBinRef {
+  return name === "web"
+    ? resolveAdapterBin(import.meta.url, "inspector-adapter-web.js", "..", "..", "adapter-web", "src", "bin")
+    : resolveAdapterBin(import.meta.url, "inspector-adapter-fake.js", "..", "..", "adapter-fake", "src", "bin");
+}
 
 export interface Workspace {
   store: Store;
@@ -89,10 +90,10 @@ export interface AdapterSpawnSpec {
 
 /** Spawn spec for a named adapter; extra env is merged over process.env. */
 export function adapterSpawn(name: string, extraEnv: NodeJS.ProcessEnv = {}): AdapterSpawnSpec {
-  const bin = name === "web" ? webBin : fakeBin;
+  const bin = adapterBin(name === "web" ? "web" : "fake");
   return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", tsxImportUrl, bin],
+    adapterCommand: bin.command,
+    adapterArgs: bin.args,
     adapterEnv: {
       ...process.env,
       ...(existsSync(repoTsconfig) ? { TSX_TSCONFIG_PATH: repoTsconfig } : {}),

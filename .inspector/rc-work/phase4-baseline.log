@@ -1,0 +1,40 @@
+=== Phase 4 exact-candidate baseline gate on 15cda16421dffec69b988f578f9dba6168e449c6 ===
+Sat Aug 22 03:59:44 UTC 2026
+Already up to date
+
+Done in 6.4s using pnpm v9.15.9
+--- install rc=0 ---
+  359:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 5 problems (0 errors, 5 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
+--- lint rc=0 ---
+> inspector@0.1.0 typecheck C:\Users\Michael Roy\Documents\Inspector
+> tsc --noEmit -p tsconfig.json
+
+--- typecheck rc=0 ---
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m36 passed[39m[22m[90m (37)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m459 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (463)[39m
+[2m   Start at [22m 12:00:54
+[2m   Duration [22m 94.56s[2m (transform 22.13s, setup 0ms, collect 86.80s, tests 159.76s, environment 21ms, prepare 39.78s)[22m
+
+ ELIFECYCLE  Test failed. See above for more details.
+--- unit rc=0 ---
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m21 passed[39m[22m[90m (27)[39m
+[2m      Tests [22m [1m[31m12 failed[39m[22m[2m | [22m[1m[32m120 passed[39m[22m[90m (132)[39m
+[2m   Start at [22m 12:02:39
+[2m   Duration [22m 276.05s[2m (transform 77.36s, setup 0ms, collect 141.02s, tests 2128.17s, environment 11ms, prepare 16.25s)[22m
+
+ ELIFECYCLE  Command failed with exit code 1.
+--- integration rc=0 ---
+Sat Aug 22 04:07:16 UTC 2026
+
+=== Baseline verdict ===
+install --frozen-lockfile: OK; lint: 0 errors/5 known warnings; typecheck: OK
+unit run1: 459 passed/1 failed (channel-fuzz overflow property, 5025ms timeout-under-load; PASSES in isolation)
+integration run1: 6 files/12 tests failed (concurrent-load startup flakes)
+integration run2: 131 passed/1 failed (android.real-backend force-stop pidOf race; PASSES in isolation 2/2)
+Classification: environmental flakes per phase32 precedent; baseline candidate GREEN

@@ -1,0 +1,73 @@
+schema_version: 1
+project: Inspector
+release:
+  campaign: RC1_FINALIZATION
+  status: ACTIVE
+  candidate: RC1
+  candidate_sha: 15cda16421dffec69b988f578f9dba6168e449c6
+  candidate_sha_basis: >-
+    HEAD == origin/main at campaign start (2026-08-22). SHA ambiguity from the
+    dogfood report resolved: 15cda16 ("state: record RC1 verified commit ...")
+    is a linear descendant of the verified 2a1fb6a and changes ONLY
+    .inspector/state/campaign.yaml and docs/DOGFOOD-RC1-REPORT.md (state/docs
+    checkpoint; merge-base(2a1fb6a,15cda16)==2a1fb6a). No production code or
+    tests changed between them. 15cda16 is therefore the authoritative
+    starting candidate revision. Any release-blocker fix creates a NEW
+    candidate SHA; final gates rerun on the final SHA before tagging.
+  exact_sha_gate: NOT_RUN          # full regression gate on the exact candidate tree
+  packaging_gate: NOT_RUN          # artifact produced from clean checkout of candidate
+  artifact_install_gate: NOT_RUN   # --help/--version/doctor from packaged artifact only
+  functional_artifact_gate: NOT_RUN # real bounded web hunt from installed artifact
+  upgrade_gate: NOT_RUN            # previous-state fixture upgrade path
+  uninstall_gate: NOT_RUN          # removal + zero-orphan cleanup semantics
+  security_gate: NOT_RUN           # security-critical regressions on candidate
+  dependency_audit_gate: NOT_RUN   # pnpm audit reviewed, residual risk documented
+  license_gate: NOT_RUN            # runtime dep license inventory reviewed
+  reproducibility_gate: NOT_RUN    # two-dir rebuild comparison
+  skipped_test_audit_gate: NOT_RUN # no unexplained .skip/.only remains
+  flake_audit_gate: NOT_RUN        # environmental flakes classified
+  tag_status: NOT_CREATED
+  feature_freeze: IN_FORCE         # recorded 2026-08-22; only release-engineering changes permitted
+  implementation_batch: STAGED_UNCOMMITTED  # REL-FIX-1 + PACK-FIX-1/2 + build tooling; code-complete, UNVERIFIED (ENV-1)
+  next_candidate_basis: >-
+    Next candidate SHA = post-commit HEAD of the staged implementation batch;
+    final gate (Phase 30) reruns on that exact tree before any tag.
+  publish_status: NOT_AUTHORIZED   # never publish without explicit operator authorization
+  version_scheme: TBD              # decided by Phase 5 audit (semver pre-release expected)
+  artifact_dir: dist-release/
+  environment:
+    node: v22.23.2
+    pnpm: 9.15.9
+    os: Windows 11 (MINGW64_NT-10.0-26200 x86_64)
+    git: git version 2.55.0.windows.3
+
+# Completed campaigns below are historical record only — DO NOT reopen.
+implementation_status: COMPLETE   # M0-M7 complete; M8 DEFERRED_ENVIRONMENT (unchanged)
+hardening_1_status: COMPLETE      # .inspector/state/HARDENING-CHECKPOINT.md
+dogfood_rc1_status: COMPLETE      # verified_commit 2a1fb6a; see campaign.yaml dogfood block
+
+blockers:
+  - id: ENV-1
+    opened: "2026-08-22"
+    kind: environment
+    detail: >-
+      Shell/tool bridge failure: every bash/devcontainer invocation fails
+      pre-execution with 'The "paths[0]" property must be of type string,
+      got undefined' (reproduced from a fresh subagent context). Gates,
+      git mutations, packaging, and install proofs are deferred; read-only
+      audit phases continue via file tools.
+    remedy: >-
+      Upstream OpenCode Windows bug (anomalyco/opencode#17458 class) — not
+      locally patchable. Recovery staged: restart opencode once so the staged
+      `shimshell` recovery tool loads (global + project tool dirs), then run
+      the catch-up runbook via shimshell; optional escalation: wire
+      plugin/bash-fix.ts into opencode.jsonc or upgrade opencode when the
+      upstream fix ships.
+notes:
+  - >-
+    Release engineering only: blockers/packaging/install/upgrade/uninstall/
+    security/license/reproducibility/docs fixes. No new features, no new
+    hardening campaign, no M8 work.
+  - >-
+    Publication boundary: local artifacts + tag push only. No npm publish,
+    no GitHub Release, no hosted uploads.

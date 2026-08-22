@@ -1,0 +1,4 @@
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m6: automation miss is ACTION_FAILED, not a defect [33m3483[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: late-throw classification (D3)[2m > [22man action-time Playwright timeout with a concurrent pageerror classifies TARGET_FAILURE [33m10147[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: pageerror action-window attribution[2m > [22mK1: pageerror arriving DURING a failing action classifies TARGET_FAILURE [33m10217[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: pageerror action-window attribution[2m > [22mK2: a pageerror from BEFORE the action window stays ACTION_FAILED [33m5596[2mms[22m[39m

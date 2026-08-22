@@ -14,8 +14,16 @@ export function resolveVersion(): string {
   for (const candidate of [
     join(here, "..", "..", "..", "package.json"),
     join(here, "..", "package.json"),
+    // Installed artifact: the build stamps the release version next to the
+    // bundles; absent in dev checkouts.
+    join(here, "inspector-version.txt"),
   ]) {
     try {
+      if (candidate.endsWith(".txt")) {
+        const raw = readFileSync(candidate, "utf8").trim();
+        if (raw.length > 0) return raw;
+        continue;
+      }
       const parsed = JSON.parse(readFileSync(candidate, "utf8")) as { version?: unknown };
       if (typeof parsed.version === "string" && parsed.version.length > 0) {
         return parsed.version;

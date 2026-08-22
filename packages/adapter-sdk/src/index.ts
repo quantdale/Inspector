@@ -1,3 +1,4 @@
+export * from "./bin-resolve.js";
 export * from "./jsonrpc.js";
 export * from "./server.js";
 export * from "./client.js";

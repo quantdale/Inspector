@@ -7,5 +7,11 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/artifact-store": "workspace:*",
+    "@inspector/protocol": "workspace:*",
+    "@inspector/store-sqlite": "workspace:*"
   }
 }

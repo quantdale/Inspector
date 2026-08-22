@@ -2,10 +2,9 @@ export * from "./types.js";
 export * from "./mock-pty.js";
 export * from "./cli-adapter.js";
 
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { resolveAdapterBin } from "@inspector/adapter-sdk";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const cliBin = resolveAdapterBin(import.meta.url, "inspector-adapter-cli.js", "bin");
 
 /** Spawn descriptor for running the CLI adapter as a JSON-RPC subprocess. */
 export function cliAdapterSpawn(): {
@@ -14,8 +13,8 @@ export function cliAdapterSpawn(): {
   adapterEnv: NodeJS.ProcessEnv;
 } {
   return {
-    adapterCommand: process.execPath,
-    adapterArgs: ["--import", "tsx", join(here, "bin.ts")],
+    adapterCommand: cliBin.command,
+    adapterArgs: cliBin.args,
     adapterEnv: { ...process.env },
   };
 }

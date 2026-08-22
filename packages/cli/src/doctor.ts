@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Store } from "@inspector/store-sqlite";
+import { resolveAdapterBin, type AdapterBinRef } from "@inspector/adapter-sdk";
 
 export interface ProbeResult {
   name: string;
@@ -14,10 +15,24 @@ export interface ProbeResult {
   remediation?: string;
 }
 
-// Relative to this file (packages/cli/src): the repository root is three up.
-const here = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-
-const fakeBin = join(here, "packages", "adapter-fake", "src", "bin.ts");
+// Resolved lazily per probe so doctor works from a workspace checkout (tsx +
+// sources) AND from an installed artifact (bundled siblings), and never
+// throws at import time when the layout is unexpected.
+function fakeAdapterBin(): AdapterBinRef | null {
+  try {
+    return resolveAdapterBin(
+      import.meta.url,
+      "inspector-adapter-fake.js",
+      "..",
+      "..",
+      "adapter-fake",
+      "src",
+      "bin",
+    );
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Workspace package roots that may legitimately own an optional dependency:
@@ -25,15 +40,19 @@ const fakeBin = join(here, "packages", "adapter-fake", "src", "bin.ts");
  * probe running from packages/cli must also look where the consumer lives
  * (adapter-web owns playwright, cli-adapter owns node-pty, etc.).
  */
+const here = dirname(fileURLToPath(import.meta.url));
+
 const PACKAGE_CONTEXTS = [
-  join(here, "packages", "cli"),
-  join(here, "packages", "adapter-web"),
-  join(here, "packages", "cli-adapter"),
-  join(here, "packages", "electron-adapter"),
-];
+  "cli",
+  "adapter-web",
+  "cli-adapter",
+  "electron-adapter",
+].map((pkg) => join(here, "..", "..", pkg));
 
 /** Resolve a specifier from any workspace package context; null when nowhere. */
-function resolveFromContexts(spec: string): { path: string; via: string } | null {
+function resolveFromContexts(
+  spec: string,
+): { path: string; via: string } | null {
   for (const dir of PACKAGE_CONTEXTS) {
     try {
       const resolved = createRequire(join(dir, "package.json")).resolve(spec);
@@ -65,7 +84,9 @@ function resolvable(spec: string): boolean {
  * optional peer packages (playwright, electron) would fail `tsc` module
  * resolution because packages/cli does not declare them as dependencies.
  */
-async function importOptional(spec: string): Promise<Record<string, unknown> | null> {
+async function importOptional(
+  spec: string,
+): Promise<Record<string, unknown> | null> {
   let mod: Record<string, unknown> | null = null;
   try {
     mod = (await import(spec)) as Record<string, unknown>;
@@ -76,7 +97,10 @@ async function importOptional(spec: string): Promise<Record<string, unknown> | n
     const resolved = resolveFromContexts(spec);
     if (!resolved) return null;
     try {
-      mod = (await import(pathToFileURL(resolved.path).href)) as Record<string, unknown>;
+      mod = (await import(pathToFileURL(resolved.path).href)) as Record<
+        string,
+        unknown
+      >;
     } catch {
       return null;
     }
@@ -114,7 +138,9 @@ function execProbe(
     const timer = setTimeout(() => {
       timedOut = true;
       if (process.platform === "win32") {
-        spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
+        spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+          windowsHide: true,
+        });
       } else {
         child.kill("SIGKILL");
       }
@@ -123,7 +149,12 @@ function execProbe(
     child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
     child.on("error", (err) => {
       clearTimeout(timer);
-      resolve({ code: null, stdout, stderr: `${stderr}${err.message}`, timedOut });
+      resolve({
+        code: null,
+        stdout,
+        stderr: `${stderr}${err.message}`,
+        timedOut,
+      });
     });
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -149,7 +180,12 @@ function probeWorkspaceWritable(base: string): ProbeResult {
     const probeFile = join(base, ".doctor-write-probe");
     writeFileSync(probeFile, "probe");
     rmSync(probeFile);
-    return { name: "workspace writable", ok: true, required: true, detail: base };
+    return {
+      name: "workspace writable",
+      ok: true,
+      required: true,
+      detail: base,
+    };
   } catch (e) {
     return {
       name: "workspace writable",
@@ -166,14 +202,20 @@ function probeStore(base: string): ProbeResult {
   try {
     store = Store.open(join(base, "runs.db"));
     store.listRuns(1);
-    return { name: "sqlite store opens", ok: true, required: true, detail: join(base, "runs.db") };
+    return {
+      name: "sqlite store opens",
+      ok: true,
+      required: true,
+      detail: join(base, "runs.db"),
+    };
   } catch (e) {
     return {
       name: "sqlite store opens",
       ok: false,
       required: true,
       detail: e instanceof Error ? e.message : String(e),
-      remediation: "check disk health and that the workspace path is not read-only",
+      remediation:
+        "check disk health and that the workspace path is not read-only",
     };
   } finally {
     try {
@@ -185,13 +227,18 @@ function probeStore(base: string): ProbeResult {
 }
 
 function probeFakeAdapter(): ProbeResult {
-  const ok = existsSync(fakeBin);
+  const bin = fakeAdapterBin();
+  const ok = bin !== null;
   return {
     name: "fake adapter resolvable",
     ok,
     required: true,
-    detail: fakeBin,
-    remediation: ok ? undefined : "fake adapter source missing; reinstall the workspace",
+    detail: bin
+      ? bin.binFile
+      : "fake adapter binary not found in this installation",
+    remediation: ok
+      ? undefined
+      : "fake adapter missing; reinstall Inspector (dev: pnpm install at the repo root)",
   };
 }
 
@@ -209,7 +256,11 @@ async function probeWeb(): Promise<ProbeResult> {
   try {
     const chromium = pw.chromium as { executablePath(): string };
     const exePath = chromium.executablePath();
-    if (typeof exePath === "string" && exePath.length > 0 && existsSync(exePath)) {
+    if (
+      typeof exePath === "string" &&
+      exePath.length > 0 &&
+      existsSync(exePath)
+    ) {
       return {
         name: "web adapter (Playwright + Chromium)",
         ok: true,
@@ -241,7 +292,9 @@ function probePty(): ProbeResult {
     name: "pty support (@lydell/node-pty)",
     ok,
     required: false,
-    detail: ok ? "@lydell/node-pty resolvable" : "@lydell/node-pty not resolvable",
+    detail: ok
+      ? "@lydell/node-pty resolvable"
+      : "@lydell/node-pty not resolvable",
     remediation: ok
       ? undefined
       : "install workspace dependencies (@lydell/node-pty powers the terminal adapters)",
@@ -256,7 +309,8 @@ async function probeAndroid(): Promise<ProbeResult> {
       ok: false,
       required: false,
       detail: "adb version timed out after 2s",
-      remediation: "ensure Android platform-tools are installed and adb responds",
+      remediation:
+        "ensure Android platform-tools are installed and adb responds",
     };
   }
   if (outcome.code !== 0) {
@@ -264,12 +318,20 @@ async function probeAndroid(): Promise<ProbeResult> {
       name: "android adb on PATH",
       ok: false,
       required: false,
-      detail: outcome.code === null ? "adb not found on PATH" : `adb version exited ${outcome.code}`,
+      detail:
+        outcome.code === null
+          ? "adb not found on PATH"
+          : `adb version exited ${outcome.code}`,
       remediation: "install Android platform-tools and put adb on PATH",
     };
   }
   const firstLine = outcome.stdout.split("\n")[0]?.trim() ?? "adb";
-  return { name: "android adb on PATH", ok: true, required: false, detail: firstLine };
+  return {
+    name: "android adb on PATH",
+    ok: true,
+    required: false,
+    detail: firstLine,
+  };
 }
 
 const UIA_PROBE_SCRIPT = [
@@ -308,7 +370,8 @@ async function probeWindowsUia(): Promise<ProbeResult> {
       ok: false,
       required: false,
       detail: "powershell UIA probe timed out after 5s",
-      remediation: "verify Windows PowerShell and UIAutomationClient availability",
+      remediation:
+        "verify Windows PowerShell and UIAutomationClient availability",
     };
   }
   const match = /UIA_OK count=(\d+)/.exec(outcome.stdout);
@@ -323,34 +386,54 @@ async function probeWindowsUia(): Promise<ProbeResult> {
   const detail =
     match && Number(match[1]) === 0
       ? "UIA loaded but zero top-level windows enumerable"
-      : (outcome.stderr.split("\n")[0]?.trim() || `powershell exited ${outcome.code}`);
+      : outcome.stderr.split("\n")[0]?.trim() ||
+        `powershell exited ${outcome.code}`;
   return {
     name: "windows-uia automation",
     ok: false,
     required: false,
     detail,
-    remediation: "verify Windows PowerShell and UIAutomationClient availability",
+    remediation:
+      "verify Windows PowerShell and UIAutomationClient availability",
   };
 }
 
+function electronAdapterBinFile(): string | null {
+  try {
+    return resolveAdapterBin(
+      import.meta.url,
+      "inspector-adapter-electron.js",
+      "..",
+      "..",
+      "electron-adapter",
+      "src",
+      "bin",
+    ).binFile;
+  } catch {
+    return null;
+  }
+}
+
 async function probeElectron(): Promise<ProbeResult> {
-  const adapterSrc = join(here, "packages", "electron-adapter", "src", "bin.ts");
+  const adapterSrc = electronAdapterBinFile();
+  const adapterPresent = adapterSrc !== null && existsSync(adapterSrc);
   if (resolvable("electron")) {
     return {
       name: "electron runtime",
       ok: true,
       required: false,
-      detail: `electron package resolvable${existsSync(adapterSrc) ? "; electron-adapter present" : ""}`,
+      detail: `electron package resolvable${adapterPresent ? "; electron-adapter present" : ""}`,
     };
   }
   return {
     name: "electron runtime",
     ok: false,
     required: false,
-    detail: existsSync(adapterSrc)
-      ? "electron-adapter source present but the electron package is not installed"
+    detail: adapterPresent
+      ? "electron-adapter binary present but the electron package is not installed"
       : "electron package not resolvable",
-    remediation: "install electron (see packages/electron-adapter) to use the electron adapter",
+    remediation:
+      "install electron (see packages/electron-adapter) to use the electron adapter",
   };
 }
 

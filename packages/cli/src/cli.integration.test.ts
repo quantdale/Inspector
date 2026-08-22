@@ -1,6 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,14 +23,26 @@ const tsxEntry = createRequire(import.meta.url).resolve("tsx");
 const tsxImportUrl = pathToFileURL(tsxEntry).href;
 
 let dir: string | null = null;
-afterEach(() => {
+afterEach(async () => {
   if (dir) {
-    rmSync(dir, { recursive: true, force: true });
+    // Killed subprocesses' SQLite handles can outlive the "close" event on
+    // Windows by a few hundred ms; retry removal like repair/worktree.dispose.
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+      }
+    }
     dir = null;
   }
 });
 
-function runCli(args: string[], workspace: string): Promise<{ code: number; stdout: string; stderr: string }> {
+function runCli(
+  args: string[],
+  workspace: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return spawnCli([...args, "--workspace", workspace], { cwd: process.cwd() });
 }
 
@@ -34,10 +52,14 @@ function spawnCli(
   opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--import", tsxImportUrl, cliBin, ...args], {
-      cwd: opts.cwd ?? process.cwd(),
-      env: { ...process.env, ...opts.env },
-    });
+    const child = spawn(
+      process.execPath,
+      ["--import", tsxImportUrl, cliBin, ...args],
+      {
+        cwd: opts.cwd ?? process.cwd(),
+        env: { ...process.env, ...opts.env },
+      },
+    );
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
@@ -66,7 +88,8 @@ function seedFindings(dbPath: string): FindingRecord[] {
         createdAt: now,
         updatedAt: now,
         signature: "PAGE_ERROR",
-        minimizationJson: '{"probes":3,"removals":1,"verifiedReproduction":true}',
+        minimizationJson:
+          '{"probes":3,"removals":1,"verifiedReproduction":true}',
         lastTransitionJson: null,
         adapter: "web-playwright",
       },
@@ -139,7 +162,10 @@ describe("cli", () => {
 
   it("rejects unknown flags with a named error on stderr", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
-    const { code, stdout, stderr } = await runCli(["doctor", "--frobnicate"], dir);
+    const { code, stdout, stderr } = await runCli(
+      ["doctor", "--frobnicate"],
+      dir,
+    );
     expect(code).toBe(1);
     expect(stderr).toContain("unknown-flag: --frobnicate");
     expect(stdout).not.toContain("--frobnicate");
@@ -207,31 +233,56 @@ describe("cli", () => {
     const list = await runCli(["findings", "list", "--json"], dir);
     expect(list.code).toBe(0);
     const findings = JSON.parse(list.stdout);
-    expect(findings.map((f: { id: string }) => f.id).sort()).toEqual(["find_test_1", "find_test_2"]);
-    const confirmed = findings.find((f: { id: string }) => f.id === "find_test_1");
+    expect(findings.map((f: { id: string }) => f.id).sort()).toEqual([
+      "find_test_1",
+      "find_test_2",
+    ]);
+    const confirmed = findings.find(
+      (f: { id: string }) => f.id === "find_test_1",
+    );
     expect(confirmed.status).toBe("CONFIRMED");
     expect(confirmed.artifactRefCount).toBe(2);
     expect(confirmed.evidenceBundlePath).toBeNull();
 
-    const filtered = await runCli(["findings", "list", "--run", "run_seed_1", "--json"], dir);
+    const filtered = await runCli(
+      ["findings", "list", "--run", "run_seed_1", "--json"],
+      dir,
+    );
     const onlyRun1 = JSON.parse(filtered.stdout);
     expect(onlyRun1.map((f: { id: string }) => f.id)).toEqual(["find_test_1"]);
 
-    const show = await runCli(["findings", "show", "find_test_1", "--json"], dir);
+    const show = await runCli(
+      ["findings", "show", "find_test_1", "--json"],
+      dir,
+    );
     expect(show.code).toBe(0);
     const detail = JSON.parse(show.stdout);
     expect(detail.signature).toBe("PAGE_ERROR");
     expect(detail.reproduction.attempts).toBe(2);
     expect(detail.minimization.verifiedReproduction).toBe(true);
 
-    const missing = await runCli(["findings", "show", "find_missing", "--json"], dir);
+    const missing = await runCli(
+      ["findings", "show", "find_missing", "--json"],
+      dir,
+    );
     expect(missing.code).toBe(1);
   });
 
   it("hunts autonomously against the fake adapter end-to-end", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
     const hunt = await runCli(
-      ["hunt", "--adapter", "fake", "--seed", "7", "--max-actions", "80", "--max-findings", "2", "--json"],
+      [
+        "hunt",
+        "--adapter",
+        "fake",
+        "--seed",
+        "7",
+        "--max-actions",
+        "80",
+        "--max-findings",
+        "2",
+        "--json",
+      ],
       dir,
     );
     expect(hunt.code).toBe(0);
@@ -255,12 +306,20 @@ describe("cli", () => {
 
     // Findings were durably persisted through the same store.
     const list = await runCli(["findings", "list", "--json"], dir);
-    const persisted = JSON.parse(list.stdout) as Array<{ id: string; status: string }>;
+    const persisted = JSON.parse(list.stdout) as Array<{
+      id: string;
+      status: string;
+    }>;
     for (const f of summary.findings) {
-      expect(persisted.some((p) => p.id === f.id && p.status === "CONFIRMED")).toBe(true);
+      expect(
+        persisted.some((p) => p.id === f.id && p.status === "CONFIRMED"),
+      ).toBe(true);
     }
     const firstFinding = summary.findings[0];
-    const show = await runCli(["findings", "show", firstFinding.id, "--json"], dir);
+    const show = await runCli(
+      ["findings", "show", firstFinding.id, "--json"],
+      dir,
+    );
     const detail = JSON.parse(show.stdout);
     expect(detail.reproduction.successes).toBeGreaterThanOrEqual(1);
     expect(detail.evidenceBundlePath).not.toBeNull();
@@ -281,6 +340,9 @@ describe("cli", () => {
 
     // Genuine interrupt: start a long fake hunt, wait until actions are
     // streaming, then hard-kill the CLI tree mid-run.
+    // The action budget must exceed what the walker can exhaust during the
+    // polling window (a full 400-action fake hunt completes in ~2s on a warm
+    // cache, racing the kill); 20000 keeps the run live until killed.
     const child = spawn(
       process.execPath,
       [
@@ -291,7 +353,7 @@ describe("cli", () => {
         "--adapter",
         "fake",
         "--max-actions",
-        "400",
+        "20000",
         "--max-minutes",
         "5",
         "--json",
@@ -303,14 +365,19 @@ describe("cli", () => {
     // Wait until the hunt is past initialization and executing actions.
     const dbPath = join(dir, ".inspector", "runs.db");
     let midRun = false;
-    for (let i = 0; i < 30 && !midRun; i++) {
-      await new Promise((r) => setTimeout(r, 500));
+    for (let i = 0; i < 60 && !midRun; i++) {
+      await new Promise((r) => setTimeout(r, 250));
       if (!existsSync(dbPath)) continue;
       let probe;
       try {
         probe = Store.open(dbPath);
         const runs = probe.listRuns(5);
-        const active = runs.find((r) => r.status !== "closed" && r.status !== "failed" && r.status !== "crashed");
+        const active = runs.find(
+          (r) =>
+            r.status !== "closed" &&
+            r.status !== "failed" &&
+            r.status !== "crashed",
+        );
         if (active && probe.getRunSteps(active.id).length >= 3) midRun = true;
       } catch {
         // db locked/absent mid-write; retry
@@ -320,7 +387,9 @@ describe("cli", () => {
     }
     expect(midRun).toBe(true);
     if (process.platform === "win32") {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
     } else {
       child.kill("SIGKILL");
     }
@@ -332,7 +401,12 @@ describe("cli", () => {
     try {
       const active = wsStore
         .listRuns(5)
-        .find((r) => r.status !== "closed" && r.status !== "failed" && r.status !== "crashed");
+        .find(
+          (r) =>
+            r.status !== "closed" &&
+            r.status !== "failed" &&
+            r.status !== "crashed",
+        );
       interruptedId = active?.id;
     } finally {
       wsStore.close();
@@ -370,7 +444,10 @@ describe("cli", () => {
     mkdirSync(join(repo, "packages"), { recursive: true });
     mkdirSync(join(repo, ".inspector", "state"), { recursive: true });
     writeFileSync(join(repo, "package.json"), "{}");
-    writeFileSync(join(repo, ".inspector", "state", "campaign.yaml"), "mode: IMPLEMENTATION\n");
+    writeFileSync(
+      join(repo, ".inspector", "state", "campaign.yaml"),
+      "mode: IMPLEMENTATION\n",
+    );
     const human = await spawnCli(["doctor"], {
       cwd: repo,
       env: { TSX_TSCONFIG_PATH: join(here, "..", "..", "..", "tsconfig.json") },
@@ -393,11 +470,19 @@ describe("cli", () => {
     const wsB = mkdtempSync(join(tmpdir(), "inspector-cli-wsb-"));
     dir = wsA;
     try {
-      const args = ["hunt", "--adapter", "fake", "--seed", "7", "--max-actions", "60", "--max-findings", "2", "--json"];
-      const [a, b] = await Promise.all([
-        runCli(args, wsA),
-        runCli(args, wsB),
-      ]);
+      const args = [
+        "hunt",
+        "--adapter",
+        "fake",
+        "--seed",
+        "7",
+        "--max-actions",
+        "60",
+        "--max-findings",
+        "2",
+        "--json",
+      ];
+      const [a, b] = await Promise.all([runCli(args, wsA), runCli(args, wsB)]);
       // Sharing one runs.db would crash at least one hunt with
       // UNIQUE constraint failed: actions.idempotency.
       expect(a.code, a.stderr).toBe(0);
@@ -414,7 +499,9 @@ describe("cli", () => {
         [wsB, runIdB, runIdA],
       ] as const) {
         const list = await runCli(["runs", "list", "--json"], ws);
-        const ids = (JSON.parse(list.stdout) as Array<{ id: string }>).map((r) => r.id);
+        const ids = (JSON.parse(list.stdout) as Array<{ id: string }>).map(
+          (r) => r.id,
+        );
         expect(ids).toContain(own);
         expect(ids).not.toContain(other);
       }
