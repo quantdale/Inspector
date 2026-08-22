@@ -1,0 +1,140 @@
+{
+ "sessions": 3,
+ "stepsPerSession": 80,
+ "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+ "sandbox": "C:\\Users\\Michael Roy\\Documents\\Inspector\\.inspector\\tmp\\ga-vim-sandbox-xEYwJW",
+ "orphanVerdict": "ALL_SESSION_PIDS_REAPED",
+ "sessionSummaries": [
+  {
+   "session": 0,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [
+    40400
+   ],
+   "interactions": 88,
+   "novelScreens": 89,
+   "nonSuccessActions": [],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {},
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 745,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  },
+  {
+   "session": 1,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [
+    25040
+   ],
+   "interactions": 88,
+   "novelScreens": 76,
+   "nonSuccessActions": [],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {},
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 735,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  },
+  {
+   "session": 2,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [
+    41580
+   ],
+   "interactions": 89,
+   "novelScreens": 76,
+   "nonSuccessActions": [
+    [
+     88,
+     "act-after-external-kill",
+     "target-failure",
+     {
+      "code": "ACTION_FAILED",
+      "message": "session not alive"
+     }
+    ]
+   ],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {
+    "pid": 41580,
+    "alivePollsMs300": [
+     true,
+     true,
+     true,
+     false
+    ],
+    "aliveAfter": false,
+    "postKillStatus": "target-failure",
+    "postKillError": {
+     "code": "ACTION_FAILED",
+     "message": "session not alive"
+    }
+   },
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 348,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  }
+ ],
+ "resources": [
+  {
+   "tag": "boot",
+   "rssMB": 60.8,
+   "heapUsedMB": 14.6,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 0,
+   "requestsApprox": 2
+  },
+  {
+   "tag": "after-session-0",
+   "rssMB": 70.7,
+   "heapUsedMB": 10.5,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 2,
+   "requestsApprox": 0
+  },
+  {
+   "tag": "after-session-1",
+   "rssMB": 67.1,
+   "heapUsedMB": 11.2,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 3,
+   "requestsApprox": 0
+  },
+  {
+   "tag": "after-session-2",
+   "rssMB": 67.7,
+   "heapUsedMB": 11,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 4,
+   "requestsApprox": 0
+  }
+ ]
+}

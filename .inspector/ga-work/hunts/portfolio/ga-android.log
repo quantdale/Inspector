@@ -1,0 +1,16 @@
+{
+ "avd": "Nitro_API_36",
+ "targetPackage": "com.android.settings",
+ "startedAt": "2026-08-22T18:41:28.945Z",
+ "serial": "emulator-5554",
+ "bootedAt": "2026-08-22T18:41:28.984Z",
+ "reusedLiveDevice": true,
+ "endedAt": "2026-08-22T18:45:11.913Z",
+ "actions": 46,
+ "clicks": 4,
+ "backs": 42,
+ "distinctScreens": 6,
+ "actionFailures": 0,
+ "honestZeroFindingsNote": "Settings is a healthy control-class app; zero findings is a valid result.",
+ "verdict": "PASS"
+}

@@ -143,7 +143,7 @@ const tasklistCsv = (filter) => {
 
 /** PIDs of all processes with the given image name ([] when none/error). */
 export function imagePids(imageName) {
-  const rows = tasklistCsv(`/IMAGENAME eq ${imageName}`);
+  const rows = tasklistCsv(`IMAGENAME eq ${imageName}`);
   const pids = [];
   for (const line of rows.split(/\r?\n/)) {
     const m = line.match(/^"[^"]+","(\d+)"/);
@@ -153,5 +153,5 @@ export function imagePids(imageName) {
 }
 
 export function pidAlive(pid) {
-  return tasklistCsv(`/PID eq ${pid}`).includes(`","${pid}"`);
+  return tasklistCsv(`PID eq ${pid}`).includes(`","${pid}"`);
 }

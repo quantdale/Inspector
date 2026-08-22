@@ -1,0 +1,386 @@
+{
+  "avd": "Nitro_API_36",
+  "targetPackage": "com.android.settings",
+  "startedAt": "2026-08-22T18:41:28.945Z",
+  "serial": "emulator-5554",
+  "bootedAt": "2026-08-22T18:41:28.984Z",
+  "reusedLiveDevice": true,
+  "endedAt": "2026-08-22T18:45:11.913Z",
+  "actions": 46,
+  "clicks": 4,
+  "backs": 42,
+  "distinctScreens": 6,
+  "actionFailures": 0,
+  "honestZeroFindingsNote": "Settings is a healthy control-class app; zero findings is a valid result.",
+  "timeline": [
+    {
+      "step": 0,
+      "screenHash": "70e440027222",
+      "novel": true,
+      "picked": "text#search_bar_title",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 1,
+      "screenHash": "4cf993b76c97",
+      "novel": true,
+      "picked": "text#search_src_text",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 6,
+      "screenHash": "4cf993b76c97",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 7,
+      "screenHash": "4cf993b76c97",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 8,
+      "screenHash": "70e440027222",
+      "novel": false,
+      "picked": "text#title",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 9,
+      "screenHash": "7b6d75700402",
+      "novel": true,
+      "picked": "text#summary",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 10,
+      "screenHash": "0405dd58d1b8",
+      "novel": true,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 11,
+      "screenHash": "7b6d75700402",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 12,
+      "screenHash": "70e440027222",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 13,
+      "screenHash": "1f8ae8ff959b",
+      "novel": true,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 14,
+      "screenHash": "5685d54b847f",
+      "novel": true,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 15,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 16,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 17,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 18,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 19,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 20,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 21,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 22,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 23,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 24,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 25,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 26,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 27,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 28,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 29,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 30,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 31,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 32,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 33,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 34,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 35,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 36,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 37,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 38,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 39,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 40,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 41,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 42,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 43,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 44,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 45,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 46,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 47,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 48,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    },
+    {
+      "step": 49,
+      "screenHash": "5685d54b847f",
+      "novel": false,
+      "picked": "(back)",
+      "status": "success",
+      "error": null
+    }
+  ],
+  "verdict": "PASS"
+}

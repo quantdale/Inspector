@@ -36,9 +36,9 @@ const VIM_EXE = resolveVimExe();
 // program through ConPTY with a short-path cwd hard-crashes node-pty
 // natively (exit 0xFFFFFFFF, no output). Repo-relative .inspector/tmp is
 // gitignored and always long.
-const REPO_TMP = mkdirSync(join(here, "..", "..", "..", "..", ".inspector", "tmp"), { recursive: true });
+const REPO_TMP = join(here, "..", "..", "..", "..", ".inspector", "tmp");
+mkdirSync(REPO_TMP, { recursive: true });
 const sandbox = mkdtempSync(join(REPO_TMP, "ga-vim-sandbox-"));
-void tmpdir;
 const SCRATCH_SEED = [
   "ga field soak target",
   "line two",

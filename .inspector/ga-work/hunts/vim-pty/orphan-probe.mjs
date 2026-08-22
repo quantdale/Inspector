@@ -9,7 +9,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const VIM = resolveVimExe();
 // Long-path scratch ONLY: os.tmpdir() short form (MICHAE~1) hard-crashes
 // ConPTY spawns (see ga-soak.mjs note).
-const REPO_TMP = mkdirSync(join(here, "..", "..", "..", "..", ".inspector", "tmp"), { recursive: true });
+const REPO_TMP = join(here, "..", "..", "..", "..", ".inspector", "tmp");
+mkdirSync(REPO_TMP, { recursive: true });
 process.chdir(mkdtempSync(join(REPO_TMP, "ga-vim-probe-"))); // writable scratch outside source control
 class B extends NodePtyBackend {
   async spawn(p) {

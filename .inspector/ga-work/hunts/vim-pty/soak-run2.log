@@ -1,0 +1,112 @@
+{
+ "sessions": 3,
+ "stepsPerSession": 80,
+ "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+ "sandbox": "C:\\Users\\Michael Roy\\Documents\\Inspector\\.inspector\\tmp\\ga-vim-sandbox-HTefS1",
+ "orphanVerdict": "UNVERIFIED_NO_PIDS_ATTRIBUTED",
+ "sessionSummaries": [
+  {
+   "session": 0,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [],
+   "interactions": 88,
+   "novelScreens": 87,
+   "nonSuccessActions": [],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {},
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 0,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  },
+  {
+   "session": 1,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [],
+   "interactions": 88,
+   "novelScreens": 76,
+   "nonSuccessActions": [],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {},
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 0,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  },
+  {
+   "session": 2,
+   "vimExe": "C:\\Program Files\\Git\\usr\\bin\\vim.exe",
+   "sessionVimPids": [],
+   "interactions": 88,
+   "novelScreens": 76,
+   "nonSuccessActions": [],
+   "ctrlCStatus": "success",
+   "ctrlCError": null,
+   "killProbe": {
+    "error": "no session-attributable vim pid"
+   },
+   "closeResult": {
+    "ok": true
+   },
+   "closeError": null,
+   "aliveAfterClose": false,
+   "reap": {
+    "reapedMs": 0,
+    "residualPids": [],
+    "residualAlive": []
+   }
+  }
+ ],
+ "resources": [
+  {
+   "tag": "boot",
+   "rssMB": 61.2,
+   "heapUsedMB": 14.7,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 0,
+   "requestsApprox": 2
+  },
+  {
+   "tag": "after-session-0",
+   "rssMB": 65.9,
+   "heapUsedMB": 11.2,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 5,
+   "requestsApprox": 0
+  },
+  {
+   "tag": "after-session-1",
+   "rssMB": 67.3,
+   "heapUsedMB": 10.8,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 6,
+   "requestsApprox": 0
+  },
+  {
+   "tag": "after-session-2",
+   "rssMB": 67.2,
+   "heapUsedMB": 11.3,
+   "vimProcessesGlobalCount": 0,
+   "sessionPidsAlive": [],
+   "openHandlesApprox": 7,
+   "requestsApprox": 0
+  }
+ ]
+}
