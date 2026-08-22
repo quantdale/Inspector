@@ -1,0 +1,2 @@
+82a85eb06f1b10b0c8f13a56af5c6c6431c2b91b27b9860ad2c040ea704a1b7a *inspector-cli-0.1.0-rc.1.tgz
+4ecc1439df61e0f4ad13ebdabd2a434d63502a6726c6219b83f9f7f8d3452539 *inspector-cli-0.1.0-rc.1-win32-x64.zip

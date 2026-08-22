@@ -20,26 +20,28 @@ const here = dirname(fileURLToPath(import.meta.url));
  * failing `--version`.
  */
 export function resolveVersion(): string {
-  for (const candidate of [
-    // Installed artifact: the build stamps the release version next to the
-    // bundles; absent in dev checkouts.
-    join(here, "inspector-version.txt"),
-    join(here, "..", "..", "..", "package.json"),
-    join(here, "..", "package.json"),
-  ]) {
-    try {
-      if (candidate.endsWith(".txt")) {
-        const raw = readFileSync(candidate, "utf8").trim();
-        if (raw.length > 0) return raw;
-        continue;
+   for (const candidate of [
+      // Installed artifact: the build stamps the release version next to the
+      // bundles; absent in dev checkouts.
+      join(here, "inspector-version.txt"),
+      join(here, "..", "..", "..", "package.json"),
+      join(here, "..", "package.json"),
+   ]) {
+      try {
+         if (candidate.endsWith(".txt")) {
+            const raw = readFileSync(candidate, "utf8").trim();
+            if (raw.length > 0) return raw;
+            continue;
+         }
+         const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
+            version?: unknown;
+         };
+         if (typeof parsed.version === "string" && parsed.version.length > 0) {
+            return parsed.version;
+         }
+      } catch {
+         /* try the next candidate */
       }
-      const parsed = JSON.parse(readFileSync(candidate, "utf8")) as { version?: unknown };
-      if (typeof parsed.version === "string" && parsed.version.length > 0) {
-        return parsed.version;
-      }
-    } catch {
-      /* try the next candidate */
-    }
-  }
-  return "0.0.0-dev";
+   }
+   return "0.0.0-dev";
 }

@@ -10,7 +10,13 @@
  * layouts anchored at a temp "here" directory, so no repo files are touched.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -28,7 +34,9 @@ function resolveFrom(anchorDir: string): string {
         if (raw.length > 0) return raw;
         continue;
       }
-      const parsed = JSON.parse(readFileSync(c, "utf8")) as { version?: unknown };
+      const parsed = JSON.parse(readFileSync(c, "utf8")) as {
+        version?: unknown;
+      };
       if (typeof parsed.version === "string" && parsed.version.length > 0) {
         return parsed.version;
       }
@@ -57,7 +65,10 @@ describe("version resolution precedence (artifact coherence)", () => {
     const root = scratch();
     const bundle = join(root, "node_modules", "inspector-cli", "bundle");
     mkdirSync(bundle, { recursive: true });
-    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "1.0.0" }));
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ version: "1.0.0" }),
+    );
     writeFileSync(join(bundle, "inspector-version.txt"), "0.1.0-rc.1\n");
     expect(resolveFrom(bundle)).toBe("0.1.0-rc.1");
   });
@@ -66,7 +77,10 @@ describe("version resolution precedence (artifact coherence)", () => {
     const root = scratch();
     const src = join(root, "packages", "cli", "src");
     mkdirSync(src, { recursive: true });
-    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "0.1.0" }));
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ version: "0.1.0" }),
+    );
     expect(resolveFrom(src)).toBe("0.1.0");
   });
 

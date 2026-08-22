@@ -2,9 +2,11 @@ schema_version: 1
 project: Inspector
 release:
   campaign: RC1_FINALIZATION
-  status: ACTIVE
+  status: COMPLETE
   candidate: RC1
-  candidate_sha: TAGGED_AT_V0.1.0-RC.1
+  candidate_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  candidate_sha_note: >-
+    == rev-list -n 1 v0.1.0-rc.1; the exact gated tree IS the tagged tree.
   candidate_sha_basis: >-
     The exact tagged commit IS the tested candidate: docs/state were
     finalized first, committed, pushed, and the full gate reran on that
@@ -44,7 +46,9 @@ release:
   # no unexplained .skip/.only remains (see checkpoint)
   flake_audit_gate: PASS
   # unit load-flakes FIXED this session; full audit at exit
-  tag_status: CREATED_AFTER_GATE
+  tag_status: CREATED_AND_PUSHED
+  tagged_at: "2026-08-22"
+  annotated_tag: true
   feature_freeze: IN_FORCE
   # recorded 2026-08-22; only release-engineering changes permitted
   implementation_batch: COMMITTED

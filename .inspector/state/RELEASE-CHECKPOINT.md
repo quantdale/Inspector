@@ -394,3 +394,21 @@ Modified:
   (already accurate), RC1-RELEASE-MANIFEST.md created.
 - Remaining: full exact-SHA gate rerun on this finalization commit, then
   tag v0.1.0-rc.1 at HEAD and push; final state commit records tag_status.
+
+### Final gate + tag session (Phase 23-25)
+
+- EXACT-SHA GATE on ddeea86 (HEAD == origin/main at gate time):
+  install --frozen-lockfile OK; lint 0 errors / 4 pre-existing warnings;
+  typecheck exit 0; unit 477 passed / 3 skipped (33.3s); integration
+  27 files / 133 tests PASSED, zero retries (414.5s wall).
+- Artifacts rebuilt from ddeea86: tarball sha256 82a85eb06f1b10b0c8f13a56a
+  f5c6c6431c2b91b27b9860ad2c040ea704a1b7a — byte-identical to the two
+  independent reproducibility clones; zip contents identical (metadata
+  varies); SHA256SUMS.txt verified. Final hashes:
+  .inspector/rc-work/rc1-final-hashes.txt.
+- Fresh-consumer smoke from this build: install 49 deps / 0 vulnerabilities,
+  --version = 0.1.0-rc.1, doctor core checks OK.
+- TAGGED: v0.1.0-rc.1 (annotated) at ddeea86; rev-list -n 1 tag ==
+  rev-parse HEAD verified BEFORE push; tag pushed to origin.
+- RC1_FINALIZATION status: COMPLETE. Publish boundary respected: no npm
+  publish, no GitHub Release, no hosted binaries.
