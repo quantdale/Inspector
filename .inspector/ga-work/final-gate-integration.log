@@ -1,0 +1,256 @@
+
+> inspector@0.1.0 test:integration C:\Users\Michael Roy\Documents\Inspector
+> vitest run --passWithNoTests --config vitest.integration.config.ts
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/Michael Roy/Documents/Inspector[39m
+
+ [32m✓[39m packages/store-sqlite/src/store.integration.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 435[2mms[22m[39m
+[90mstdout[2m | packages/store-sqlite/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: sqlite durable-store long-run churn[2m > [22m[2mSOAK-J7: thousands of commits survive repeated reopen cycles with exact row accounting
+[22m[39m[soak-j] J7 db: cycles=40 reopenCycles=40 steps=3200 dbBytes=2924544 (2856KiB, 914 bytes/step), wallMs=4440
+[soak-j] J7 resources: rss 61.8MB -> 74.7MB (growth 12.9MB), active resources 3 -> 4
+
+ [32m✓[39m packages/store-sqlite/src/soak.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 4532[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: sqlite durable-store long-run churn[2m > [22mSOAK-J7: thousands of commits survive repeated reopen cycles with exact row accounting [33m4505[2mms[22m[39m
+ [32m✓[39m packages/core/src/run-manager.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 27647[2mms[22m[39m
+   [33m[2m✓[22m[39m core run manager (acceptance 1-5,7,8)[2m > [22m1: happy-path run persists exact ordered events [33m2736[2mms[22m[39m
+   [33m[2m✓[22m[39m core run manager (acceptance 1-5,7,8)[2m > [22m5: budget exhaustion is deterministic [33m2590[2mms[22m[39m
+   [33m[2m✓[22m[39m core run manager (acceptance 1-5,7,8)[2m > [22m3+7: unknown-outcome action is not blindly duplicated on restart; crash classified separately [33m14505[2mms[22m[39m
+   [33m[2m✓[22m[39m core run manager (acceptance 1-5,7,8)[2m > [22mFIELD-1 regression: resume replays the durable create spec (lifecycle.create + spawn-env delta) so re-observation works on a fresh process; targeted web runs must not silently retarget [33m4232[2mms[22m[39m
+   [33m[2m✓[22m[39m core run manager (acceptance 1-5,7,8)[2m > [22m8: artifact hash/metadata round-trips [33m3556[2mms[22m[39m
+ [32m✓[39m packages/android/src/android.real-backend.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 26355[2mms[22m[39m
+   [33m[2m✓[22m[39m android real ADB backend[2m > [22macquires a live device (pre-existing or freshly booted AVD) [33m1518[2mms[22m[39m
+   [33m[2m✓[22m[39m android real ADB backend[2m > [22mexercises com.android.settings end to end [33m24835[2mms[22m[39m
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] life 1 ended (stopped); queue=3
+[fleet] audit(after-life-1): fleet/leases/ledger/telemetry parse clean
+[fleet] life 2 ended (stopped); queue=3
+[fleet] audit(after-life-2): fleet/leases/ledger/telemetry parse clean
+[fleet] life 3 ended (stopped); queue=3
+[fleet] audit(after-life-3): fleet/leases/ledger/telemetry parse clean
+
+ [32m✓[39m packages/android/src/android.conformance.integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 34162[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m1: passes initialize/version/capability negotiation [33m2499[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m2/3: lifecycle create + observe returns semantic UI tree [33m2370[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m4: semantic traversal reaches the dashboard [33m3623[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m5: application crash is a target-failure, not an adapter crash [33m5207[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m6: automation miss is ACTION_FAILED, not a defect [33m6071[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m7: reset returns to identical seeded state [33m5767[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m8: create/reset with launchPackage (no seedApk) round-trips over the protocol [33m5661[2mms[22m[39m
+   [33m[2m✓[22m[39m android adapter conformance (M5)[2m > [22m9: create with seedApk keeps the seeded install path working [33m2946[2mms[22m[39m
+ [32m✓[39m packages/scale/src/campaign.integration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1502[2mms[22m[39m
+   [33m[2m✓[22m[39m M8-proving multi-worker campaign (S0/S5/S8)[2m > [22mruns a bounded campaign across two isolated workers with clean shutdown [33m672[2mms[22m[39m
+   [33m[2m✓[22m[39m M8-proving multi-worker campaign (S0/S5/S8)[2m > [22msurvives controller restart without duplicating completed work [33m509[2mms[22m[39m
+ [32m✓[39m packages/windows-adapter/src/windows.real-uia.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 38945[2mms[22m[39m
+   [33m[2m✓[22m[39m windows real UIA backend (integration)[2m > [22mlaunches Paint, attaches, reads the semantic tree, exercises invoke/value, closes cleanly [33m22046[2mms[22m[39m
+   [33m[2m✓[22m[39m windows real UIA backend (integration)[2m > [22mwaitForWindow resolves on cold start and times out typed; tree throws DEAD_WINDOW after kill [33m16897[2mms[22m[39m
+ [32m✓[39m packages/repair/src/repair.hardening.integration.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 50538[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD1: hostile patch agent cannot escape the worktree through the engine [33m3773[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD3: mid-pipeline throw restores CONFIRMED and persists an audit record [33m5436[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD3: replay crash after patch is contained per attempt, not stranded in PATCHING [33m11636[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD3: pipeline-level failure persists an ERROR record and keeps the finding recoverable [33m4748[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD4: accepted patch and regression evidence survive dispose; worktree identity recorded [33m4814[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6a: rejects patches that tamper with test files unless allow-listed [33m3278[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6a: allow-listed test paths are still patchable [33m4194[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6b: probe failing on the unpatched revision yields PROBE_INVALID, not blamed patches [33m2823[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6c: agent returning no patch within budget yields NO_PATCH [33m3304[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6c: empty-file patch counts as NO_PATCH too [33m2509[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD6d: regression scenario derives its expected oracle from the repair hints [33m2093[2mms[22m[39m
+   [33m[2m✓[22m[39m repair hardening[2m > [22mD4: applyAcceptedPatch materializes the accepted patch into a target checkout on explicit request [33m1928[2mms[22m[39m
+ [32m✓[39m packages/adapter-fake/src/conformance.integration.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 19555[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mnegotiates capabilities at protocol version 0.1 [33m2833[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mtransitions state through semantic actions and observes [33m3395[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22msignals the deterministic failure oracle as target-failure [33m2462[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mresets the environment to the initial state [33m2053[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mcreates an artifact stub with a valid sha256 [33m1853[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mclassifies an injected adapter crash separately from target failure [33m2064[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mclassifies an injected timeout as deadline-exceeded [33m2142[2mms[22m[39m
+   [33m[2m✓[22m[39m fake adapter conformance[2m > [22mresponds to health/heartbeat [33m2749[2mms[22m[39m
+ [32m✓[39m packages/cli-adapter/src/cli.conformance.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 9880[2mms[22m[39m
+   [33m[2m✓[22m[39m cli adapter conformance (M6 C1)[2m > [22mpasses the common conformance contract [33m7706[2mms[22m[39m
+   [33m[2m✓[22m[39m cli adapter conformance (M6 C1)[2m > [22mcounter overflow defect aborts the process at the boundary [33m2172[2mms[22m[39m
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J1: 160 items / 4 workers survive 20+ restart injections with exactly-once work
+[22m[39m[soak-j] J1 campaign churn: rss 71.3MB -> 95.1MB (growth 23.7MB), active resources 5 -> 6
+[soak-j] J1 mid-run sample at cycle 21: rss 78.2MB, resources 6
+[soak-j] J1 shape: 160 items x 2 steps, workerCount=4, cycles=38, restarts=37, realBodyRuns=186, staleInjections=26, workerFailures=19, charges=372, wallMs=34206
+
+[90mstderr[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J1: 160 items / 4 workers survive 20+ restart injections with exactly-once work
+[22m[39m[scale] item item-106 failed: injected worker crash for item-106
+[scale] stale completion ignored: item=item-111 worker=worker-0
+[scale] stale completion ignored: item=item-136 worker=worker-0
+[scale] item item-146 failed: injected worker crash for item-146
+[scale] stale completion ignored: item=item-146 worker=worker-1
+[scale] item item-41 failed: injected worker crash for item-41
+[scale] stale completion ignored: item=item-46 worker=worker-3
+[scale] stale completion ignored: item=item-66 worker=worker-0
+[scale] item item-76 failed: injected worker crash for item-76
+[scale] stale completion ignored: item=item-76 worker=worker-0
+[scale] item item-12 failed: injected worker crash for item-12
+[scale] stale completion ignored: item=item-147 worker=worker-3
+[scale] item item-17 failed: injected worker crash for item-17
+[scale] stale completion ignored: item=item-27 worker=worker-1
+[scale] stale completion ignored: item=item-52 worker=worker-1
+[scale] item item-57 failed: injected worker crash for item-57
+[scale] stale completion ignored: item=item-72 worker=worker-2
+[scale] item item-92 failed: injected worker crash for item-92
+[scale] stale completion ignored: item=item-103 worker=worker-0
+[scale] stale completion ignored: item=item-128 worker=worker-0
+[scale] item item-133 failed: injected worker crash for item-133
+[scale] stale completion ignored: item=item-133 worker=worker-1
+[scale] item item-28 failed: injected worker crash for item-28
+[scale] stale completion ignored: item=item-3 worker=worker-3
+[scale] stale completion ignored: item=item-53 worker=worker-0
+[scale] item item-63 failed: injected worker crash for item-63
+[scale] stale completion ignored: item=item-63 worker=worker-0
+[scale] item item-104 failed: injected worker crash for item-104
+[scale] stale completion ignored: item=item-134 worker=worker-3
+[scale] item item-144 failed: injected worker crash for item-144
+[scale] stale completion ignored: item=item-159 worker=worker-1
+[scale] stale completion ignored: item=item-39 worker=worker-1
+[scale] item item-4 failed: injected worker crash for item-4
+[scale] stale completion ignored: item=item-59 worker=worker-2
+[scale] item item-79 failed: injected worker crash for item-79
+[scale] stale completion ignored: item=item-89 worker=worker-0
+[scale] stale completion ignored: item=item-100 worker=worker-0
+[scale] item item-110 failed: injected worker crash for item-110
+[scale] stale completion ignored: item=item-110 worker=worker-1
+[scale] item item-15 failed: injected worker crash for item-15
+[scale] stale completion ignored: item=item-150 worker=worker-3
+[scale] stale completion ignored: item=item-30 worker=worker-0
+[scale] item item-40 failed: injected worker crash for item-40
+[scale] stale completion ignored: item=item-40 worker=worker-0
+[scale] item item-80 failed: injected worker crash for item-80
+
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J2: budget exhaustion fails a durable tail and never overspends
+[22m[39m[soak-j] J2 budget: completed=35 failedDurable=5 actions=140/140
+
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected [json]
+[22m[39m[soak-j] J3 fencing [json]: rounds=250, duplicateClaimsRejected=500, reclaims=250, staleCompletionsRejected=250, safeReleases=250
+
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected [sqlite]
+[22m[39m[soak-j] J3 fencing [sqlite]: rounds=250, duplicateClaimsRejected=500, reclaims=250, staleCompletionsRejected=250, safeReleases=250
+
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J4: model-router fallback storm routes correctly under continuous provider failure
+[22m[39m[soak-j] J4 router storm: fallbackIterations=3000, outageIterations=200, flapIterations=1000, hits={"prov-a":1167,"prov-b":1333,"prov-c":1500}
+
+[90mstdout[2m | packages/scale/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: unattended-campaign long-run churn[2m > [22m[2mSOAK-J5: repeated truncation quarantines corrupt state without silent resets
+[22m[39m[soak-j] J5 quarantine: truncationCycles=24, quarantineFiles=24
+
+ [32m✓[39m packages/scale/src/soak.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 63426[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J1: 160 items / 4 workers survive 20+ restart injections with exactly-once work [33m34227[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J2: budget exhaustion fails a durable tail and never overspends [33m4064[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected [json] [33m21521[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J3: lease fencing storm — duplicate claims, expiry reclaims, stale writes rejected [sqlite] [33m2426[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J4: model-router fallback storm routes correctly under continuous provider failure [33m432[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: unattended-campaign long-run churn[2m > [22mSOAK-J5: repeated truncation quarantines corrupt state without silent resets [33m726[2mms[22m[39m
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] web item web-1 done: stopped=action-budget actions=45 findings=1
+
+ [32m✓[39m packages/explore/src/web.generic-dom.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 42830[2mms[22m[39m
+   [33m[2m✓[22m[39m exploration over generic external DOM[2m > [22minteracts (fill/click/press) on a React-like id-less form app and visits >=5 states [33m23396[2mms[22m[39m
+   [33m[2m✓[22m[39m exploration over generic external DOM[2m > [22mstill interacts on Backbone-style id-bearing markup [33m19432[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.window-classification.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 18438[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: pageerror action-window attribution[2m > [22mK1: pageerror arriving DURING a failing action classifies TARGET_FAILURE [33m11406[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: pageerror action-window attribution[2m > [22mK2: a pageerror from BEFORE the action window stays ACTION_FAILED [33m7030[2mms[22m[39m
+ [32m✓[39m packages/cli-adapter/src/pty-exit-wedge.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 20001[2mms[22m[39m
+   [33m[2m✓[22m[39m NodePtyBackend host-exit wedge regression[2m > [22msurvives N=5 external-kill + close cycles in-process [33m9842[2mms[22m[39m
+   [33m[2m✓[22m[39m NodePtyBackend host-exit wedge regression[2m > [22mlets a host process that spawned/killed/closed sessions exit cleanly [33m10158[2mms[22m[39m
+ [32m✓[39m packages/explore/src/web-replay.target-url.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 28059[2mms[22m[39m
+   [33m[2m✓[22m[39m WebReplayDriver external targetUrl[2m > [22mreproduces the external app's crash when targetUrl is set [33m14450[2mms[22m[39m
+   [33m[2m✓[22m[39m WebReplayDriver external targetUrl[2m > [22mdoes NOT reproduce against the seeded app without targetUrl (no false positive) [33m13583[2mms[22m[39m
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] web item web-3 done: stopped=action-budget actions=45 findings=1
+
+ [32m✓[39m packages/cli-adapter/src/node-pty-backend.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1663[2mms[22m[39m
+   [33m[2m✓[22m[39m NodePtyBackend (real PTY)[2m > [22mspawns a real process and round-trips write/readScreen/isAlive/kill [33m1654[2mms[22m[39m
+ [32m✓[39m packages/core/src/run-manager.create-options.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 650[2mms[22m[39m
+   [33m[2m✓[22m[39m startRun createOptions forwarding[2m > [22momits options when createOptions is absent (backward compatible) [33m385[2mms[22m[39m
+ [32m✓[39m packages/windows-adapter/src/windows.conformance.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 6097[2mms[22m[39m
+   [33m[2m✓[22m[39m windows adapter conformance (M6 C3)[2m > [22mpasses the common conformance contract [33m4548[2mms[22m[39m
+   [33m[2m✓[22m[39m windows adapter conformance (M6 C3)[2m > [22mcounter overflow defect surfaces through the UIA boundary [33m1546[2mms[22m[39m
+[90mstdout[2m | packages/artifact-store/src/soak.integration.test.ts[2m > [22m[2mSOAK-J: artifact-store long-run churn[2m > [22m[2mSOAK-J6: thousands of write/read/meta cycles dedup exactly and leave zero tmp litter
+[22m[39m[soak-j] J6 artifacts: writeOps=5000 readOps=2500 tamperCycles=25 -> physicalFiles=1707 (dedup 2.93x), uniquePairs=40, bytes=3799296, wallMs=62327
+[soak-j] J6 resources: rss 63.5MB -> 74.2MB (growth 10.7MB), active resources 3 -> 3
+
+ [32m✓[39m packages/artifact-store/src/soak.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 63379[2mms[22m[39m
+   [33m[2m✓[22m[39m SOAK-J: artifact-store long-run churn[2m > [22mSOAK-J6: thousands of write/read/meta cycles dedup exactly and leave zero tmp litter [33m62339[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.hardening.integration.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 100479[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: create/cleanup cluster (D2)[2m > [22ma second create replaces the prior instance without leaking it [33m21846[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: create/cleanup cluster (D2)[2m > [22mtraces are stored under the run's artifact dir and leave nothing in the os tmpdir [33m6370[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: create/cleanup cluster (D2)[2m > [22mreset reports storage-clear failure honestly instead of ok:true [33m17686[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: late-throw classification (D3)[2m > [22mclassifies an uncaught throw arriving within the configured settle window [33m7131[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: late-throw classification (D3)[2m > [22mdocuments the residual race: throws well beyond the default settle window are missed [33m5743[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: late-throw classification (D3)[2m > [22man action-time Playwright timeout with a concurrent pageerror classifies TARGET_FAILURE [33m9841[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: secret redaction (D7)[2m > [22mmasks password-field values and sensitive storage keys in observations [33m3204[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: secret redaction (D7)[2m > [22mredacts credentials and sensitive query params in console and network captures [33m5628[2mms[22m[39m
+   [33m[2m✓[22m[39m web hardening: attribution threading (D8)[2m > [22mthreads real run/environment ids from lifecycle options into observations [33m3648[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mempty page observes cleanly and missing-element clicks are automation misses [33m9641[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22ma huge accessibility tree (1200 controls) observes without choking [33m2602[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mconsole storms are captured and drained per observation [33m964[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mstale/detached DOM during act resolves without crashing the adapter [33m1350[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mnavigation triggered during an action resolves within the deadline [33m1886[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mnetwork 5xx/delayed/aborted responses are observed and never crash the adapter [33m1949[2mms[22m[39m
+   [33m[2m✓[22m[39m web torture (seeded-server only)[2m > [22mredirect loops fail the navigate action instead of hanging [33m983[2mms[22m[39m
+ [32m✓[39m packages/adapter-web/src/web.conformance.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 58890[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m1: passes initialize/version/capability negotiation [33m3727[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m2/3: lifecycle create + observe returns url/title/semantic tree [33m9483[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m4: semantic traversal reaches the dashboard with correlated artifacts [33m6548[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m5: forbidden origin navigation is rejected [33m6421[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m6: page/application crash is a target-failure, not an adapter crash [33m9418[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m3: reset returns to identical seeded state [33m14159[2mms[22m[39m
+   [33m[2m✓[22m[39m web adapter conformance (M1)[2m > [22m6: injected adapter (browser) crash is classified separately [33m9132[2mms[22m[39m
+ [32m✓[39m packages/electron-adapter/src/electron.conformance.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 23114[2mms[22m[39m
+   [33m[2m✓[22m[39m electron adapter conformance (M6 C2)[2m > [22mreports electron identity while reusing browser semantics [33m2533[2mms[22m[39m
+   [33m[2m✓[22m[39m electron adapter conformance (M6 C2)[2m > [22mpasses the common conformance contract [33m20579[2mms[22m[39m
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] web item web-2 done: stopped=action-budget actions=45 findings=1
+
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] life 4 ended (drained); queue=0
+[fleet] audit(final): fleet/leases/ledger/telemetry parse clean
+[fleet] state: executions=12 failures=3 terminal=["win-tail-a","win-tail-b"] stale=1 restarts=3 findings=5 rotations=13
+[fleet] findings: android/CONFIRMED/PAGE_ERROR, android/CONFIRMED/PAGE_ERROR, web/CONFIRMED/PAGE_ERROR, web/CONFIRMED/PAGE_ERROR, web/CONFIRMED/PAGE_ERROR
+[fleet] web hygiene target: non-boom finding find_0502ce2d44d54dfba72f03ec41512ccf token="HiddenValidationCrash"
+
+[90mstdout[2m | packages/scale/src/fleet.integration.test.ts[2m > [22m[2mFLEET: concurrent multi-target unattended campaign[2m > [22m[2mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects
+[22m[39m[fleet] resources: rss 116.9MB -> 159.0MB (growth 42.1MB), handles 5 -> 5, tempRoots 1 -> 1, wallMs=125271
+[fleet] tracked subprocesses: 41444(web:web-1:a1), 23316(web:web-2:a1), 20568(web:web-3:a1), 10628(electron:elec-1), 39900(web:web-2:a2)
+[fleet] SUMMARY effects=35 duplicates=0 stale=1 restarts=3 killPid=23316 escalations=1 fallbacks=2 actions=53/56 wallMs=125271
+
+ [32m✓[39m packages/scale/src/fleet.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 126713[2mms[22m[39m
+   [33m[2m✓[22m[39m FLEET: concurrent multi-target unattended campaign[2m > [22mruns web/electron/cli/android/windows lanes concurrently under restarts, kills, fencing, fallback and budget chaos with zero duplicate effects [33m126703[2mms[22m[39m
+ [32m✓[39m packages/cli/src/cli.integration.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 136233[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor passes on a clean checkout [33m6925[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mdoctor reports structured probes with remediation hints [33m17865[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mrejects unknown flags with a named error on stderr [33m8328[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints the version from the root package.json [33m11344[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mprints general and per-command help [33m7866[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mruns a non-interactive fake demonstration and records the run [33m15537[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22msays 'no runs recorded' instead of printing nothing [33m4211[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mcreates a durable workspace directory [33m6402[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mlists and shows seeded findings [33m13928[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mhunts autonomously against the fake adapter end-to-end [33m13787[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mrefuses to resume a closed run and resumes an interrupted one [33m14749[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mresolves $INSPECTOR_WORKSPACE when --workspace is absent [33m2374[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mwarns on stderr when the resolved workspace is a repository root [33m5334[2mms[22m[39m
+   [33m[2m✓[22m[39m cli[2m > [22mkeeps two concurrent hunts in two workspaces fully isolated [33m7579[2mms[22m[39m
+ [32m✓[39m packages/repair/src/repair.e2e.integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 137320[2mms[22m[39m
+   [33m[2m✓[22m[39m M4 autonomous repair[2m > [22mrepairs a confirmed seeded defect end-to-end in an isolated worktree [33m59501[2mms[22m[39m
+   [33m[2m✓[22m[39m M4 autonomous repair[2m > [22mrejects and rolls back a bad patch, preserving the audit trail [33m77442[2mms[22m[39m
+   [33m[2m✓[22m[39m M4 autonomous repair[2m > [22mpolicy-blocks weak-suspicion findings from entering repair [33m376[2mms[22m[39m
+ [32m✓[39m packages/repair/src/dogfood.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 310963[2mms[22m[39m
+   [33m[2m✓[22m[39m HARDENING_1 final dogfood: Inspector repairs its own seeded defect end-to-end[2m > [22mSTEP 1 explores the seeded web app autonomously and processes discovered anomalies [33m178925[2mms[22m[39m
+   [33m[2m✓[22m[39m HARDENING_1 final dogfood: Inspector repairs its own seeded defect end-to-end[2m > [22mSTEP 3a rejects a masking patch that deletes the crashing control, and falls back to CONFIRMED [33m30728[2mms[22m[39m
+   [33m[2m✓[22m[39m HARDENING_1 final dogfood: Inspector repairs its own seeded defect end-to-end[2m > [22mSTEP 3b accepts a valid patch with regression-first proof and durable audit [33m23668[2mms[22m[39m
+   [33m[2m✓[22m[39m HARDENING_1 final dogfood: Inspector repairs its own seeded defect end-to-end[2m > [22mSTEP 4 applies the accepted patch to a fixture checkout and replays the original defect clean [33m13336[2mms[22m[39m
+   [33m[2m✓[22m[39m HARDENING_1 final dogfood: Inspector repairs its own seeded defect end-to-end[2m > [22mSTEP 5 runs two more independent pipelines concurrently on different seeded defects without cross-contamination [33m64300[2mms[22m[39m
+ [32m✓[39m packages/explore/src/web.explore.integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 269483[2mms[22m[39m
+   [33m[2m✓[22m[39m M3 autonomous web exploration[2m > [22mdiscovers multiple hidden seeded defects with reproducible evidence [33m186134[2mms[22m[39m
+   [33m[2m✓[22m[39m M3 autonomous web exploration[2m > [22mis deterministic for a given seed [33m83344[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+[2m      Tests [22m [1m[32m134 passed[39m[22m[90m (134)[39m
+[2m   Start at [22m 03:56:51
+[2m   Duration [22m 355.99s[2m (transform 9.72s, setup 0ms, collect 38.81s, tests 1621.29s, environment 9ms, prepare 10.70s)[22m
+

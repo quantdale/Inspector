@@ -287,12 +287,21 @@ phases:
   # artifact inspection (no model-request records). Recorded as zero, not
   # manufactured.
   # zero model calls expected — record explicitly when campaigns confirm
-  p23_defect_policy: ACTIVE
-  p24_rc11_decision: PENDING
-  # RC1 runtime CHANGED during GA (cc0d34b, e40fa2d) -> rc.2 candidate required;
-  # v0.1.0-rc.1 tag untouched, remains historical validated artifact of record
-  p25_scorecard: PENDING
-  p26_docs_audit: PENDING
+  p23_defect_policy: DONE
+  # FIELD-1 HIGH: fixed (cc0d34b) + deterministic regression + affected field
+  # evidence re-run. FIELD-2 MEDIUM: fixed (e40fa2d) + regression. No
+  # assertions deleted, no failing test skipped, no deterministic failure
+  # converted to retry; bounded retries only for demonstrated environmental
+  # Chromium startup flakes (documented in ledger).
+  p24_rc11_decision: DONE
+  # see candidate_staleness_decision above; v0.1.0-rc.1 untouched,
+  # rc.2 candidate validated, no tag authority -> nothing pushed.
+  p25_scorecard: COMPLETE
+  # rolled into docs/GA-FIELD-VALIDATION-REPORT.md scorecard section
+  p26_docs_audit: DONE
+  # STATUS.md rewritten to field-validation reality; ROADMAP M0 stale
+  # 'ACTIVE' line corrected; AGENTS.md campaign-mode header updated;
+  # historical ledgers untouched.
   p27_security_privacy_check: DONE
   # re-verified this campaign: no host-global mouse/keyboard injection APIs
   # exist anywhere under packages/** (grep SendInput/keybd_event/mouse_event/
@@ -303,7 +312,33 @@ phases:
   # re-run in P29 gate). Repair worktree lexical containment remains DOCUMENTED
   # debt (unchanged from RC1 ledger); policy/risk/idempotency enforcement
   # unchanged and exercised by every soak resume.
-  p28_final_fleet_soak: PENDING
-  p29_full_regression: PENDING
-  p30_ga_decision: PENDING
-  p31_final_report: PENDING
+  p28_final_fleet_soak: DONE
+  # Fleet = portfolio (web x2, UIA x3, vim, android) + interrupt/resume (14
+  # kills) + web-window (56 cases) + longrun (720 actions) + UIA/vim soaks.
+  # All ran against runtime identical to the final tree (last runtime commit
+  # e40fa2d; later commits are state/docs/harness only); the P29 integration
+  # gate re-ran dogfood proof + soaks + conformance on the exact final SHA.
+  p29_full_regression: DONE
+  final_gate:
+    tree_sha: febbbab03e81caace420ed2f7c1076645bc848a3
+    executed_at: "2026-08-23"
+    pnpm_install_frozen_lockfile: PASS
+    lint: "PASS — 0 errors, 4 pre-existing warnings"
+    typecheck: PASS
+    unit: "PASS — 480 passed / 3 skipped, 40 files"
+    integration: "PASS — 134 passed, 27 files, exit 0, first run (no retries)"
+    environment:
+      node: v22.23.2
+      pnpm: 9.15.9
+      os: Windows 11 (MINGW64_NT-10.0-26200)
+    logs:
+      - .inspector/ga-work/final-gate-integration.log
+  p30_ga_decision: DECIDED_GO_WITH_DOCUMENTED_DEBT
+  # Rationale: every Critical/High defect found during field validation is
+  # closed with deterministic regression coverage (FIELD-1 HIGH -> cc0d34b);
+  # the validated release candidate is 0.1.0-rc.2 (built from 85011ca, fully
+  # provenance-stamped); the exact final tree passes the complete gate;
+  # publication/tagging remain unauthorized and untouched. Named residual
+  # debt is MEDIUM/LOW and does not invalidate GA claims (see p31 report).
+  p31_final_report: COMPLETE
+  # docs/GA-FIELD-VALIDATION-REPORT.md
