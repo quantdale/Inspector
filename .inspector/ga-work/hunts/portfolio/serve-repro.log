@@ -1,0 +1,17 @@
+up on 8127
+hunt exit: 0
+{
+  "ok": true,
+  "runId": "run_0e6a2185c61d4b7eab3a605af119f0de",
+  "adapter": "web",
+  "seed": 5,
+  "stoppedReason": "action-budget",
+  "actionsExecuted": 15,
+  "statesVisited": 1,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": []
+}
+

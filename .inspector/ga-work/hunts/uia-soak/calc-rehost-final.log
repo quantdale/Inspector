@@ -1,0 +1,188 @@
+{
+ "verdict": "NO_COLLAPSE_OBSERVED",
+ "probes": 10,
+ "timeline": [
+  {
+   "event": "swept-stale-hosts",
+   "pids": []
+  },
+  {
+   "event": "attached",
+   "pid": 39128
+  },
+  {
+   "event": "baseline",
+   "nodes": 57,
+   "reattached": false
+  },
+  {
+   "event": "candidates",
+   "names": [
+    "Minimize Calculator",
+    "Maximize Calculator",
+    "Close Calculator",
+    "Open Navigation",
+    "Memory add",
+    "Memory subtract",
+    "Memory store",
+    "Percent",
+    "Clear entry",
+    "Clear",
+    "Backspace",
+    "Reciprocal",
+    "Square",
+    "Square root",
+    "Divide by",
+    "Multiply by",
+    "Minus",
+    "Plus",
+    "Equals",
+    "Zero",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Decimal separator",
+    "Positive negative",
+    "Keep on top"
+   ]
+  },
+  {
+   "event": "invoked",
+   "name": "Open Navigation",
+   "error": null
+  },
+  {
+   "event": "probe",
+   "after": "Open Navigation",
+   "probe": 0,
+   "nodes": 85,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Open Navigation",
+   "probe": 1,
+   "nodes": 85,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Open Navigation",
+   "probe": 2,
+   "nodes": 85,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Open Navigation",
+   "probe": 3,
+   "nodes": 85,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Open Navigation",
+   "probe": 4,
+   "nodes": 85,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "invoked",
+   "name": "Close Navigation",
+   "error": null
+  },
+  {
+   "event": "probe",
+   "after": "Close Navigation",
+   "probe": 0,
+   "nodes": 57,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Close Navigation",
+   "probe": 1,
+   "nodes": 57,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Close Navigation",
+   "probe": 2,
+   "nodes": 57,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Close Navigation",
+   "probe": 3,
+   "nodes": 57,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "probe",
+   "after": "Close Navigation",
+   "probe": 4,
+   "nodes": 57,
+   "reattached": false,
+   "modalBlocking": false
+  },
+  {
+   "event": "invoked",
+   "name": "Keep on top",
+   "error": null
+  },
+  {
+   "event": "probe-error",
+   "after": "Keep on top",
+   "probe": 0,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "enum-error",
+   "round": 3,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "enum-error",
+   "round": 4,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "enum-error",
+   "round": 5,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "enum-error",
+   "round": 6,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "enum-error",
+   "round": 7,
+   "error": "window rehost suspected (57 -> 1 nodes, pid 39128 alive); reattach failed: no top-level window remains for pid 39128"
+  },
+  {
+   "event": "close",
+   "closeOk": true,
+   "windowGone": true,
+   "residualKilled": false
+  }
+ ]
+}

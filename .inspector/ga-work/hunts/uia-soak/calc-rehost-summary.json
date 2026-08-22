@@ -1,5 +1,5 @@
 {
-  "verdict": "NO_COLLAPSE_OBSERVED",
+  "verdict": "REHOST_DETECTED_HONEST_FAILURE",
   "probes": 10,
   "timeline": [
     {
@@ -8,7 +8,7 @@
     },
     {
       "event": "attached",
-      "pid": 40840
+      "pid": 30180
     },
     {
       "event": "baseline",
@@ -151,32 +151,32 @@
       "event": "probe-error",
       "after": "Keep on top",
       "probe": 0,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "enum-error",
       "round": 3,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "enum-error",
       "round": 4,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "enum-error",
       "round": 5,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "enum-error",
       "round": 6,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "enum-error",
       "round": 7,
-      "error": "window rehost suspected (57 -> 1 nodes, pid 40840 alive); reattach failed: no top-level window remains for pid 40840"
+      "error": "window rehost suspected (57 -> 1 nodes, pid 30180 alive); reattach failed: no top-level window remains for pid 30180"
     },
     {
       "event": "close",

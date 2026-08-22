@@ -13,7 +13,7 @@
  * Run from repo root:
  *   node --import tsx .inspector/ga-work/hunts/vim-pty/ga-soak.mjs [sessions] [stepsPerSession]
  */
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -30,8 +30,15 @@ const { execSync } = require("node:child_process");
 const here = dirname(fileURLToPath(import.meta.url));
 const VIM_EXE = resolveVimExe();
 
-// Deterministic scratch target, generated per run OUTSIDE the repository.
-const sandbox = mkdtempSync(join(tmpdir(), "ga-vim-sandbox-"));
+// Deterministic scratch target, generated per run OUTSIDE source control.
+// IMPORTANT: the sandbox MUST be a long path. os.tmpdir() resolves to the
+// 8.3 short form (C:\Users\MICHAE~1\...) on this machine, and spawning any
+// program through ConPTY with a short-path cwd hard-crashes node-pty
+// natively (exit 0xFFFFFFFF, no output). Repo-relative .inspector/tmp is
+// gitignored and always long.
+const REPO_TMP = mkdirSync(join(here, "..", "..", "..", "..", ".inspector", "tmp"), { recursive: true });
+const sandbox = mkdtempSync(join(REPO_TMP, "ga-vim-sandbox-"));
+void tmpdir;
 const SCRATCH_SEED = [
   "ga field soak target",
   "line two",

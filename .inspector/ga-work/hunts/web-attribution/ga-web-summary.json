@@ -1,0 +1,80 @@
+{
+  "reps": 8,
+  "total": 56,
+  "failed": 0,
+  "byScenario": {
+    "S1-pre-action-stays-ACTION_FAILED": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S2-during-failing->TARGET_FAILURE": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S3-boundary-crash-no-hang": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S4-settle-window-crash(20ms-in-50ms)": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S4b-beyond-settle-reads-success(pinned)": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S5-navigation-during-action-bounded": {
+      "pass": 8,
+      "fail": 0
+    },
+    "S6-error-storm-overlap": {
+      "pass": 8,
+      "fail": 0
+    }
+  },
+  "timingDistributionMs": {
+    "S1-pre-action-stays-ACTION_FAILED": {
+      "n": 8,
+      "min": 4132,
+      "p50": 4284,
+      "max": 5850
+    },
+    "S2-during-failing->TARGET_FAILURE": {
+      "n": 8,
+      "min": 10868,
+      "p50": 11076,
+      "max": 11807
+    },
+    "S3-boundary-crash-no-hang": {
+      "n": 8,
+      "min": 455,
+      "p50": 519,
+      "max": 694
+    },
+    "S4-settle-window-crash(20ms-in-50ms)": {
+      "n": 8,
+      "min": 473,
+      "p50": 553,
+      "max": 932
+    },
+    "S4b-beyond-settle-reads-success(pinned)": {
+      "n": 8,
+      "min": 482,
+      "p50": 551,
+      "max": 827
+    },
+    "S5-navigation-during-action-bounded": {
+      "n": 8,
+      "min": 7844,
+      "p50": 7933,
+      "max": 8880
+    },
+    "S6-error-storm-overlap": {
+      "n": 8,
+      "min": 484,
+      "p50": 555,
+      "max": 1181
+    }
+  },
+  "failures": []
+}

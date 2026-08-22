@@ -269,8 +269,7 @@ if (existsSync(join(globalPkgDir, "package.json"))) {
 }
 
 function execFileSyncSafe(cmd, args) {
-  try { return execFileSync(cmd, args, { encoding: "utf8" }); }
-  catch { return ""; }
+  return run(cmd, args, { timeoutMs: 60000 }).stdout ?? "";
 }
 
 server.close();

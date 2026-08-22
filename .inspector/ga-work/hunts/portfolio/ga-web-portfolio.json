@@ -1,0 +1,127 @@
+{
+  "artifactEntry": "C:\\Users\\Michael Roy\\AppData\\Roaming\\npm\\node_modules\\inspector-cli\\bundle\\inspector-cli.js",
+  "startedAt": "2026-08-22T17:58:31.352Z",
+  "results": [
+    {
+      "id": "web-todomvc-react",
+      "provenance": "todomvc-react@1.0.4 from registry.npmjs.org (MIT)",
+      "url": "http://127.0.0.1:51220/",
+      "startedAt": "2026-08-22T17:57:13.810Z",
+      "wallMs": 32987,
+      "ready": true,
+      "serverEvents": [],
+      "huntExit": 0,
+      "stoppedReason": "action-budget",
+      "actionsExecuted": 220,
+      "statesVisited": 21,
+      "resets": 0,
+      "anomalies": 0,
+      "findings": [],
+      "warnings": [],
+      "findingIdsShown": 0,
+      "dbMetrics": {
+        "runId": "run_de494bf620b14b1d862a47d443aaa276",
+        "status": "closed",
+        "adapter": "web-playwright",
+        "actionByStatus": {
+          "success": 163,
+          "target-failure": 57
+        },
+        "actionKinds": {
+          "fill": 127,
+          "press": 45,
+          "click": 22,
+          "reload": 7,
+          "forward": 7,
+          "back": 7,
+          "wait": 5
+        },
+        "observations": 441,
+        "distinctObservations": 25,
+        "findingRows": 0,
+        "oracleEvaluations": 0
+      },
+      "workspace": "C:\\Users\\MICHAE~1\\AppData\\Local\\Temp\\ga-p4-web-todomvc-react-kNP4EJ"
+    },
+    {
+      "id": "web-todomvc-backbone",
+      "provenance": "official todomvc@0.1.1 backbone example (MIT)",
+      "url": "http://127.0.0.1:55924/",
+      "startedAt": "2026-08-22T17:57:47.789Z",
+      "wallMs": 41157,
+      "ready": true,
+      "serverEvents": [],
+      "huntExit": 0,
+      "stoppedReason": "action-budget",
+      "actionsExecuted": 180,
+      "statesVisited": 22,
+      "resets": 2,
+      "anomalies": 0,
+      "findings": [],
+      "warnings": [],
+      "findingIdsShown": 0,
+      "dbMetrics": {
+        "runId": "run_0866d49bcf5c4492a47a46edae564cc2",
+        "status": "closed",
+        "adapter": "web-playwright",
+        "actionByStatus": {
+          "success": 143,
+          "target-failure": 37
+        },
+        "actionKinds": {
+          "fill": 66,
+          "click": 23,
+          "press": 22,
+          "back": 21,
+          "forward": 20,
+          "reload": 18,
+          "wait": 10
+        },
+        "observations": 365,
+        "distinctObservations": 63,
+        "findingRows": 0,
+        "oracleEvaluations": 0
+      },
+      "workspace": "C:\\Users\\MICHAE~1\\AppData\\Local\\Temp\\ga-p4-web-todomvc-backbone-LqbuNi"
+    },
+    {
+      "id": "inspector-seeded-control",
+      "role": "LABELED CONTROL (fake adapter; excluded from novel-defect evidence)",
+      "huntExit": 0,
+      "stoppedReason": "action-budget",
+      "actionsExecuted": 80,
+      "statesVisited": 4,
+      "anomalies": 1,
+      "findings": [
+        {
+          "id": "find_7b7473c8534542b39203c32bcdf32102",
+          "signature": "DEFECT_SUBMIT_INVALID",
+          "status": "CONFIRMED",
+          "severity": "high",
+          "confidence": 1
+        }
+      ],
+      "dbMetrics": {
+        "runId": "run_1f7af8f6e35043f7bdc91696972a3336",
+        "status": "closed",
+        "adapter": "adapter-fake",
+        "actionByStatus": {
+          "success": 79,
+          "target-failure": 1
+        },
+        "actionKinds": {
+          "toggleFlag": 30,
+          "goHome": 21,
+          "fillField": 12,
+          "openForm": 9,
+          "submit": 8
+        },
+        "observations": 80,
+        "distinctObservations": 4,
+        "findingRows": 1,
+        "oracleEvaluations": 30
+      },
+      "workspace": "C:\\Users\\MICHAE~1\\AppData\\Local\\Temp\\ga-p4-control-M5EN5q"
+    }
+  ]
+}

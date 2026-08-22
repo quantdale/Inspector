@@ -15,13 +15,26 @@
  *   node --import tsx .inspector/ga-work/hunts/web-attribution/ga-web-window-soak.mts [repsPerScenario]
  */
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Action } from "../../../../packages/protocol/src/messages.js";
 import { WebAdapterHandler } from "../../../../packages/adapter-web/src/web-adapter.js";
 
+const here = dirname(fileURLToPath(import.meta.url));
 const REPS = Number(process.argv[2] ?? 12);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Per-scenario wall-clock samples for the timing-distribution requirement. */
+const timings: Record<string, number[]> = {};
+async function timed(label: string, fn: () => Promise<void>): Promise<void> {
+  const t0 = Date.now();
+  try {
+    await fn();
+  } finally {
+    (timings[label] ??= []).push(Date.now() - t0);
+  }
+}
 
 function act(
   id: string,
@@ -248,13 +261,13 @@ async function s6(rep: number): Promise<void> {
 }
 
 for (let rep = 1; rep <= REPS; rep++) {
-  await s1(rep);
-  await s2(rep);
-  await s3(rep);
-  await s4(rep);
-  await s4b(rep);
-  await s5(rep);
-  await s6(rep);
+  await timed("S1-pre-action-stays-ACTION_FAILED", () => s1(rep));
+  await timed("S2-during-failing->TARGET_FAILURE", () => s2(rep));
+  await timed("S3-boundary-crash-no-hang", () => s3(rep));
+  await timed("S4-settle-window-crash(20ms-in-50ms)", () => s4(rep));
+  await timed("S4b-beyond-settle-reads-success(pinned)", () => s4b(rep));
+  await timed("S5-navigation-during-action-bounded", () => s5(rep));
+  await timed("S6-error-storm-overlap", () => s6(rep));
   process.stdout.write(`rep ${rep}/${REPS}\n`);
 }
 rmSync(ART_BASE, { recursive: true, force: true });
@@ -266,17 +279,23 @@ for (const r of rows) {
   if (r.ok) byScenario[r.scenario]!.pass += 1;
   else byScenario[r.scenario]!.fail += 1;
 }
-console.log(
-  JSON.stringify(
-    {
-      reps: REPS,
-      total: rows.length,
-      failed: fails.length,
-      byScenario,
-      failures: fails.slice(0, 12),
-    },
-    null,
-    1,
-  ),
+const dist = (xs: number[]) => ({
+  n: xs.length,
+  min: Math.min(...xs),
+  p50: xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)],
+  max: Math.max(...xs),
+});
+const timingDistribution = Object.fromEntries(
+  Object.entries(timings).map(([k, v]) => [k, dist(v)]),
 );
+const summaryJson = {
+  reps: REPS,
+  total: rows.length,
+  failed: fails.length,
+  byScenario,
+  timingDistributionMs: timingDistribution,
+  failures: fails.slice(0, 12),
+};
+writeFileSync(join(here, "ga-web-summary.json"), JSON.stringify(summaryJson, null, 2));
+console.log(JSON.stringify(summaryJson, null, 1));
 process.exit(fails.length > 0 ? 1 : 0);

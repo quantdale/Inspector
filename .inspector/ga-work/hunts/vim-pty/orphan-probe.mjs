@@ -1,6 +1,5 @@
 import { join, dirname } from "node:path";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdtempSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { NodePtyBackend } from "../../../../packages/cli-adapter/src/node-pty-backend.js";
 import { CliAdapterHandler } from "../../../../packages/cli-adapter/src/cli-adapter.js";
@@ -8,7 +7,10 @@ import { resolveVimExe, imagePids, pidAlive } from "../../tools/discovery.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const VIM = resolveVimExe();
-process.chdir(mkdtempSync(join(tmpdir(), "ga-vim-probe-"))); // writable scratch outside repo
+// Long-path scratch ONLY: os.tmpdir() short form (MICHAE~1) hard-crashes
+// ConPTY spawns (see ga-soak.mjs note).
+const REPO_TMP = mkdirSync(join(here, "..", "..", "..", "..", ".inspector", "tmp"), { recursive: true });
+process.chdir(mkdtempSync(join(REPO_TMP, "ga-vim-probe-"))); // writable scratch outside source control
 class B extends NodePtyBackend {
   async spawn(p) {
     return super.spawn(p === "vim" ? VIM : p, ["-R", "-"]);

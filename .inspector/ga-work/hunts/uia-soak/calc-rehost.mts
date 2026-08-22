@@ -177,11 +177,27 @@ try {
   bridge.dispose();
 }
 
-// Verdict: any blind root-only stub? any unexplained failure?
+// Verdict semantics:
+//   REGRESSION_BLIND_STUB      - a root-only stub came back WITHOUT error
+//   FIX_COVERS_CF2_REATTACHED  - collapse detected AND recovery returned a full tree
+//   REHOST_DETECTED_HONEST_FAILURE - collapse detected, bounded reattach failed
+//     truthfully (target surface not enumerable after rehost on this build)
+//   NO_COLLAPSE_OBSERVED       - no trigger fired this run
 const probes = timeline.filter((t) => t.event === "probe") as { nodes: number; reattached: boolean }[];
+const probeErrors = timeline.filter(
+  (t) => (t.event === "probe-error" || t.event === "enum-error") &&
+    /rehost suspected/i.test(String((t as { error?: string }).error ?? "")));
 const blindStub = probes.some((p) => p.nodes <= 1 && !p.reattached);
 const recovered = probes.some((p) => p.reattached && p.nodes > 1);
-const verdict = blindStub ? "REGRESSION_BLIND_STUB" : recovered ? "FIX_COVERS_CF2_REATTACHED" : "NO_COLLAPSE_OBSERVED";
+const rehostDetected = blindStub || recovered || probeErrors.length > 0;
+const verdict = blindStub
+  ? "REGRESSION_BLIND_STUB"
+  : recovered
+    ? "FIX_COVERS_CF2_REATTACHED"
+    : probeErrors.length > 0
+      ? "REHOST_DETECTED_HONEST_FAILURE"
+      : "NO_COLLAPSE_OBSERVED";
+void rehostDetected;
 const out = { verdict, probes: probes.length, timeline };
 writeFileSync(join(here, "calc-rehost-summary.json"), JSON.stringify(out, null, 2));
 console.log(JSON.stringify(out, null, 1));
