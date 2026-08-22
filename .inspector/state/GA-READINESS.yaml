@@ -74,13 +74,95 @@ phase_2_reproduction:
       differ (zip writer records local time). Tarball (npm pack fixed
       mtimes) is fully byte-reproducible. Explains prior QUALIFIED_PASS.
 
-field_runs: []
-# each: {id, target, adapter, inspector_version, artifact_source, target_rev,
-#        started, ended, budget, actions, states, findings[], failures[],
-#        resource_metrics_ref}
+field_runs:
+  - id: GA-WEB-WINDOW-SOAK-1
+    target: inline scenario pages (Chromium)
+    adapter: web/Playwright
+    inspector_version: workspace source @ e40fa2d
+    artifact_source: source
+    started: "2026-08-23"
+    reps_per_scenario: 8
+    total_cases: 56
+    failed: 0
+    verdict: PASS
+    detail_ref: .inspector/ga-work/hunts/web-attribution/ga-web-summary.json
+  - id: GA-UIA-PORTFOLIO-1
+    target: mspaint + calc + notepad (real UIA)
+    inspector_version: workspace source @ e40fa2d
+    artifact_source: source
+    cycles: 6
+    interactions: 114
+    successes: 110
+    failures_classified: >-
+      4 = app-side WinUI broken InvokePattern on nameless Panes (see
+      FIELD-ENV-CAST) + honest mid-transition staleness
+    kill_probes: all three targets reported DEAD_WINDOW honestly after taskkill
+    resources: RSS stable 59.6->60.6MB; powershell bridge count flat 8->9
+    verdict: PASS
+    detail_ref: .inspector/ga-work/hunts/uia-soak/ga-uia-summary.json
+  - id: GA-WEB-PORTFOLIO-1
+    targets: todomvc-react@1.0.4, todomvc-backbone(official example)
+    inspector_version: installed rc.1 artifact
+    artifact_source: installed-global
+    react: 220 actions / 21 states / exit 0 / honest-zero anomalies
+    backbone: 180 actions / 22 states / exit 0 / honest-zero anomalies
+    control: fake seeded pipeline proof (LABELED CONTROL)
+    verdict: PASS
+    detail_ref: .inspector/ga-work/hunts/portfolio/ga-web-portfolio.json
 
-confirmed_inspector_defects: []
-# each: {id: FIELD-N, severity, title, status, evidence, fix_commit?}
+confirmed_inspector_defects:
+  - id: FIELD-1
+    severity: HIGH
+    title: >-
+      Resume never re-created the environment on the fresh adapter process;
+      targeted web runs also lost their spawn-env delta (silent retarget risk)
+    status: CLOSED_FIXED
+    evidence: >-
+      P3 install battery vs installed rc.1: resume of mid-flight killed web run
+      exited 1 with observeError 'environment not created' (reattached:false,
+      stepsRecorded:105). Core resumeRun issued initialize only; CLI resume of
+      fake runs masked it because FakeAdapterHandler.observe tolerates no-create.
+    fix_commit: cc0d34b
+    regression: >-
+      packages/core/src/run-manager.integration.test.ts FIELD-1 test (strict
+      lifecycle fixture refuses observe-before-create; asserts create replayed
+      with durable options + spawn-env delta reaches new process) + store
+      migration #6 columns
+  - id: FIELD-2
+    severity: MEDIUM
+    title: >-
+      UIA rehost recovery could not follow a window that migrated to a NEW
+      owner pid (C-F2 class): same-pid-only reattach died at Calculator
+      'Keep on top' transitions
+    status: CLOSED_FIXED
+    evidence: >-
+      calc-rehost probe: collapse detected honestly (57->1) but reattach failed
+      'no top-level window remains' while the pinned surface lived under a new
+      owner. Fix: title-evidenced cross-owner fallback + bounded 250ms poll in
+      attemptReattach. Keep-on-top pinned surface itself is NOT enumerable at
+      desktop root on this Win11 build (keepontop-debug evidence), so that one
+      transition still ends in truthful REATTACH_FAILED by design.
+    fix_commit: e40fa2d
+    regression: windows.stale-window.test.ts C-F2 describe block (3 tests)
+
+environment_findings_not_inspector_defects:
+  - id: FIELD-ENV-CAST
+    finding: >-
+      'Specified cast is not valid.' during UIA Invoke is an APP-side broken
+      pattern advertisement on nameless WinUI Pane elements (Win11 Notepad).
+      Classification matrix: fails identically through same-bridge retry,
+      session reattach, and a brand-new PS/UIA session; every named control
+      invokes cleanly. Product behavior honest (error surfaced, exploration
+      continued).
+    evidence_ref: .inspector/ga-work/hunts/uia-soak/cast-matrix-summary.json
+  - id: FIELD-ENV-CONPTY-SHORTPATH
+    finding: >-
+      Spawning any program through ConPTY (@lydell/node-pty native agent) with
+      an 8.3 short-path cwd (os.tmpdir() -> C:\Users\MICHAE~1\...) hard-crashes
+      the host process natively (exit 0xFFFFFFFF, zero output). Harnesses now
+      sandbox under repo-relative long paths. Not reachable from product code
+      paths (CLI hunts never chdir into short paths).
+
 
 real_target_findings: []
 # each: {id, target, run, classification, confidence, repro}
@@ -105,28 +187,42 @@ phases:
   p0_post_tag_audit: DONE
   p1_durable_state: DONE
   p2_reproduce_from_tag: DONE
-  p3_installed_artifact_harness: PENDING
-  p4_real_target_portfolio: PENDING
+  p3_installed_artifact_harness: >-
+    PARTIAL — harness built+executed against installed rc.1 (18/20 checks
+    PASS incl. version/help/doctor/fake-hunt/web-hunt/findings/runs/
+    uninstall/no-source-leak); resume check exposed FIELD-1 (fixed at
+    cc0d34b); full PASS requires rc.2 rebuild from fixed tree.
+  p4_real_target_portfolio: IN_PROGRESS
+  # web x2 + control DONE (GA-WEB-PORTFOLIO-1); UIA x3 DONE (GA-UIA-PORTFOLIO-1);
+  # vim PTY + android AVD runs in flight; iOS stays DEFERRED_ENVIRONMENT
   p5_long_unattended_runs: PENDING
-  p6_operational_metrics: PENDING
-  p7_resource_stability: PENDING
-  p8_finding_quality: PENDING
+  p6_operational_metrics: IN_PROGRESS
+  p7_resource_stability: IN_PROGRESS
+  p8_finding_quality: PARTIAL
+  # honest-zero on healthy todomvc targets recorded; aggregate metrics after
+  # all portfolio lanes finish
   p9_coverage_quality: PENDING
-  p10_clean_result_confidence: PENDING
+  p10_clean_result_confidence: PARTIAL
   p11_reproduction_reliability: PENDING
   p12_repair_trials: PENDING
-  p13_adapter_stability: PENDING
-  p14_uia_rehost_soak: PENDING
-  p15_web_action_window_soak: PENDING
-  p16_interrupt_resume_soak: PENDING
+  p13_adapter_stability: PARTIAL
+  p14_uia_rehost_soak: DONE
+  # GA-UIA-PORTFOLIO-1 + cast-matrix + calc-rehost probes; FIELD-2 fix landed
+  p15_web_action_window_soak: DONE
+  # GA-WEB-WINDOW-SOAK-1: 56/56 across S1-S6, timing distribution persisted
+  p16_interrupt_resume_soak: BLOCKED_ON_RC2_REBUILD
+  # harness ready (.inspector/ga-work/hunts/interrupt-resume/ga-interrupt-resume.mjs)
   p17_install_matrix: PENDING
   p18_native_dependency: PENDING
   p19_browser_provisioning: PENDING
   p20_state_growth: PENDING
   p21_performance_baseline: PENDING
   p22_model_cost_accounting: PENDING
+  # zero model calls expected — record explicitly when campaigns confirm
   p23_defect_policy: ACTIVE
   p24_rc11_decision: PENDING
+  # RC1 runtime CHANGED during GA (cc0d34b, e40fa2d) -> rc.2 candidate required;
+  # v0.1.0-rc.1 tag untouched, remains historical validated artifact of record
   p25_scorecard: PENDING
   p26_docs_audit: PENDING
   p27_security_privacy_check: PENDING
