@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   existsSync,
+  copyFileSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -42,6 +43,18 @@ const ADAPTER_ENTRIES = [
 
 const version = process.env.RELEASE_VERSION ?? "0.1.0-rc.1";
 
+function gitOutput(args) {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? String(result.stdout).trim() : "";
+}
+
+const sourceCommit = gitOutput(["rev-parse", "HEAD"]);
+const sourceStatus = gitOutput(["status", "--porcelain"]);
+
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(bundleDir, { recursive: true });
 
@@ -79,6 +92,18 @@ for (const entry of allEntries) {
   }
 }
 
+const fixtureSources = [
+  "packages/electron-adapter/src/fixtures/main.cjs",
+  "packages/electron-adapter/src/fixtures/renderer.html",
+];
+const fixturePayload = fixtureSources.map((source) => {
+  const name = source.split("/").at(-1);
+  const destination = join(bundleDir, "fixtures", name);
+  mkdirSync(dirname(destination), { recursive: true });
+  copyFileSync(join(root, source), destination);
+  return `bundle/fixtures/${name}`;
+});
+
 writeFileSync(join(bundleDir, "inspector-version.txt"), `${version}\n`);
 
 const meta = {
@@ -95,19 +120,62 @@ const meta = {
   type: "module",
   engines: { node: ">=22" },
   bin: { inspector: "bundle/inspector-cli.js" },
-  files: ["bundle/", "INSTALL.txt"],
+  files: ["bundle/", "INSTALL.txt", "build-manifest.json", "SHA256SUMS.txt"],
   dependencies: {
     "@lydell/node-pty": "^1.1.0",
     ajv: "^8.17.1",
     "ajv-formats": "^3.0.1",
     "better-sqlite3": "^11.7.0",
-    playwright: "^1.49.1",
+    playwright: "^1.62.1",
+  },
+  optionalDependencies: {
+    // Electron is optional because its native executable is large and some
+    // operators only need web/native adapters. The adapter reports and refuses
+    // honestly when the optional executable is not available.
+    electron: "43.4.1",
   },
 };
 
 writeFileSync(
   join(outDir, "package.json"),
   `${JSON.stringify(meta, null, 2)}\n`,
+);
+
+const buildManifest = {
+  schema: "inspector-release/2",
+  product: "inspector-cli",
+  version,
+  source: {
+    commit: sourceCommit || null,
+    dirty: sourceStatus.length > 0,
+  },
+  build: {
+    platform: process.platform,
+    architecture: process.arch,
+    node: process.version,
+    builtAt: new Date().toISOString(),
+  },
+  package: {
+    name: meta.name,
+    license: meta.license,
+    engines: meta.engines,
+    dependencies: meta.dependencies,
+    optionalDependencies: meta.optionalDependencies,
+  },
+  entries: allEntries.map((entry) => entry.out),
+  payload: [
+    "package.json",
+    "INSTALL.txt",
+    "build-manifest.json",
+    "SHA256SUMS.txt",
+    ...allEntries.flatMap((entry) => [`bundle/${entry.out}.js`, `bundle/${entry.out}.js.map`]),
+    "bundle/inspector-version.txt",
+    ...fixturePayload,
+  ],
+};
+writeFileSync(
+  join(outDir, "build-manifest.json"),
+  `${JSON.stringify(buildManifest, null, 2)}\n`,
 );
 
 writeFileSync(
@@ -129,9 +197,12 @@ writeFileSync(
     "Verify:",
     "  inspector --version",
     "  inspector doctor",
+    "  inspector campaign list --json",
     "",
     "Notes:",
     "- Native modules (better-sqlite3, @lydell/node-pty) are fetched/compiled during install.",
+    "- Electron is optional; install may omit its executable. `doctor` reports",
+    "  that condition and the adapter never presents injectable coverage as real.",
     "- State lives under your workspace (.inspector/); set INSPECTOR_WORKSPACE to isolate runs.",
   ].join("\r\n"),
 );
@@ -144,7 +215,7 @@ const checksumFiles = ["package.json", "INSTALL.txt"];
 for (const entry of allEntries) {
   checksumFiles.push(`bundle/${entry.out}.js`, `bundle/${entry.out}.js.map`);
 }
-checksumFiles.push("bundle/inspector-version.txt");
+checksumFiles.push("bundle/inspector-version.txt", "build-manifest.json", ...fixturePayload);
 
 const checksumLines = checksumFiles
   .filter((rel) => existsSync(join(outDir, rel)))
@@ -153,6 +224,7 @@ writeFileSync(join(outDir, "SHA256SUMS.txt"), `${checksumLines.join("\n")}\n`);
 
 const platformTag = `${process.platform}-${process.arch}`;
 const zipName = `inspector-cli-${version}-${platformTag}.zip`;
+const archiveFiles = ["bundle", "package.json", "INSTALL.txt", "build-manifest.json", "SHA256SUMS.txt"];
 if (process.platform === "win32") {
   // Windows ships bsdtar (C:\Windows\System32\tar.exe); `tar -a -cf x.zip`
   // writes a spec-compliant zip with forward-slash entries that any unzip
@@ -164,10 +236,7 @@ if (process.platform === "win32") {
       "-c",
       "-f",
       zipName,
-      "bundle",
-      "package.json",
-      "INSTALL.txt",
-      "SHA256SUMS.txt",
+      ...archiveFiles,
     ],
     { cwd: outDir, stdio: "inherit" },
   );
@@ -176,7 +245,7 @@ if (process.platform === "win32") {
 } else {
   const rc = spawnSync(
     "zip",
-    ["-r", zipName, "bundle", "package.json", "INSTALL.txt", "SHA256SUMS.txt"],
+    ["-r", zipName, ...archiveFiles],
     { cwd: outDir, stdio: "inherit" },
   );
   if (rc.status !== 0) throw new Error(`zip failed with status ${rc.status}`);
@@ -199,8 +268,40 @@ const tgzName = String(packed.stdout).trim().split("\n").at(-1).trim();
 if (!existsSync(join(outDir, tgzName)))
   throw new Error(`npm pack produced no tarball: ${tgzName}`);
 
+function assertPackedContents(tgzPath) {
+  const listed = spawnSync("tar", ["-tf", tgzPath], {
+    cwd: outDir,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (listed.status !== 0) {
+    throw new Error(`cannot inspect packed tarball: ${listed.stderr}`);
+  }
+  const entries = String(listed.stdout)
+    .split(/\r?\n/)
+    .map((entry) => entry.replace(/\/$/, ""))
+    .filter(Boolean);
+  const forbidden = /(?:^|\/)(?:node_modules|\.git|\.inspector|test|tests|fixtures|evidence|artifacts|\.env(?:$|\.))/i;
+  for (const entry of entries) {
+    if (!entry.startsWith("package/")) throw new Error(`tarball entry escapes package root: ${entry}`);
+    const rel = entry.slice("package/".length);
+    if (!rel || rel === "bundle") continue;
+    if (forbidden.test(rel) && !rel.startsWith("bundle/fixtures/")) throw new Error(`forbidden development/evidence content in tarball: ${entry}`);
+    if (!(rel === "package.json" || rel === "INSTALL.txt" || rel === "build-manifest.json" || rel === "SHA256SUMS.txt" || rel.startsWith("bundle/"))) {
+      throw new Error(`unexpected tarball content: ${entry}`);
+    }
+  }
+}
+
+assertPackedContents(join(outDir, tgzName));
+
+const zipSha = `${sha256(join(outDir, zipName))}  ${zipName}\n`;
+const tgzSha = `${sha256(join(outDir, tgzName))}  ${tgzName}\n`;
+writeFileSync(join(outDir, `${zipName}.sha256`), zipSha);
+writeFileSync(join(outDir, `${tgzName}.sha256`), tgzSha);
+
 console.log(`release artifact: ${relative(root, join(outDir, zipName))}`);
 console.log(
   `release tarball:  ${relative(root, join(outDir, tgzName))} ` +
-    `(sha256 ${sha256(join(outDir, tgzName))})`,
+    `(sha256 ${sha256(join(outDir, tgzName))}; source ${sourceCommit || "unknown"})`,
 );

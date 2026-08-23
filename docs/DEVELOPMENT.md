@@ -22,6 +22,8 @@ Optional, per backend:
   the android-real backend
 - PowerShell 5.1+ (built into Windows) — required only for the windows-uia
   real UIA bridge
+- Electron 43 executable — optional for the production Electron backend;
+  `INSPECTOR_ELECTRON_BACKEND=real` fails closed when it is not installed.
 
 The CLI's `doctor` command probes all of these and reports which capabilities
 are present:
@@ -80,6 +82,15 @@ pnpm cli runs list
 pnpm cli runs show <runId> --json
 pnpm cli findings list
 pnpm cli findings show <findingId>
+
+# M11 operator workflows
+pnpm cli verify <findingId> --json
+pnpm cli regress --json
+pnpm cli explore --adapter fake --max-actions 60 --json
+pnpm cli campaign run --items id=fake --workers 2 --steps 4 --json
+pnpm cli campaign list --json
+# repair requires an explicit provider and never edits the primary checkout
+pnpm cli repair <findingId> --repo-root <checkout> --revision <sha> --provider <module> --json
 ```
 
 ### Continue an autonomous hunt
@@ -135,9 +146,29 @@ other value is an error, never a silent fallback.
 | `INSPECTOR_PTY` | `real` \| `mock` | `mock` (real must be opted into explicitly) |
 | `INSPECTOR_WINDOWS_BACKEND` | `real` \| `mock` \| `auto` | `auto`: probe PowerShell/UIA, use real when the probe succeeds, else mock with a warning |
 | `INSPECTOR_ANDROID_BACKEND` | `real` \| `mock` \| `auto` | `auto`: probe adb, fall back to mock with a warning |
+| `INSPECTOR_ELECTRON_BACKEND` | `real` \| `injectable` \| `auto` | `auto`: use the installed executable when present; otherwise report/use injectable; `real` never falls back |
 
-Web always uses Playwright + Chromium. See `docs/PLATFORM-ADAPTERS.md` for the
-honest capability matrix and known per-platform limitations.
+Web always uses Playwright + Chromium. The Electron adapter uses Playwright's
+Electron API and the shipped deterministic fixture when the optional runtime is
+available. See `docs/PLATFORM-ADAPTERS.md` for the honest capability matrix and
+known per-platform limitations.
+
+## Release and installed-artifact smoke
+
+The release builder creates a bundled CLI, provenance `build-manifest.json`,
+payload checksums, platform zip, and npm tarball. It asserts that the tarball
+contains only the declared bundle/fixture/install files:
+
+```bash
+RELEASE_VERSION=0.1.0-m11.0 pnpm build:release
+RELEASE_VERSION=0.1.0-m11.0 pnpm release:smoke
+```
+
+The smoke installs the tarball into a fresh temporary npm prefix and runs
+`--version`, `doctor`, fake `hunt`, findings/runs inspection, and `campaign
+list`. It skips optional browser/Electron binary downloads and expects doctor
+to report those capabilities honestly. These commands create local candidate
+artifacts only; they do not publish packages or releases.
 
 ## Troubleshooting
 
@@ -172,7 +203,7 @@ packages/
   adapter-web/     # Playwright web adapter
   cli-adapter/     # CLI/PTY adapter (mock + @lydell/node-pty ConPTY)
   windows-adapter/ # Windows UIA adapter (mock + PowerShell bridge)
-  electron-adapter/# Electron runtime binding (injectable backend)
+  electron-adapter/# Electron runtime binding (real + injectable backends + fixture)
   android/         # Android ADB adapter (mock + RealAdbBackend)
   core/            # policy/budget + run manager
   explore/         # autonomous exploration engine

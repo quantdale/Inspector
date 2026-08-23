@@ -48,11 +48,11 @@ The first proof depends heavily on Playwright and likely Appium/MCP interoperabi
                                |
                     Inspector Adapter Protocol
                                |
-        +-----------------------+-------------------------+
-        |             |             |          |          |
-     Web adapter    CLI adapter   Android    Windows     iOS
-        |             |             |          |          |
-  Playwright         PTY        ADB/UIA2   UIA/Appium XCUITest
+        +-----------------------+------------------------------+
+        |             |             |          |          |       |
+     Web adapter    CLI adapter   Android    Windows   Electron  iOS
+        |             |             |          |          |       |
+  Playwright         PTY        ADB/UIA2   UIA/Appium Playwright XCUITest
 ```
 
 ## Packages (implemented in M0)
@@ -67,7 +67,8 @@ The monorepo under `packages/` currently contains:
 | `@inspector/adapter-sdk` | Line-delimited JSON-RPC 2.0 over stdio transport, `AdapterServer`/`AdapterClient` with deadline enforcement, event notifications, subprocess spawning. |
 | `@inspector/adapter-fake` | Deterministic 5-state / 8-action fake adapter with a deterministic failure oracle, reset, artifact stubs, and fault injection (timeout, crash). |
 | `@inspector/core` | Policy/budget engine and `RunManager`/`RunController`: lifecycle, policy enforcement, durable step commit, checkpointing, crash recovery. |
-| `@inspector/cli` | `inspector` CLI: `doctor`, `run --adapter fake`, `runs list`, `runs show <id>`, JSON output. |
+| `@inspector/cli` | Installed operator CLI: `hunt`, `verify`, `regress`, `explore`, `repair`, bounded `campaign`, findings/runs inspection, doctor, and stable JSON contracts. |
+| `@inspector/electron-adapter` | Production Playwright Electron handler plus explicit injectable contract backend, deterministic fixture, renderer/main evidence, and backend honesty probes. |
 
 Runtime notes:
 

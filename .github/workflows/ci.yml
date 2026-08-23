@@ -5,14 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: inspector-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Required fast gate: the complete platform-independent quality contract.
   quality:
+    name: Linux quality gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: "9"
+          version: "9.15.9"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -22,3 +28,43 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:integration
+
+  # Distribution is exercised after the required gate from a clean npm
+  # prefix. Browser/Electron binaries are intentionally skipped here; doctor
+  # must report those optional capabilities rather than masking their absence.
+  release-smoke:
+    name: Linux installed-artifact smoke
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9.15.9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:smoke
+
+  # Windows-sensitive behavior is a separate signal from the Linux gate:
+  # filesystem containment, native PTY/process lifecycle, CLI installation,
+  # and the generated distribution are exercised on the supported host OS.
+  windows:
+    name: Windows path/native gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9.15.9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run packages/repair/src/worktree.hardening.test.ts packages/repair/src/path-policy-property.test.ts packages/cli-adapter/src/cli.hardening.test.ts packages/cli/src/args.test.ts packages/cli/src/workspace.test.ts
+      - run: pnpm exec vitest run --config vitest.integration.config.ts packages/cli-adapter/src/node-pty-backend.integration.test.ts packages/cli-adapter/src/tui-screen.integration.test.ts packages/cli/src/cli.integration.test.ts
+      - run: pnpm release:smoke

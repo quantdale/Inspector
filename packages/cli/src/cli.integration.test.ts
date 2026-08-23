@@ -171,6 +171,25 @@ describe("cli", () => {
     expect(stdout).not.toContain("--frobnicate");
   });
 
+  it("emits a stable JSON error envelope without contaminating stdout", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
+    const result = await runCli(["doctor", "--frobnicate", "--json"], dir);
+    expect(result.code).toBe(4);
+    expect(result.stderr).toBe("");
+    const payload = JSON.parse(result.stdout) as {
+      schema: string;
+      ok: boolean;
+      command: string;
+      error: { kind: string; classification: string; exitCode: number };
+    };
+    expect(payload).toMatchObject({
+      schema: "inspector-cli/error/1",
+      ok: false,
+      command: "doctor",
+      error: { kind: "unknown-flag", classification: "user/config", exitCode: 4 },
+    });
+  });
+
   it("prints the version from the root package.json", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
     const short = await runCli(["-v"], dir);

@@ -54,3 +54,18 @@ Environment instability must not be mistaken for application defects.
 ## Replay diagnostics
 
 Every replay should record environment fingerprint and compare it to the original finding. Mismatches such as browser version, emulator snapshot, fixture revision, feature flags, or backend schema are surfaced before judging the result.
+
+## Operator CLI output
+
+With `--json`, product workflows emit versioned command schemas on stdout and
+send progress to stderr. Unexpected failures use
+`inspector-cli/error/1` with a stable kind, classification, and exit code;
+malformed JSON is never used for an error path. Verification, regression,
+repair, and campaign records are persisted in SQLite alongside their evidence
+artifacts, so an interrupted operator process can resume or report an explicit
+environment/incompatible-target outcome.
+
+Target freeform text is redacted before it enters persisted observations,
+evidence, or model context. Raw evidence remains available where it does not
+contain recognized secret material, with hashes and provenance retained for
+audit.

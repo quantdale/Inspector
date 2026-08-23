@@ -14,7 +14,8 @@
     "test": "vitest run --passWithNoTests",
     "test:integration": "vitest run --passWithNoTests --config vitest.integration.config.ts",
     "cli": "tsx packages/cli/src/bin.ts",
-    "build:release": "node scripts/build-release.mjs"
+    "build:release": "node scripts/build-release.mjs",
+    "release:smoke": "node scripts/release-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

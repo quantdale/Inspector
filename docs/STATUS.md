@@ -1,12 +1,13 @@
 # Project Status
 
-Last updated: M10 COMPLETE (2026-08-23)
+Last updated: M11 P7 IN PROGRESS (2026-08-23)
 
 ## Campaign
 
-- Mode: **M10 — Resumable exploration campaigns: COMPLETE**. M9 native
-  autonomous exploration and M10 resumability are complete; the milestone
-  state is recorded in `.inspector/state/campaign.yaml`.
+- Mode: **M11 — Operator-grade product workflows and distribution: ACTIVE**.
+  M9 native autonomous exploration and M10 resumability are complete. M11
+  P0-P6 are complete; P7 is the active CI/distribution/acceptance waypoint.
+  Canonical state is recorded in `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
@@ -53,6 +54,27 @@ process-kill continuation. The seeded restart soak uses boundaries 1, 2, 4,
 and 6 and ends with unique monotonic steps, exactly the configured action
 budget, and no checkpoint growth beyond retention 8.
 
+## M11 outcome to date
+
+The installed CLI now exposes durable `verify`, `regress`, `explore`,
+`repair`, and `campaign run|list|show|stop|resume` workflows over the existing
+finding, replay/oracle, repair, exploration, and scale engines. Product-facing
+JSON schemas and deterministic outcome classes distinguish reproduction,
+fixed, flaky, environment failure, incompatible target, policy refusal, and
+internal errors. Discovery never implies patching permission.
+
+M11 P5 closed the product-blocking oracle false-positive, realpath repair
+containment, freeform redaction, restart-durable budget/accounting, atomic
+artifact cleanup, and timestamped web attribution debt. P6 added a production
+Playwright Electron binding and deterministic fixture with explicit real vs
+injectable selection, plus a real PTY VT viewport/cursor/resize model. The
+current host has no downloaded Electron executable: the production field proof
+is `ENVIRONMENT_DEFERRED`, not substituted with a mock result.
+
+P7 is implementing layered Linux/Windows CI, the clean installed npm-tarball
+smoke, the end-to-end acceptance matrix, and final documentation/state
+reconciliation. No rc.2 package, release, or tag has been published.
+
 ## Candidate staleness (GA decision)
 
 Field validation found and fixed two runtime defects (FIELD-1 HIGH:
@@ -89,6 +111,13 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 | test (unit) | PASS (518 passed / 3 skipped) |
 | test:integration | PASS (144/144 across 31 files) |
 
+M11 targeted evidence on the current tree: P1-P4 product integration proofs
+and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration
+passes, Electron injectable conformance is 2/2, and the real Electron test is
+honestly skipped because the executable is unavailable. P7's installed-artifact
+smoke passes from a fresh npm prefix (`inspector-cli-0.1.0-m11.0.tgz`); its
+final provenance SHA is recorded after the closing commit.
+
 M10 final-gate evidence is the `c0835d7` implementation commit plus the
 following state-synchronization commit; historical RC1 reports remain
 unchanged.
@@ -112,5 +141,6 @@ None blocking continued validation.
 | M8 iOS | DEFERRED_ENVIRONMENT |
 | M9 Platform-neutral exploration | COMPLETE |
 | M10 Resumable exploration | COMPLETE |
+| M11 Operator workflows/distribution | ACTIVE — P0-P6 COMPLETE, P7 IN PROGRESS |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

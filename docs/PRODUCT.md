@@ -45,7 +45,9 @@ A developer or small engineering team that wants long-running autonomous QA agai
 
 `inspector hunt`
 
-Explore until budget exhausted or stop policy fires. Record candidates, confirm reproducible defects, and optionally repair.
+Explore until budget exhausted or stop policy fires. Record candidates and
+confirm reproducible defects. Hunt is discovery-only by default; any repair
+requires a separate explicit `inspector repair` authorization.
 
 ### Verify
 
@@ -70,6 +72,32 @@ Build state/action coverage without automatically patching.
 `inspector repair <finding>`
 
 Create isolated worktree, diagnose, patch, verify, and produce a reviewable change.
+
+### Campaign
+
+`inspector campaign run|list|show|stop|resume`
+
+Run bounded scale workflows over explicit target assignments. Campaign state,
+leases, worker ownership, budgets, finding clustering, and stop/resume state
+are durable; the CLI never pushes, merges, or releases a repair.
+
+## Installed CLI machine contract
+
+Important product commands emit a stable top-level schema with `--json`:
+
+| Command | Schema | Exit meaning |
+| --- | --- | --- |
+| `hunt` | `inspector-cli/hunt/1` | `0` completed; `1` adapter/observation or error-level hunt stop |
+| `explore` | `inspector-cli/explore/1` | same execution classes as hunt; patching is always disabled |
+| `verify` | `inspector-cli/verify/1` | `0` fixed/clean; `2` reproduced; `3` flaky/environment; `4` incompatible/skipped |
+| `regress` | `inspector-cli/regress/1` | `0` pass/fixed; `2` reproduced regression; `3` flaky/environment/incompatible |
+| `repair` | `inspector-cli/repair/1` | `0` resolved; `2` patch failed; `3` execution error; `4` policy/probe refusal |
+| `campaign` | `inspector-cli/campaign/1` | `0` bounded operation accepted/completed; `2` failed item execution |
+
+Unexpected command failures use `inspector-cli/error/1` and keep JSON on stdout
+only, with `error.kind`, `error.classification`, and `error.exitCode`.
+Progress is sent to stderr. Environment failures and automation misses are
+never promoted to target defects.
 
 ## Success metrics
 

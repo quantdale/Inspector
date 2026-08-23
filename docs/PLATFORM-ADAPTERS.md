@@ -2,7 +2,7 @@
 
 Adapters translate Inspector's semantic sensor/action vocabulary into platform-native automation.
 
-## Capability status (RC1)
+## Capability status (M11)
 
 Three honest tiers. Claims below are true of the current tree; see
 `docs/STATUS.md`, `.inspector/rc-work/INVENTORY.md`,
@@ -14,7 +14,7 @@ Three honest tiers. Claims below are true of the current tree; see
 | **Proven real on dev machine** | CLI — real PTY via `@lydell/node-pty` (ConPTY) | Real ConPTY round-trip integration green; unscripted vim session driven over a live PTY (69 interactions, kill/liveness probes honest) |
 | **Proven real on dev machine** | Windows UIA — PowerShell bridge (`RealUiaBackend`) | Tree enumeration/invoke/value round-trip exercised on Calculator and Store Paint end-to-end; dead-window detection and `waitForWindow` landed after dogfood findings |
 | **Proven real on dev machine** | Android ADB — `RealAdbBackend` | Headless AVD booted (~42 s) and `com.android.settings` driven end-to-end (~65 s); liveness-verified devices, uiautomator dump with retries, screencap validation, logcat |
-| **Proven via injectable backend only** | Electron runtime binding | Adapter interfaces proven against injectable backends; no real Electron runtime exercised in RC1 |
+| **Production binding complete; field proof deferred** | Electron runtime binding | Playwright Electron handler, deterministic fixture, renderer/main logs, evidence, reset, replay/error classification, and explicit real-vs-injectable selection are implemented; this host has no downloaded Electron executable, so the real runtime test is honestly skipped |
 | **Proven via injectable backend only** | iOS interfaces | Interfaces and remote-worker contract fully specified and conformance-tested against fakes; no macOS/Xcode runtime available |
 | **Deferred** | M8 iOS/Xcode | Deferred for lack of a macOS/Xcode/simulator runtime; resumption requirements in `specs/008-ios/SPEC.md` |
 
@@ -25,6 +25,7 @@ Three honest tiers. Claims below are true of the current tree; see
 | `INSPECTOR_PTY` | `real` \| `mock` | `mock`; `INSPECTOR_PTY=real` opts into native node-pty explicitly (no auto mode) |
 | `INSPECTOR_WINDOWS_BACKEND` | `real` \| `mock` \| `auto` | `auto`: probe PowerShell/UIA availability; real when the probe succeeds, otherwise mock with a logged warning |
 | `INSPECTOR_ANDROID_BACKEND` | `real` \| `mock` \| `auto` | `auto`: probe adb; fall back to mock with a logged warning when unavailable |
+| `INSPECTOR_ELECTRON_BACKEND` | `real` \| `injectable` \| `auto` | `auto`: use the installed Electron executable when present; otherwise use the explicitly reported injectable contract backend; `real` fails closed when the executable is absent |
 
 Any other value is an error, never a silent fallback.
 
@@ -33,9 +34,10 @@ Any other value is an error, never a silent fallback.
 - **Web**: external targets are localhost-only by policy in RC1 (`--url` is
   validated and forwarded via `WEB_TARGET_URL`; non-local origins are rejected).
   Firefox/WebKit projects not yet exercised.
-- **CLI/TUI**: `readScreen` returns a scrollback-tail model, not a cell grid;
-  full-screen TUI redraws can leave stale fragments and degrade state detection
-  for full-screen apps (documented in `NodePtyBackend`). No resize operation.
+- **CLI/TUI**: the production PTY backend now models a deterministic VT cell
+  viewport separately from bounded scrollback, including cursor, dimensions,
+  resize, and a stable fingerprint. Raw output remains available as evidence;
+  terminal-specific accessibility protocols are not yet modeled.
   Windows CreateProcess semantics require fully qualified program paths for
   some msys tools.
 - **Windows/UIA**: packaged (Store) apps can linger as processes after their
@@ -121,7 +123,17 @@ Avoid requiring physical mouse/keyboard input. Prefer a dedicated emulator per w
 
 ## Electron
 
-Use Playwright's Electron support where appropriate, plus Chromium/CDP instrumentation for renderer observability. Add main-process logs and IPC-aware hooks when the app under test opts in.
+Use Playwright's Electron support where appropriate, plus Chromium/CDP instrumentation for renderer observability. The production handler launches a
+real `BrowserWindow`, captures renderer/main-process logs, page errors,
+network/storage/UI evidence, screenshots and traces, and applies semantic
+actions through the renderer. A minimal deterministic fixture is shipped with
+the CLI artifact for integration proof.
+
+`INSPECTOR_ELECTRON_BACKEND=real` never falls back to the injectable backend.
+`auto` selects real only when the optional Electron executable is available;
+`doctor` reports a missing executable as an optional warning. The current
+development host has no downloaded executable, so the field proof remains
+`ENVIRONMENT_DEFERRED`; the binding and refusal/injectable tests are complete.
 
 Electron can also be exercised through the Windows adapter for true black-box validation; both paths are useful and should be distinguishable.
 

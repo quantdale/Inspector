@@ -21,8 +21,8 @@ Actuators include clicks/taps/typing/swipes, browser/device control, launch/kill
 
 The first executable proof was **web applications through Playwright**. That
 proof is complete, and the platform order below has been followed through
-CLI/PTY, Android/ADB, and Windows/UIA (see the capability summary above);
-Electron and iOS remain behind it. Platform order:
+CLI/PTY, Android/ADB, Windows/UIA, and the Electron production binding (see
+the capability summary above). Platform order:
 
 1. Web / Playwright
 2. CLI / PTY
@@ -64,9 +64,11 @@ zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferr
 for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M10 — resumable exploration campaigns complete**. RC1 field
-validation is complete with a documented GO decision; the RC1 tag and release
-state remain unchanged and no rc.2 release has been published.
+Current status: **M11 — operator-grade product workflows and distribution
+active**. M10 resumable exploration and M11 P0-P6 are complete; P7 is closing
+layered CI, installed-artifact smoke, acceptance evidence, and documentation.
+RC1 field validation is complete with a documented GO decision; the RC1 tag
+and release state remain unchanged and no rc.2 release has been published.
 
 ## Quickstart
 
@@ -92,6 +94,14 @@ pnpm cli hunt --adapter fake --max-actions 60 --json
 # Inspect results
 pnpm cli findings list
 pnpm cli findings show <findingId>
+
+# Product workflows (durable; use --json for automation)
+pnpm cli verify <findingId> --json
+pnpm cli regress --json
+pnpm cli explore --adapter fake --max-actions 60 --json
+pnpm cli repair <findingId> --repo-root <checkout> --revision <sha> --provider <module> --json
+pnpm cli campaign run --items id=fake --workers 2 --steps 4 --json
+pnpm cli campaign list --json
 ```
 
 Evidence bundles land under `<workspace>/.inspector/bundles/<runId>/`, where the
@@ -117,7 +127,8 @@ re-observes an environment without continuing autonomous exploration.
 | Tier | Platforms |
 | --- | --- |
 | Proven real on dev machine | Web (Playwright + Chromium); CLI PTY (ConPTY via `@lydell/node-pty`); Windows UIA (PowerShell bridge); Android ADB (headless emulator) |
-| Proven via injectable backend only | Electron runtime binding; iOS interfaces |
+| Production binding complete; field proof deferred | Electron (Playwright Electron API + deterministic fixture; this host lacks the optional downloaded executable) |
+| Proven via injectable backend only | iOS interfaces |
 | Deferred | M8 iOS/Xcode |
 
 Details and known limitations: `docs/PLATFORM-ADAPTERS.md`.

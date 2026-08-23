@@ -30,7 +30,9 @@ function driverFor(workspace) {
     async replay(actions) {
       const broken = readFileSync(path, "utf8").includes("BAD");
       const outcomes = actions.map((action) => {
-        const fails = broken && action.kind === "trigger";
+        // The acceptance proof reuses a real fake-hunt reproducer whose final
+        // action is `submit`; the focused repair fixture still uses `trigger`.
+      const fails = broken && action.kind !== "healthcheck";
         return {
           actionId: action.id,
           runId: action.runId,
@@ -42,7 +44,10 @@ function driverFor(workspace) {
       });
       return {
         outcomes,
-        signals: broken && actions.some((action) => action.kind === "trigger")
+        // Keep the acceptance fixture useful even when minimization proves an
+        // empty path: the unpatched source is the defect oracle, while the
+        // healthcheck remains the benign masking probe.
+        signals: broken && (actions.length === 0 || actions.some((action) => action.kind !== "healthcheck"))
           ? [{ kind: "TARGET_FAILURE", detail: "fixture defect" }]
           : [],
         observations: [],

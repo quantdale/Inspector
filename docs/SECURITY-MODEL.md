@@ -57,6 +57,31 @@ Fault injection such as process kill, file corruption, database mutation, or net
 
 Commit/push/PR operations are separately permissioned. A successful repair does not grant publishing rights.
 
+### Repair worktree containment
+
+Repair is anchored to an exact Git revision in a detached disposable worktree;
+the primary checkout is never edited by the CLI. Path policy resolves the
+nearest existing filesystem ancestor and compares real paths, failing closed
+for traversal, absolute/UNC/drive paths, `.git` metadata, symlink escapes, and
+Windows junction/reparse escapes. Lexical normalization alone is not treated
+as a security boundary.
+
+### Evidence redaction and crash safety
+
+Freeform PTY, logcat, web, and adapter text is redacted before durable artifact
+or model-context persistence for URL query secrets, bearer/auth headers,
+cookies, credential environment variables, and recognizable API-key forms.
+Evidence writes use atomic staging/rename and bounded orphan cleanup; valid
+artifacts are not removed during cleanup. Repair attempts and artifact-byte
+budgets are persisted so restarting Inspector cannot reset them.
+
+### Backend honesty
+
+The Electron adapter has separate `real`, `injectable`, and `auto` modes.
+Explicit real mode fails if the Electron executable is unavailable; auto mode
+reports which backend was selected. Injectable coverage is never recorded as a
+real-backend field proof.
+
 ## Artifact retention
 
 Retention and maximum size are run policies. Sensitive artifacts should support immediate redaction or deletion while preserving hashes/metadata needed for audit.

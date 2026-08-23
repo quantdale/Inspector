@@ -1246,6 +1246,8 @@ async function runExplorationCommand(
     const code = badStop || errorOutcomes.length > 0 ? 1 : 0;
 
     const huntSummary = {
+      schema: "inspector-cli/hunt/1" as const,
+      command: "hunt" as const,
       ok: code === 0,
       ...(warning !== null ? { warning } : {}),
       runId: result.runId,

@@ -53,6 +53,10 @@ export function generalUsage(): string {
     "  inspector findings show find_abc123",
     "  inspector runs list",
     "  inspector runs resume run_abc123",
+    "",
+    "Machine exit codes: 0 success; 2 reproduced finding/regression;",
+    "3 environment unavailable/flaky; 4 user/config or policy refusal;",
+    "1 internal Inspector error. JSON failures use schema inspector-cli/error/1.",
   ].join("\n");
 }
 
@@ -87,8 +91,8 @@ const COMMAND_HELP: Record<string, string> = {
     "                         fresh Inspector process; original target/config",
     "                         are loaded and incompatible overrides are refused",
     "",
-    "Exit code 1 on adapter-error / initial-observe-failed stops or any",
-    "error-level finding outcome; otherwise 0.",
+    "JSON schema: inspector-cli/hunt/1. Exit code 1 on adapter-error /",
+    "initial-observe-failed stops or any error-level finding outcome; otherwise 0.",
     "",
     WORKSPACE_NOTE,
   ].join("\n"),

@@ -111,6 +111,18 @@ CONFIRMED
 
 Inspector should prefer generating a failing regression test before source edits where feasible.
 
+The installed CLI exposes repair only as a separately authorized workflow.
+`explore` never applies patches, and `hunt` does not imply repair permission.
+`repair <findingId>` requires an explicit repository root, exact revision, and
+configured provider; rejected attempts remain reviewable and the primary
+checkout is reported untouched.
+
+For unattended work, action, wall-clock, reset, finding, model/token/cost,
+repair-attempt, artifact-byte, and resource budgets are admitted from durable
+state. Controller restart or campaign resume cannot grant a fresh process-local
+allowance. Campaign workers use exclusive durable leases and explicit target
+assignments.
+
 ## Stop policies
 
 A hunt may stop on:
