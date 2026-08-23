@@ -216,8 +216,9 @@ verification:
     M11 re-verification with real Electron runtime: lint 0 errors/4
     pre-existing warnings; typecheck PASS; unit 533 passed/3 skipped;
     integration 155 passed/1 skipped across 37 files on the first run;
-    M11 acceptance matrix PASS; installed release smoke PASS from clean
-    source 91411fa (candidate SHA-256 de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126,
+    M11 acceptance matrix PASS; installed release smoke PASS (including the
+    fake explore workflow) from clean source 23a4a27dcff472bd709c3b93b29572ad087564a5
+    (candidate SHA-256 2149dc76f09e4409e953270fa6c0481a9500439369ee09c595048765e10963ae,
     source.dirty false); production Electron field proof EXECUTED against a
     real Electron 43.4.1 process on this Windows host; layered CI now includes
     an Xvfb Electron proof lane and per-job timeouts; hosted CI not invoked

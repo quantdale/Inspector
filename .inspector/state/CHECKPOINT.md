@@ -25,8 +25,10 @@ lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit **533 passed /
 3 skipped**; integration **155 passed / 1 skipped across 37 files on the
 first run** (no retries needed); `release:smoke` PASS from a clean prefix.
 Fresh clean-tree candidate `inspector-cli-0.1.0-m11.0.tgz` SHA-256 is
-`de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126`, built from
-`91411faaffb763109bea90792da0c92128c9c44b` with `source.dirty: false`.
+`2149dc76f09e4409e953270fa6c0481a9500439369ee09c595048765e10963ae`, built from
+`23a4a27dcff472bd709c3b93b29572ad087564a5` with `source.dirty: false`; the
+smoke proves the installed CLI's `--version`, `doctor`, fake `hunt`, fake
+`explore`, findings/runs inspection, and `campaign list`.
 Hosted CI has still not executed (no push authority; GitHub unreachable from
 this host), so the Linux/Windows/Xvfb lanes remain CONFIGURED-not-yet-run.
 M8 remains deferred to a macOS/Xcode environment; no release/tag action was

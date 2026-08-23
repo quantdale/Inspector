@@ -122,11 +122,11 @@ passes, Electron injectable conformance is 2/2, and the real Electron
 production proof now executes against an actual Electron 43.4.1 process on
 this host (the only skip left is the executable-absent refusal case). P7's
 installed-artifact smoke passes from a fresh npm prefix
-(`inspector-cli-0.1.0-m11.0.tgz`). The latest clean candidate SHA-256 is
-`de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126`, with
-manifest source commit `91411faaffb763109bea90792da0c92128c9c44b` and
-`source.dirty: false`; the earlier P7 candidate
-(`a6265950…39001f3`, `e6f4c78…bc8e3`) remains historical record.
+(`inspector-cli-0.1.0-m11.0.tgz`, including the fake `explore` workflow).
+The latest clean candidate SHA-256 is
+`2149dc76f09e4409e953270fa6c0481a9500439369ee09c595048765e10963ae`, with
+manifest source commit `23a4a27dcff472bd709c3b93b29572ad087564a5` and
+`source.dirty: false`; earlier candidates remain historical record.
 
 M10 final-gate evidence is the `c0835d7` implementation commit plus the
 following state-synchronization commit; historical RC1 reports remain
