@@ -10,17 +10,18 @@
   },
   "dependencies": {
     "@inspector/adapter-fake": "workspace:*",
-    "better-sqlite3": "^11.7.0",
-    "@inspector/protocol": "workspace:*",
-    "@inspector/core": "workspace:*",
-    "@inspector/finding": "workspace:*",
-    "@inspector/store-sqlite": "workspace:*",
+    "@inspector/adapter-sdk": "workspace:*",
     "@inspector/adapter-web": "workspace:*",
     "@inspector/android": "workspace:*",
-    "@inspector/cli-adapter": "workspace:*",
-    "@inspector/electron-adapter": "workspace:*",
-    "@inspector/windows-adapter": "workspace:*",
     "@inspector/artifact-store": "workspace:*",
-    "@inspector/adapter-sdk": "workspace:*"
+    "@inspector/cli-adapter": "workspace:*",
+    "@inspector/core": "workspace:*",
+    "@inspector/electron-adapter": "workspace:*",
+    "@inspector/finding": "workspace:*",
+    "@inspector/protocol": "workspace:*",
+    "@inspector/store-sqlite": "workspace:*",
+    "@inspector/windows-adapter": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "yaml": "^2.9.0"
   }
 }

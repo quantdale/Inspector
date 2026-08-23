@@ -8,8 +8,11 @@ import { join } from "node:path";
 import { newId, isId } from "@inspector/protocol";
 import {
   UnattendedCampaign,
+  CampaignConfigError,
+  loadCampaignManifest,
   type Budget,
   type CampaignReport,
+  type LoadedManifest,
   type WorkItem,
 } from "@inspector/scale";
 import { CliError, intFlag, type ParsedInvocation } from "./args.js";
@@ -19,6 +22,7 @@ import { writeJsonAtomic } from "./atomic.js";
 const CAMPAIGN_SCHEMA = "inspector-cli/campaign/1";
 const CAMPAIGN_LIST_SCHEMA = "inspector-cli/campaign-list/1";
 const CAMPAIGN_SHOW_SCHEMA = "inspector-cli/campaign-show/1";
+const CAMPAIGN_VALIDATE_SCHEMA = "inspector-cli/campaign-validate/1";
 const MAX_WORKERS = 32;
 const MAX_STEPS = 10_000;
 
@@ -42,10 +46,13 @@ interface CampaignManifest {
   status: CampaignStatus;
   lastReport?: CampaignReport;
   lastError?: string;
+  /** M12 F2 provenance of a file-based manifest when one was used. */
+  sourceManifest?: { path: string; sha256: string };
+  keepWorkspaces?: boolean;
 }
 
 interface CampaignRequest {
-  operation: "run" | "list" | "show" | "stop" | "resume";
+  operation: "run" | "list" | "show" | "stop" | "resume" | "validate";
   id?: string;
   workerCount: number;
   items?: WorkItem[];
@@ -57,6 +64,7 @@ interface CampaignRequest {
   maxWallMs: number;
   limit: number;
   provided: Set<string>;
+  manifestPath?: string;
 }
 
 interface CampaignSnapshot {
@@ -80,18 +88,30 @@ interface CampaignSnapshot {
 
 export function parseCampaignRequest(parsed: ParsedInvocation): CampaignRequest {
   const operation = parsed.positionals[0];
-  if (operation !== "run" && operation !== "list" && operation !== "show" && operation !== "stop" && operation !== "resume") {
-    throw new CliError("missing-argument", "campaign requires run, list, show, stop, or resume");
+  if (
+    operation !== "run" &&
+    operation !== "list" &&
+    operation !== "show" &&
+    operation !== "stop" &&
+    operation !== "resume" &&
+    operation !== "validate"
+  ) {
+    throw new CliError("missing-argument", "campaign requires run, validate, list, show, stop, or resume");
+  }
+  const manifestPath = parsed.flags["--manifest"];
+  if (manifestPath === true) throw new CliError("missing-value", "--manifest requires a path to a campaign manifest file (YAML or JSON)");
+  if (manifestPath !== undefined && operation !== "run" && operation !== "validate") {
+    throw new CliError("invalid-value", "--manifest is only valid with campaign run or campaign validate");
+  }
+  if (manifestPath !== undefined && typeof manifestPath === "string" && manifestPath.trim() === "") {
+    throw new CliError("missing-value", "--manifest requires a non-empty path");
   }
   const id = parsed.positionals[1];
-  if (operation === "list" && parsed.positionals.length > 1) {
-    throw new CliError("unexpected-argument", "campaign list does not take a campaign id");
+  if ((operation === "list" || operation === "validate") && parsed.positionals.length > 1) {
+    throw new CliError("unexpected-argument", `campaign ${operation} does not take a campaign id`);
   }
-  if (operation !== "run" && operation !== "list" && (!id || parsed.positionals.length > 2)) {
+  if (operation !== "run" && operation !== "list" && operation !== "validate" && (!id || parsed.positionals.length > 2)) {
     throw new CliError("missing-argument", `campaign ${operation} requires one campaign id`);
-  }
-  if (operation === "run" && parsed.positionals.length > 1) {
-    throw new CliError("unexpected-argument", "campaign run uses --id <campaignId>");
   }
   if (id !== undefined && !isId(id)) throw new CliError("invalid-value", `invalid campaign id '${id}'`);
 
@@ -144,6 +164,7 @@ export function parseCampaignRequest(parsed: ParsedInvocation): CampaignRequest 
     maxWallMs: maxMinutes * 60_000,
     limit: intFlag(parsed.flags, "--limit", 100),
     provided: new Set(Object.keys(parsed.flags)),
+    ...(typeof manifestPath === "string" ? { manifestPath } : {}),
   };
 }
 
@@ -165,6 +186,68 @@ export async function campaignCommand(
     return { code: 0, data: output };
   }
 
+  // M12 F2: pre-flight manifest validation — no directories or state are
+  // created until the whole document is proven valid.
+  if (req.operation === "validate" || (req.operation === "run" && req.manifestPath !== undefined)) {
+    const loaded = loadManifestForRequest(req);
+    if (req.operation === "validate") {
+      const output = {
+        schema: CAMPAIGN_VALIDATE_SCHEMA,
+        ok: true,
+        command: "campaign",
+        operation: "validate",
+        result: {
+          valid: true,
+          path: loaded.path,
+          sha256: loaded.sha256,
+          workers: loaded.config.workerCount,
+          items: loaded.config.items.map((item) => ({
+            id: item.id,
+            workflow: item.mode,
+            adapterFamily: item.adapterFamily ?? item.target,
+            targetUri: item.targetUri ?? null,
+            seed: item.seed,
+            priority: item.priority,
+            requiresCapabilities: item.requiresCapabilities ?? [],
+            repairAuthorized: item.repairAuthorized === true,
+          })),
+        },
+        warnings: warning ? [warning] : [],
+      };
+      emit(ctx, output, `manifest ${loaded.path}: valid (${loaded.config.items.length} item(s), ${loaded.config.workerCount} worker(s))`);
+      return { code: 0, data: output };
+    }
+    // run --manifest: build the effective request from the validated file;
+    // explicitly provided flags may narrow the durable configuration.
+    const cfg = loaded.config;
+    const effective: CampaignRequest = {
+      operation: "run",
+      workerCount: req.provided.has("--workers") ? req.workerCount : cfg.workerCount,
+      items: cfg.items,
+      usagePerStep: req.usagePerStep,
+      globalBudget: anyBudgetFlagProvided(req) ? req.globalBudget : cfg.globalBudget,
+      workerBudget: req.provided.has("--max-worker-actions") ? req.workerBudget : cfg.workerBudget,
+      leaseTtlMs: req.provided.has("--lease-ttl-ms") ? req.leaseTtlMs : cfg.leaseTtlMs,
+      leaseBackend: req.provided.has("--lease-backend") ? req.leaseBackend : cfg.leaseBackend,
+      maxWallMs: req.provided.has("--max-minutes") ? req.maxWallMs : cfg.maxWallMs,
+      limit: req.limit,
+      provided: req.provided,
+      manifestPath: loaded.path,
+    };
+    const requestedId = stringFlag(parsed.flags, "--id", "");
+    const id = requestedId || cfg.id || `campaign-${newId()}`;
+    if (!isId(id)) throw new CliError("invalid-value", `invalid campaign id '${id}'`);
+    const manifestPath = join(root, id, "manifest.json");
+    if (existsSync(manifestPath)) {
+      throw new CliError("already-exists", `campaign already exists: ${id}; use a new --id or operate the existing campaign`);
+    }
+    const created = createManifest(root, id, effective);
+    created.sourceManifest = { path: loaded.path, sha256: loaded.sha256 };
+    if (cfg.keepItemWorkspaces) created.keepWorkspaces = true;
+    writeManifest(manifestPath, created);
+    return operateCampaign(req, id, manifestPath, created, ctx, warning);
+  }
+
   const id = (req.id ?? stringFlag(parsed.flags, "--id", "")) || (req.operation === "run" ? `campaign-${newId()}` : "");
   if (!id) throw new CliError("missing-argument", `campaign ${req.operation} requires a campaign id`);
   if (!isId(id)) throw new CliError("invalid-value", `invalid campaign id '${id}'`);
@@ -173,7 +256,7 @@ export async function campaignCommand(
 
   if (req.operation === "run" && !manifest) {
     if (!req.items || req.items.length === 0) {
-      throw new CliError("missing-value", "campaign run requires --items id=target,id=target; target must be fake in the current CLI executor");
+      throw new CliError("missing-value", "campaign run requires --items id=target,id=target or --manifest <path>");
     }
     manifest = createManifest(root, id, req);
     writeManifest(manifestPath, manifest);
@@ -183,7 +266,19 @@ export async function campaignCommand(
     validateOverrides(manifest, req);
   }
 
-  if (!manifest) throw new CliError("internal", `campaign manifest unavailable: ${id}`);
+  return operateCampaign(req, id, manifestPath, manifest!, ctx, warning);
+}
+
+/** Shared run/stop/resume/show execution over one durable campaign manifest. */
+async function operateCampaign(
+  req: CampaignRequest,
+  id: string,
+  manifestPath: string,
+  existing: CampaignManifest,
+  ctx: CommandContext,
+  warning: string | null,
+): Promise<{ code: number; data?: unknown }> {
+  let manifest = existing;
   if (req.operation === "show") {
     const snapshot = inspectManifest(manifest);
     const output = { schema: CAMPAIGN_SHOW_SCHEMA, ok: true, command: "campaign", operation: "show", campaign: snapshot, warnings: warning ? [warning] : [] };
@@ -223,6 +318,29 @@ export async function campaignCommand(
   }
 }
 
+/** Load the request's manifest file; map config failures to stable CLI errors. */
+function loadManifestForRequest(req: CampaignRequest): LoadedManifest {
+  if (req.manifestPath === undefined) {
+    throw new CliError("missing-value", "--manifest requires a path to a campaign manifest file (YAML or JSON)");
+  }
+  try {
+    return loadCampaignManifest(req.manifestPath);
+  } catch (err) {
+    if (err instanceof CampaignConfigError) {
+      throw new CliError("manifest-invalid", err.message);
+    }
+    throw err;
+  }
+}
+
+function anyBudgetFlagProvided(req: CampaignRequest): boolean {
+  return (
+    req.provided.has("--max-actions") ||
+    req.provided.has("--max-tokens") ||
+    req.provided.has("--max-cost-usd")
+  );
+}
+
 function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
   const workerBudget = manifest.workerBudget;
   const workerBudgets = workerBudget
@@ -238,6 +356,7 @@ function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
       ...(workerBudgets ? { workerBudgets } : {}),
       leaseTtlMs: manifest.leaseTtlMs,
       leaseBackend: manifest.leaseBackend,
+      ...(manifest.keepWorkspaces ? { keepItemWorkspaces: true } : {}),
     },
     manifest.artifactsDir,
   );

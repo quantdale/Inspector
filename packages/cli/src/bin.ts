@@ -13,7 +13,7 @@ function commandOf(args: string[]): string | null {
     "--max-minutes", "--max-findings", "--resume", "--attempts", "--min-successes",
     "--timeout-ms", "--revision", "--run", "--finding", "--provider", "--patch-agent",
     "--repo-root", "--max-attempts", "--error-text", "--selectors", "--id", "--items",
-    "--workers", "--steps", "--mode", "--lease-backend", "--lease-ttl-ms", "--limit",
+    "--manifest", "--workers", "--steps", "--mode", "--lease-backend", "--lease-ttl-ms", "--limit",
   ]);
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index]!;

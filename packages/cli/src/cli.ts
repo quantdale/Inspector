@@ -124,6 +124,7 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
           [
             "--id",
             "--items",
+            "--manifest",
             "--workers",
             "--steps",
             "--seed",

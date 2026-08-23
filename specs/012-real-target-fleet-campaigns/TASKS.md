@@ -35,15 +35,20 @@ before the next activates.
 
 ## F2 — Versioned work-item schema and manifest
 
-- [ ] F2.1 v2 assignment schema (`inspector-campaign-workitem/1`) + validation
-      with deterministic error codes; legacy WorkItem accepted and normalized.
-- [ ] F2.2 Manifest file schema (`inspector-campaign-manifest/1`) parsed from
-      YAML/JSON: workers, budgets, leases, items with per-item budgets/
-      requirements/repair authorization.
-- [ ] F2.3 CLI `campaign run --manifest <path>` with full pre-flight validation
-      and stable config-error kinds; backward-compatible --items path intact.
-- Gate: unit tests for parsing/validation/backcompat; CLI integration test for
-  manifest run end-to-end on fake executor.
+- [x] F2.1 v2 assignment schema (`inspector-campaign-workitem/1` semantics in
+      validateWorkItem) + validation with deterministic error codes; legacy
+      WorkItem accepted and normalized (mode regression alias kept).
+- [x] F2.2 Manifest file schema (`inspector-campaign-manifest/1`) parsed from
+      YAML/JSON: workers, leases, budgets, items with per-item budgets/
+      requirements/explicit repair authorization; sha256 provenance recorded.
+- [x] F2.2b `campaign validate --manifest <path>` operation with stable JSON
+      schema inspector-cli/campaign-validate/1.
+- [x] F2.3 CLI `campaign run --manifest <path>` with full pre-flight validation
+      (CampaignConfigError -> stable kind manifest-invalid) and durable source-
+      manifest provenance; backward-compatible --items path intact.
+- Gate: PASSED 2026-08-24 — 9 new scale unit tests + CLI integration test
+  (validate/refusals/end-to-end manifest run); lint 0 errors; typecheck PASS;
+  unit 542 passed/3 skipped; integration 156 passed/1 skipped.
 
 ## F3 — Real workflow services (@inspector/workflows)
 

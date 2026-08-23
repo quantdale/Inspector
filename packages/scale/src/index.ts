@@ -10,4 +10,6 @@ export * from "./discovery.js";
 export * from "./facade.js";
 export * from "./executor.js";
 export * from "./fake-executor.js";
+export * from "./work-item.js";
+export * from "./manifest.js";
 export * from "./campaign.js";

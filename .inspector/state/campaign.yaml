@@ -514,8 +514,8 @@ m12:
   task_groups:
     F0: COMPLETE
     F1: COMPLETE
-    F2: ACTIVE
-    F3: PENDING
+    F2: COMPLETE
+    F3: ACTIVE
     F4: PENDING
     F5: PENDING
     F6: PENDING
@@ -524,7 +524,7 @@ m12:
     F9: PENDING
     F10: PENDING
     F11: PENDING
-  waypoint: M12.F2.manifest-schema
+  waypoint: M12.F3.workflow-services
   waypoint_status: ACTIVE
   blockers: []
 
