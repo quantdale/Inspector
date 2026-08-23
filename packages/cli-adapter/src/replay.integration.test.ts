@@ -12,7 +12,6 @@ import { join } from "node:path";
 import { newId } from "@inspector/protocol";
 import type { Action } from "@inspector/protocol";
 import { Store } from "@inspector/store-sqlite";
-import { ArtifactStore } from "@inspector/artifact-store";
 import {
   FindingEngine,
   OracleEngine,
@@ -36,7 +35,6 @@ function line(value: string, id: string): Action {
 describe("SPEC-009 W6: CLI replay pipeline", () => {
   const base = mkdtempSync(join(tmpdir(), "spec009-cli-replay-"));
   const store = Store.open(join(base, "runs.db"));
-  const artifacts = new ArtifactStore(join(base, "artifacts"));
 
   function engine(): FindingEngine {
     return new FindingEngine(OracleEngine.defaults(), store);

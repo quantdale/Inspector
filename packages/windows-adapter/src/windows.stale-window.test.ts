@@ -286,6 +286,7 @@ describe("rehost across owner pids (C-F2): title-evidenced window migration", ()
         return { pid: 111, nodes: [stubNode] }; // ALWAYS root-only
       },
     });
+    void trees;
     const backend = new RealUiaBackend(bridge as never);
     await backend.attach({ pid: 111 });
     // First root-only enumeration: counter starts, stub surfaces honestly.

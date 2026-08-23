@@ -117,7 +117,6 @@ export function parseUiautomatorDump(xml: string): AndroidUiElement[] {
     const text = decodeEntities(attrs["text"] ?? "");
     const desc = decodeEntities(attrs["content-desc"] ?? "");
     const enabled = attrs["enabled"] !== "false";
-    const x1 = bounds.x1;
     const y1 = bounds.y1;
 
     out.push({
