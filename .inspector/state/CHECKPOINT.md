@@ -72,6 +72,21 @@ unreachable from this environment; local `origin/main` remains at that SHA.
 - P3 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
   warnings**.
 
+### M11 P4 — campaign CLI checkpoint
+
+- Added `inspector campaign run|list|show|stop|resume` over the existing
+  `@inspector/scale` `UnattendedCampaign` controller.
+- Campaign manifests, queue/completion state, leases, resource ledger, worker
+  assignments, budgets, and stop state are durable under the workspace;
+  SQLite leases are the CLI default, with bounded worker/action/wall budgets.
+- Added explicit `id=fake` target assignments and refusal for unsupported
+  targets rather than silently routing them through the fake executor.
+- Added a deterministic two-worker integration proof plus idempotent rerun and
+  durable stop/resume checks; completed executions remain exactly once.
+- Targeted integration: **1 passed** (`campaign.integration.test.ts`).
+- P4 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
+  warnings**.
+
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
 M7 exit gate satisfied: bounded multi-worker unattended campaign survives controller restart, preserves durable evidence/state, accounts for resources, exposes a stable integration facade.

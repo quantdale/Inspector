@@ -11,6 +11,7 @@ import { runsCommand } from "./runs.js";
 import { verifyCommand } from "./verify.js";
 import { regressCommand } from "./regress.js";
 import { repairCommand } from "./repair.js";
+import { campaignCommand } from "./campaign.js";
 import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 
 // Public workspace/spawn helpers re-exported for library consumers.
@@ -114,6 +115,34 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
     case "repair":
       return repairCommand(
         parseArgs(rest, ["--repo-root", "--revision", "--provider", "--patch-agent", "--max-attempts", "--error-text", "--selectors"], []),
+        ctx,
+      );
+    case "campaign":
+      return campaignCommand(
+        parseArgs(
+          rest,
+          [
+            "--id",
+            "--items",
+            "--workers",
+            "--steps",
+            "--seed",
+            "--mode",
+            "--lease-backend",
+            "--lease-ttl-ms",
+            "--max-minutes",
+            "--max-actions",
+            "--max-tokens",
+            "--max-cost-usd",
+            "--max-worker-actions",
+            "--model-requests-per-step",
+            "--tokens-per-step",
+            "--cost-per-step",
+            "--actions-per-step",
+            "--limit",
+          ],
+          [],
+        ),
         ctx,
       );
     case "version":

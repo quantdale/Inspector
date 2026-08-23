@@ -29,13 +29,14 @@ active:
   status: ACTIVE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P4
-  waypoint: M11.P4.campaign-cli
+  task_group: P5
+  waypoint: M11.P5.product-correctness-safety
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Expose the existing bounded scale campaign controller through campaign
-    run/list/show/stop/resume CLI operations. M8 remains deferred to a
-    macOS/Xcode environment; no release publication is authorized.
+    Close product-blocking oracle, filesystem containment, redaction, budget,
+    artifact, and web attribution debt required before the new workflows are
+    considered product-ready. M8 remains deferred to a macOS/Xcode
+    environment; no release publication is authorized.
 
 progress:
   completed_milestones:
@@ -199,6 +200,7 @@ progress:
     - M11.P1.verify-and-regress
     - M11.P2.explicit-explore
     - M11.P3.safe-repair-cli
+    - M11.P4.campaign-cli
   deferred_milestones:
     - M8
 
@@ -230,9 +232,13 @@ known_debt:
     only with a configured provider, exact revision, detached worktree,
     regression-first gates, masking/test-tamper policy, and durable audit.
   - >-
-    STILL_OPEN / M11.P4: scale campaign operations are not yet exposed as a
-    complete installed-CLI workflow; repair containment/redaction and related
-    productization debt remains in M11.P5.
+    CLOSED_BY_M11.P4: bounded `campaign run`, `list`, `show`, `stop`, and
+    `resume` are installed-CLI operations over @inspector/scale with explicit
+    fake target assignments, SQLite leases by default, global/per-worker
+    budgets, and durable idempotent state.
+  - >-
+    STILL_OPEN / M11.P5: repair containment/redaction, universal automation
+    failure oracle coverage, and artifact/web attribution debt remains.
   - >-
     STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
     redaction, fully durable unattended budgets, atomic artifact orphan
@@ -258,7 +264,6 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - campaign_cli_workflow
     - repair_containment_redaction_and_budget_productization
     - repair_containment_redaction_and_budget_productization
     - crash_artifact_cleanup_and_web_settle_attribution
@@ -463,8 +468,8 @@ m11:
     P1: COMPLETE
     P2: COMPLETE
     P3: COMPLETE
-    P4: IN_PROGRESS
-    P5: PENDING
+    P4: COMPLETE
+    P5: IN_PROGRESS
     P6: PENDING
     P7: PENDING
   blockers: []

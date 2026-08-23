@@ -5,7 +5,7 @@ import { newId } from "@inspector/protocol";
 import { FindingEngine, OracleEngine, type Finding } from "@inspector/finding";
 import { Store } from "@inspector/store-sqlite";
 import { FakeAdapterHandler } from "@inspector/adapter-fake";
-import type { WorkItem } from "./types.js";
+import type { Budget, WorkItem } from "./types.js";
 import { LeaseManager } from "./leases.js";
 import { ResourceLedger } from "./ledger.js";
 import { FindingClusterer } from "./cluster.js";
@@ -19,9 +19,12 @@ export interface CampaignOptions {
   /** Deterministic per-action usage charged to the ledger. */
   usagePerStep: { modelRequests: number; tokens: number; costUsd: number; actions: number };
   globalBudget?: { maxActions?: number; maxTokens?: number; maxCostUsd?: number };
+  workerBudgets?: Record<string, Budget>;
   now?: () => number;
   /** Lease TTL; long items renew at half-TTL intervals while they run. */
   leaseTtlMs?: number;
+  /** Durable lease backend; SQLite is recommended for cross-process CLI use. */
+  leaseBackend?: "json" | "sqlite";
 }
 
 export interface CampaignReport {
@@ -89,8 +92,10 @@ export class UnattendedCampaign {
     this.artifactsPath = artifactsDir ?? mkdtempSync(join(tmpdir(), "inspector-scale-"));
     const stateDir = stateDirOverride ?? opts.stateDir ?? join(this.artifactsPath, "state");
     this.ttlMs = opts.leaseTtlMs ?? 60_000;
-    this.leases = new LeaseManager(stateDir, opts.now ?? Date.now, this.ttlMs);
-    this.ledger = new ResourceLedger(stateDir, opts.globalBudget ?? {});
+    this.leases = new LeaseManager(stateDir, opts.now ?? Date.now, this.ttlMs, {
+      backend: opts.leaseBackend,
+    });
+    this.ledger = new ResourceLedger(stateDir, opts.globalBudget ?? {}, opts.workerBudgets ?? {});
     this.stateFile = new StateFile<CampaignState>(stateDir, "campaign", () => ({
       queue: [],
       executions: [],
@@ -156,9 +161,15 @@ export class UnattendedCampaign {
    * any state under it). A caller-provided artifacts dir is never touched.
    */
   dispose(): void {
+    this.close();
     if (this.ownsArtifactsDir) {
       rmSync(this.artifactsPath, { recursive: true, force: true });
     }
+  }
+
+  /** Release backend handles while retaining durable campaign state. */
+  close(): void {
+    this.leases.close();
   }
 
   async run(): Promise<CampaignReport> {
@@ -166,11 +177,11 @@ export class UnattendedCampaign {
 
     if (!(this.stopped || this.ledger.isStopped)) {
       for (;;) {
-        if (this.stopped) break;
+        if (this.stopped || this.ledger.isStopped) break;
         if (this.stateFile.load().queue.length === 0) break;
         let progressed = false;
         for (const workerId of workers) {
-          if (this.stopped) break;
+          if (this.stopped || this.ledger.isStopped) break;
           const itemId = this.stateFile.load().queue[0];
           if (itemId === undefined) break;
           const item = this.itemsById.get(itemId);
