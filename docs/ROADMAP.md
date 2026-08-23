@@ -304,6 +304,41 @@ artifact executes core and M11 commands; layered CI and applicable repository
 gates pass; Electron status is honest; and durable state is marked COMPLETE
 with exact evidence. No release or tag publication is performed.
 
+## M12 — Real-target fleet campaigns, capability-aware scheduling, and unattended runtime efficiency (product development)
+
+Spec: `specs/012-real-target-fleet-campaigns/SPEC.md`
+
+**Status: ACTIVE (2026-08-23).**
+
+Goal: remove the fake-target limitation from the campaign product surface so
+`inspector campaign` orchestrates real Inspector workflows against real
+adapter-backed targets with the durability, isolation, evidence, policy,
+budget, restart, lease, and provenance guarantees already built in.
+
+Deliverables:
+
+- pluggable execution contract (`WorkItemExecutor`) behind the scale scheduler;
+  deterministic fake execution becomes one implementation of that contract;
+- versioned, validated campaign work-item schema plus a file-based manifest
+  interface (`campaign run --manifest <file>`) with a backward-compatible
+  quick path;
+- capability-aware worker routing from probed backend availability, with
+  persisted snapshots/decisions and honest refusal classification;
+- reusable workflow services shared by interactive CLI commands and fleet
+  executors (hunt/explore first; verify/regress via their replay machinery;
+  repair only with explicit authorization);
+- per-item isolation and durable campaign → item → worker → run → finding →
+  evidence provenance;
+- restart/cancellation guarantees proven at campaign scale; finding
+  aggregation/deduplication on campaign output; enriched observability;
+- web replay runtime-efficiency work with recorded measurements;
+- installed-artifact campaign smoke proof.
+
+Exit gate: all SPEC-012 acceptance tests pass; ≥2 genuinely different real
+adapter families are exercised through `UnattendedCampaign` on an available
+host (honest deferrals elsewhere); installed artifact operates campaigns;
+repository gates pass on the final tree; documentation and durable state match.
+
 ## Explicitly not required before implementation completion
 
 These are valuable but belong to later hardening/productization unless needed by a milestone gate:

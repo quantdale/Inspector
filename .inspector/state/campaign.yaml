@@ -504,6 +504,30 @@ m11:
     per-job timeouts added; clean candidate de577d58…d7126 from 91411fa.
   blockers: []
 
+m12:
+  campaign: REAL_TARGET_FLEET_CAMPAIGNS
+  status: ACTIVE
+  started_at: "2026-08-23"
+  started_from_commit: 3b974c62db58ede47940267c5b62137325c49896
+  spec: specs/012-real-target-fleet-campaigns/SPEC.md
+  tasks: specs/012-real-target-fleet-campaigns/TASKS.md
+  task_groups:
+    F0: COMPLETE
+    F1: ACTIVE
+    F2: PENDING
+    F3: PENDING
+    F4: PENDING
+    F5: PENDING
+    F6: PENDING
+    F7: PENDING
+    F8: PENDING
+    F9: PENDING
+    F10: PENDING
+    F11: PENDING
+  waypoint: M12.F1.executor-contract
+  waypoint_status: ACTIVE
+  blockers: []
+
 ga_readiness:
   campaign: RC1_FIELD_VALIDATION
   status: COMPLETE

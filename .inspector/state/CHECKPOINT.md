@@ -3,10 +3,34 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE — M11 Operator-Grade Product Workflows & Distribution**
+- Status: **ACTIVE — M12 Real-Target Fleet Campaigns, Capability-Aware Scheduling, Unattended Runtime Efficiency**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
+
+### M12 activation (2026-08-23)
+
+M12 activated from a clean tree at `3b974c62db58ede47940267c5b62137325c49896`
+(M11 COMPLETE). SPEC-012 and its task graph were created; the roadmap gained
+the M12 milestone; campaign.yaml `active` now points at SPEC-012 with an
+`m12:` block tracking F0-F11. Baseline facts carried into M12:
+
+- `@inspector/scale` `UnattendedCampaign` (packages/scale/src/campaign.ts)
+  constructs `FakeAdapterHandler` inline in `executeItem`; this is the product
+  limitation M12 removes behind a pluggable executor contract.
+- The CLI `campaign run` accepts only `--items id=target` with target=fake
+  (packages/cli/src/campaign.ts parseItems refuses other targets).
+- Web exploration replay remains ~4-6 minutes in the full E2E path
+  (STILL_OPEN debt) — F9 profiles and safely optimizes it.
+- This host has real backends available per prior proofs: Playwright/Chromium,
+  ConPTY (@lydell/node-pty), Windows UIA bridge, ADB + AVD (health varies),
+  Electron 43.4.1 executable. Android/Electron proofs stay gated on live
+  health checks; honest deferrals otherwise.
+- Hosted CI has never executed (no push authority); lanes remain
+  CONFIGURED-not-yet-run unless a push occurs this session.
+
+F0 gate: durable state references SPEC-012; no historical evidence rewritten;
+M8 stays DEFERRED_ENVIRONMENT.
 
 ## Last trusted implementation state
 
