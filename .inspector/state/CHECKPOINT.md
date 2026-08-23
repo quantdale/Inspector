@@ -20,8 +20,8 @@ web/Android interruption proofs are in place. Frozen install, lint, typecheck,
 unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
-M11 is activated at the current tree. P0-P5 are complete and P6 is the active
-waypoint. The repository was clean at `023dabf` before M11 changes. `git fetch
+M11 is activated at the current tree. P0-P5 are complete at `651a1fc` and P6
+is the active waypoint. The repository was clean at `023dabf` before M11 changes. `git fetch
 origin` was attempted on 2026-08-23 but GitHub was unreachable from this
 environment; local `origin/main` remains at that SHA.
 

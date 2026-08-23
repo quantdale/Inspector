@@ -206,7 +206,7 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: c0835d7
+  last_verified_commit: 651a1fc
   last_gate: "M11.P5: targeted oracle/redaction/artifact/containment/core/web gates PASS; lint 0 errors/4 pre-existing warnings; typecheck PASS"
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
