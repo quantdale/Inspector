@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdapterCrashError } from "@inspector/adapter-sdk";
 import type { Action } from "@inspector/protocol";
+import { SEED_HTML } from "@inspector/adapter-web";
 import { ElectronAdapterHandler } from "./electron-adapter.js";
 
 const ART_BASE = join(tmpdir(), "inspector-electron-hardening");
@@ -34,7 +35,7 @@ describe("electron hardening: one-shot crash fault (D8)", () => {
   });
 
   it("a handler without the fault never throws AdapterCrashError from act", async () => {
-    const handler = new ElectronAdapterHandler({}, ART_BASE);
+    const handler = new ElectronAdapterHandler({}, ART_BASE, SEED_HTML, "injectable");
     await expect(handler.act({ action: act("n", "click", { selector: "#loginBtn" }) })).rejects.toThrow(
       /environment not created/,
     );
@@ -43,8 +44,8 @@ describe("electron hardening: one-shot crash fault (D8)", () => {
 
 describe("electron hardening: unique artifact dirs (D4)", () => {
   it("concurrent instances get distinct artifact directories under the shared base", () => {
-    const a = new ElectronAdapterHandler({}, ART_BASE);
-    const b = new ElectronAdapterHandler({}, ART_BASE);
+    const a = new ElectronAdapterHandler({}, ART_BASE, SEED_HTML, "injectable");
+    const b = new ElectronAdapterHandler({}, ART_BASE, SEED_HTML, "injectable");
     // artifactDir is the mkdtemp directory the underlying web handler derived
     // for this instance (owned by the adapter-web package).
     const dirOf = (h: ElectronAdapterHandler) =>
@@ -61,7 +62,7 @@ describe("electron hardening: unique artifact dirs (D4)", () => {
 
 describe("electron hardening: attribution threading (D8)", () => {
   it("threads real run/environment ids from lifecycle options into the underlying handler", async () => {
-    const handler = new ElectronAdapterHandler({}, ART_BASE);
+    const handler = new ElectronAdapterHandler({}, ART_BASE, SEED_HTML, "injectable");
     await handler.lifecycle({ op: "create", options: { runId: "r42", environmentId: "e7" } });
     const web = handler as unknown as { web: { runId?: string; environmentId?: string } };
     expect(web.web.runId).toBe("r42");

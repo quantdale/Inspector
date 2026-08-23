@@ -11,6 +11,9 @@ import {
 
 let handler: RealElectronHandler | undefined;
 
+const hasInteractiveDisplay =
+  process.platform !== "linux" || !!process.env.DISPLAY || !!process.env.WAYLAND_DISPLAY;
+
 function action(id: string, kind: string, input?: Record<string, unknown>): Action {
   return {
     id,
@@ -40,7 +43,7 @@ describe("Electron production binding", () => {
     await expect(handler.lifecycle({ op: "create" })).rejects.toThrow(/production Electron runtime unavailable/);
   });
 
-  describe.skipIf(!electronExecutablePath())("with the installed Electron executable", () => {
+  describe.skipIf(!electronExecutablePath() || !hasInteractiveDisplay)("with the installed Electron executable", () => {
     it("proves lifecycle, renderer actions, evidence, errors, and reset", async () => {
       handler = new RealElectronHandler(mkdtempSync(join(tmpdir(), "inspector-electron-real-test-")));
       await handler.initialize();

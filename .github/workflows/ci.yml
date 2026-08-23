@@ -11,9 +11,14 @@ concurrency:
 
 jobs:
   # Required fast gate: the complete platform-independent quality contract.
+  # The Electron binary is deliberately not downloaded here; the real-runtime
+  # proof runs in its own display-capable job below.
   quality:
     name: Linux quality gate
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,6 +41,7 @@ jobs:
     name: Linux installed-artifact smoke
     needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,6 +52,8 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       - run: pnpm release:smoke
 
   # Windows-sensitive behavior is a separate signal from the Linux gate:
@@ -54,6 +62,7 @@ jobs:
   windows:
     name: Windows path/native gate
     runs-on: windows-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -67,4 +76,26 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm exec vitest run packages/repair/src/worktree.hardening.test.ts packages/repair/src/path-policy-property.test.ts packages/cli-adapter/src/cli.hardening.test.ts packages/cli/src/args.test.ts packages/cli/src/workspace.test.ts
       - run: pnpm exec vitest run --config vitest.integration.config.ts packages/cli-adapter/src/node-pty-backend.integration.test.ts packages/cli-adapter/src/tui-screen.integration.test.ts packages/cli/src/cli.integration.test.ts
+      - run: pnpm exec vitest run --config vitest.integration.config.ts packages/electron-adapter/src/electron-production.integration.test.ts
       - run: pnpm release:smoke
+
+  # Genuine Electron execution on a display-capable hosted runner. Xvfb is a
+  # real X server, so this proves the production binding against an actual
+  # Electron process rather than a mock.
+  electron-real:
+    name: Electron real-runtime proof (Xvfb)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9.15.9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libnss3 libgtk-3-0t64 libgbm1 libasound2t64 libatk-bridge2.0-0t64
+      - run: xvfb-run --auto-servernum pnpm exec vitest run --config vitest.integration.config.ts packages/electron-adapter/src/electron-production.integration.test.ts
