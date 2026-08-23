@@ -24,17 +24,18 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M10
-  milestone_name: Resumable exploration campaigns
-  status: COMPLETE
-  spec: specs/010-resumable-exploration/SPEC.md
-  tasks: specs/010-resumable-exploration/TASKS.md
-  task_group: R9
-  waypoint: M10.R9.final-gate
-  waypoint_status: COMPLETE
+  milestone_id: M11
+  milestone_name: Operator-grade product workflows and distribution
+  status: ACTIVE
+  spec: specs/011-operator-product-workflows/SPEC.md
+  tasks: specs/011-operator-product-workflows/TASKS.md
+  task_group: P1
+  waypoint: M11.P1.verify-and-regress
+  waypoint_status: IN_PROGRESS
   next_action: >-
-    M10 exit gate passed. Continue only with the next separately authorized
-    roadmap milestone; M8 remains deferred to a macOS/Xcode environment.
+    Implement verify/regress on the existing durable finding/replay/oracle
+    machinery. M8 remains deferred
+    to a macOS/Xcode environment; no release publication is authorized.
 
 progress:
   completed_milestones:
@@ -206,17 +207,51 @@ verification:
 blockers: []
 known_debt:
   - >-
-    Replay oracle is loose: TargetFailureOracle counts any target-failure
-    outcome (including ACTION_FAILED automation misses) as reproduction, so
-    minimization can over-reduce paths that end in a hidden-element miss.
-    Partially mitigated by the M4 OracleSuite; full tightening deferred.
+    CLOSED_BY_M9: native exploration now uses platform-faithful replay drivers
+    and automation failures are excluded from the target-defect pipeline;
+    remaining universal oracle/verification coverage is carried into M11.P5.
   - >-
-    Web exploration E2E takes ~4-6 min wall clock (fresh Chromium per replay);
-    acceptable for the gate but a candidate for later perf work.
+    CLOSED_BY_M10: exploration graphs, RNG/decision state, finding classes,
+    action/reset/finding/wall budgets, and checkpoint recovery are durable and
+    resumable for web and native campaigns.
   - >-
-    Production bindings for PTY/UIA/Electron-runtime/ADB CLI/emulator remain
-    hardening items; injectable contracts proven by mocks per spec blocker
-    policies.
+    STILL_OPEN / M11.P1-P4: verify, regress, explore, repair, and scale
+    campaign operations are not yet exposed as complete installed-CLI
+    workflows.
+  - >-
+    STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
+    redaction, fully durable unattended budgets, atomic artifact orphan
+    cleanup, web settle attribution, layered CI, and release/distribution
+    smoke remain to be implemented or proven.
+  - >-
+    STILL_OPEN: web exploration replay is expensive (~4-6 minutes in the
+    existing full E2E gate); this is product-acceptable but not optimized.
+  - >-
+    ENVIRONMENT_DEFERRED: M8 iOS requires macOS/Xcode/simulator. Electron
+    production-real proof is an M11 field task and may remain deferred only
+    after independent binding/fixture work is complete.
+  - >-
+    PRODUCT_DECISION_REQUIRED: none currently; any future provider or release
+    authorization change must remain explicit and must not be inferred.
+
+debt_audit:
+  closed_by_m9:
+    - native_autonomous_exploration
+    - native_replay_provenance_and_failure_classification
+  closed_by_m10:
+    - resumable_exploration_graph_and_rng
+    - durable_action_reset_finding_and_wall_budgets_for_hunts
+    - checkpoint_checksum_retention_and_restart_reconciliation
+  still_open:
+    - operator_cli_workflows
+    - repair_containment_redaction_and_budget_productization
+    - crash_artifact_cleanup_and_web_settle_attribution
+    - campaign_cli_surface
+    - layered_ci_and_clean_distribution_smoke
+  environment_deferred:
+    - ios_macos_xcode_runtime
+    - electron_runtime_field_proof_until_host_supports_it
+  product_decision_required: []
 
 hardening:
   active: false
@@ -368,31 +403,54 @@ stop_conditions:
   - deterministic_gate_failure_with_no_safe_forward_path
 
 next_milestone_after_completion:
-  milestone_id: M10
-  working_name: Resumable exploration campaigns
+  milestone_id: M11
+  working_name: Operator-grade product workflows and distribution
   rationale: >-
-    Closes the spec-003 E7 gap named as top debt by both the HARDENING_1 and
-    GA ledgers (exploration graphs are not resumable). Directly multiplies
-    M9's value: long unattended native+web hunts survive host restarts
-    without losing explored-state graphs.
+    Converts the completed exploration/finding/reproduction/repair/scale
+    engines into the operator workflows already promised by PRODUCT.md,
+    without restarting HARDENING_1 or publishing a release.
   status: ACTIVATED
 
 m10:
   campaign: RESUMABLE_EXPLORATION
-  status: IN_PROGRESS
+  status: COMPLETE
   started_at: "2026-08-23"
+  completed_at: "2026-08-23"
   spec: specs/010-resumable-exploration/SPEC.md
   task_groups:
-    R0: IN_PROGRESS
-    R1: PENDING
-    R2: PENDING
-    R3: PENDING
-    R4: PENDING
-    R5: PENDING
-    R6: PENDING
-    R7: PENDING
-    R8: PENDING
-    R9: PENDING
+    R0: COMPLETE
+    R1: COMPLETE
+    R2: COMPLETE
+    R3: COMPLETE
+    R4: COMPLETE
+    R5: COMPLETE
+    R6: COMPLETE
+    R7: COMPLETE
+    R8: COMPLETE
+    R9: COMPLETE
+  waypoint: M10.R9.final-gate
+  waypoint_status: COMPLETE
+  exit_gate: >-
+    PASS at c0835d7 plus the immediate state synchronization: frozen install,
+    lint 0 errors/4 pre-existing warnings, typecheck PASS, unit 518 passed/3
+    skipped, integration 144/144, deterministic restart matrix/soak, and
+    real web/Android interruption proofs. No release/tag action taken.
+  blockers: []
+
+m11:
+  campaign: OPERATOR_PRODUCT_WORKFLOWS_DISTRIBUTION
+  status: ACTIVE
+  started_at: "2026-08-23"
+  spec: specs/011-operator-product-workflows/SPEC.md
+  task_groups:
+    P0: COMPLETE
+    P1: IN_PROGRESS
+    P2: PENDING
+    P3: PENDING
+    P4: PENDING
+    P5: PENDING
+    P6: PENDING
+    P7: PENDING
   blockers: []
 
 ga_readiness:

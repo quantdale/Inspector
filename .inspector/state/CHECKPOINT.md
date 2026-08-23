@@ -3,7 +3,7 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE — M10 exit gate passed**
+- Status: **ACTIVE — M11 Operator-Grade Product Workflows & Distribution**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
@@ -11,7 +11,7 @@
 ## Last trusted implementation state
 
 M9 native exploration is complete at `6ebc414`. M10 implementation waypoints
-R0-R9 are complete at `c0835d7` (with this state synchronization committed
+R0-R9 are complete at `c0835d7` (with the state synchronization committed
 immediately afterward): a dedicated, checksummed exploration
 campaign/checkpoint stream and durable reset events retain the generic
 `checkpoints` table for low-level `RunController` step-sequence recovery;
@@ -19,6 +19,13 @@ web/native explorers, CLI continuation, deterministic restart tests, and real
 web/Android interruption proofs are in place. Frozen install, lint, typecheck,
 unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
+
+M11 is activated at the current tree. P0 state reconciliation is recorded in
+the durable campaign file and this checkpoint; the next implementation
+waypoint is P1 (`verify`/`regress`) on the existing replay, oracle, finding,
+and evidence machinery. The repository was clean at `023dabf` before M11
+changes. `git fetch origin` was attempted on 2026-08-23 but GitHub was
+unreachable from this environment; local `origin/main` remains at that SHA.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
@@ -40,11 +47,23 @@ M7 exit gate satisfied: bounded multi-worker unattended campaign survives contro
 
 Final gates at M7 checkpoint: **lint (0 errors), typecheck (exit 0), test (63 unit), test:integration (47 integration across 12 files)** — all green.
 
-## Known debt (recorded in campaign.yaml)
+## Current debt audit
 
-- Legacy TargetFailureOracle counts ACTION_FAILED target-failures as reproduction; partially mitigated by OracleSuite.
-- Web exploration E2E takes ~4–6 min wall clock.
-- Production bindings (PTY/UIA/Electron runtime/ADB CLI/emulator) remain hardening items; injectable contracts proven by mocks.
+- CLOSED BY M9: native exploration, platform-faithful replay provenance, and
+  automation-failure exclusion from target-defect promotion.
+- CLOSED BY M10: resumable web/native exploration graphs, RNG/decision state,
+  finding continuity, checkpoint checksums/retention, and durable hunt budgets.
+- STILL OPEN FOR M11: operator `verify`, `regress`, `explore`, `repair`, and
+  campaign CLI workflows; repair containment/redaction; process-durable
+  unattended budgets; atomic artifact orphan cleanup; web action-window
+  attribution; layered CI and clean distribution smoke.
+- ENVIRONMENT-DEFERRED: iOS requires macOS/Xcode/simulator. Electron must be
+  proven with the actual runtime or recorded as an honest M11 environment
+  deferral after independent binding/fixture work.
+- PRODUCT DECISION REQUIRED: none currently.
+
+Historical hardening and RC1/GA ledgers below remain historical evidence and
+are not rewritten to claim that M11 work occurred earlier.
 
 ## Resumption notes
 

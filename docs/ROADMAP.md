@@ -264,6 +264,42 @@ show no duplicate actions/findings, sequence/idempotency corruption, unsafe
 unknown-action retry, or checkpoint growth beyond retention; all repository
 gates and documentation/state synchronization pass.
 
+## M11 — Operator-grade product workflows and distribution (product development)
+
+Spec: `specs/011-operator-product-workflows/SPEC.md`
+
+**Status: ACTIVE (2026-08-23).** M11 converts the mature internal engines into
+the workflows promised by `docs/PRODUCT.md` and validates them from the
+installed CLI. M10 remains historically COMPLETE; M8 remains
+`DEFERRED_ENVIRONMENT`.
+
+Goal: make an operator able to discover, verify, regress, explore, repair, and
+operate bounded campaigns without reaching into package internals, while
+preserving provenance, isolation, graduated autonomy, and honest environment
+classification.
+
+Deliverables:
+
+- real `verify` and `regress` commands using durable evidence and replay/oracle
+  machinery;
+- explicit durable `explore` workflow and opt-in-only repair from hunt;
+- safe `repair <findingId>` around the existing isolated repair pipeline;
+- operator-facing scale campaign run/list/show/stop/resume commands;
+- product-blocking oracle, containment, redaction, budget, artifact, and web
+  attribution fixes;
+- production Electron binding/proof when the environment supports it, or an
+  honest independent-work-complete environment deferral;
+- improved PTY/TUI terminal state, layered CI, truthful release artifacts, and
+  clean installed-artifact smoke proof;
+- synchronized docs and an end-to-end M11 acceptance matrix.
+
+Exit gate: `verify`, `regress`, `explore`, and `repair` are real tested product
+commands; major scale functionality is operator-accessible; required safety
+and durability debt is closed or explicitly evidenced; a clean release
+artifact executes core and M11 commands; layered CI and applicable repository
+gates pass; Electron status is honest; and durable state is marked COMPLETE
+with exact evidence. No release or tag publication is performed.
+
 ## Explicitly not required before implementation completion
 
 These are valuable but belong to later hardening/productization unless needed by a milestone gate:
