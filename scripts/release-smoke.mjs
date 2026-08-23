@@ -73,6 +73,9 @@ try {
   const hunt = runInspector(["hunt", "--adapter", "fake", "--max-actions", "8", "--max-minutes", "1", "--json"]);
   const huntPayload = JSON.parse(hunt.stdout);
   if (huntPayload.schema !== "inspector-cli/hunt/1" || huntPayload.command !== "hunt" || typeof huntPayload.runId !== "string") throw new Error("release smoke: fake hunt schema mismatch");
+  const explore = runInspector(["explore", "--adapter", "fake", "--max-actions", "8", "--max-minutes", "1", "--json"]);
+  const explorePayload = JSON.parse(explore.stdout);
+  if (explorePayload.schema !== "inspector-cli/explore/1" || explorePayload.command !== "explore") throw new Error("release smoke: fake explore schema mismatch");
   JSON.parse(runInspector(["findings", "list", "--json"]).stdout);
   JSON.parse(runInspector(["runs", "list", "--json"]).stdout);
   JSON.parse(runInspector(["campaign", "list", "--json"]).stdout);
@@ -82,7 +85,7 @@ try {
     version,
     tarball,
     workspace: prefix,
-    commands: ["--version", "doctor --json", "hunt --adapter fake", "findings list", "runs list", "campaign list"],
+    commands: ["--version", "doctor --json", "hunt --adapter fake", "explore --adapter fake", "findings list", "runs list", "campaign list"],
   }, null, 2) + "\n");
 } finally {
   rmSync(prefix, { recursive: true, force: true });
