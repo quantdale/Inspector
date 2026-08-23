@@ -76,6 +76,7 @@ async function processFailure(
   path: Action[],
   sinks: Sinks,
   replayDriverFactory?: () => ReplayDriver | Promise<ReplayDriver>,
+  adapterId?: string,
 ): Promise<void> {
   const message = outcome.error?.message ?? "deterministic oracle failure";
   const classKey = `TARGET_FAILURE|${message}`;
@@ -87,7 +88,8 @@ async function processFailure(
     {
       runId: path[0]?.runId,
       title: `TARGET_FAILURE: ${message}`,
-      adapter: undefined,
+      // Provenance: findings must name the adapter family they came from.
+      adapter: adapterId ?? undefined,
     },
   );
 
@@ -173,7 +175,16 @@ export async function runNativeHunt(
     }
 
     // Observe through the standard pipeline (persists an observation).
-    const obs = await run.observe(["uiTree"]);
+    let obs;
+    try {
+      obs = await run.observe(["uiTree"]);
+    } catch (e) {
+      // Honest stop: backend-level enumeration failure (e.g. ROOT_ONLY_STUB,
+      // DEAD_WINDOW) ends the session instead of crashing the host process.
+      sinks.warnings.push(`observe failed: ${String(e instanceof Error ? e.message : e).slice(0, 140)}`);
+      stoppedReason = "adapter-error";
+      break;
+    }
     const uiTree = uiTreeOf(obs);
     // Fine-grained identity: terminal screens keep constant element ids
     // (line-N), so novelty must include dynamic text/values, not just the
@@ -265,7 +276,7 @@ export async function runNativeHunt(
       outcome.status === "target-failure" &&
       outcome.error?.code === "TARGET_FAILURE"
     ) {
-      await processFailure(findingEngine, outcome, segment.slice(), sinks, replayDriverFactory);
+      await processFailure(findingEngine, outcome, segment.slice(), sinks, replayDriverFactory, caps.adapter);
     }
     await sleep(100);
   }

@@ -271,4 +271,28 @@ describe("rehost across owner pids (C-F2): title-evidenced window migration", ()
     expect(invocations).toBe(2);
     expect(attachedPids).toEqual([111, 222]);
   });
+
+  it("blind-stub guard: two root-only enumerations trigger one migration, then honest ROOT_ONLY_STUB", async () => {
+    const stubNode = {
+      id: "root", type: "Window", name: "Calculator", automationId: "",
+      enabled: true, offscreen: false, rect: null, patterns: [],
+    };
+    let trees = 0;
+    const bridge = fakeBridge({
+      windowStatus: () => ({ alive: true, pid: 111 }),
+      listWindows: () => [{ pid: 111, title: "Calculator" }], // same pid, still blind
+      tree: () => {
+        trees++;
+        return { pid: 111, nodes: [stubNode] }; // ALWAYS root-only
+      },
+    });
+    const backend = new RealUiaBackend(bridge as never);
+    await backend.attach({ pid: 111 });
+    // First root-only enumeration: counter starts, stub surfaces honestly.
+    const first = await backend.richTree();
+    expect(first.nodes.length).toBe(1);
+    // Second consecutive root-only: migration runs, stays blind -> honest
+    // typed error instead of feeding exploration an empty world forever.
+    await expect(backend.richTree()).rejects.toMatchObject({ code: "ROOT_ONLY_STUB" });
+  });
 });

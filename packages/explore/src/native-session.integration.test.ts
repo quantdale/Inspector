@@ -108,6 +108,8 @@ describe("SPEC-009 A4: native exploration session over a live adapter", () => {
       if (failureRows > 0) {
         expect(result.findings.length).toBeGreaterThanOrEqual(1);
         expect(result.evidenceBundles.length).toBe(result.findings.length);
+        // Provenance: findings name their adapter family.
+        expect(result.findings[0]?.adapter).toBe("windows-uia");
         expect(evalCount).toBeGreaterThan(0);
       }
       // Every observed anomaly has an honest ledger entry.

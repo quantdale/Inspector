@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "runId": "run_7009dac7c7774404832cea611f4314c7",
+  "adapter": "windows",
+  "seed": 91,
+  "stoppedReason": "adapter-error",
+  "actionsExecuted": 46,
+  "statesVisited": 37,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": [
+    "observe failed: UIA bridge timeout after 5000ms (op=treeDesktop)"
+  ]
+}

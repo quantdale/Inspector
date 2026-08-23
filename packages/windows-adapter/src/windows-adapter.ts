@@ -20,6 +20,14 @@ import { join } from "node:path";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import type { UiaBackend, UiaBackendWindowOps } from "./types.js";
 
+/**
+ * Controls whose invocation is EVIDENCED (spec009 transition-forensics,
+ * GA keepontop-debug) to move this build's app content into a surface that
+ * desktop-root UIA cannot enumerate under any pid. The adapter annotates
+ * them; the explorer declines them autonomously.
+ */
+export const SURFACE_DETACHING_CONTROLS = /keep on top/i;
+
 export const WINDOWS_CAPABILITIES: CapabilityDoc = {
   protocolVersion: PROTOCOL_VERSION,
   adapter: "windows-uia",
@@ -185,6 +193,14 @@ export class WindowsAdapterHandler implements AdapterHandler {
           text: n.type === "Edit" ? undefined : label,
           automationId: n.automationId || undefined,
           controlType: n.type,
+          // Empirically evidenced (GA forensics + spec009 transition
+          // forensics): invoking these controls moves the live content into a
+          // surface that desktop-root UIA cannot enumerate under ANY pid on
+          // this Win11 build, ending exploration. Annotated so the explorer
+          // can decline them autonomously.
+          ...(SURFACE_DETACHING_CONTROLS.test(label)
+            ? { surfaceDetaching: true }
+            : {}),
           ...(Array.isArray(n.patterns) && n.patterns.length > 0
             ? { patterns: n.patterns }
             : {}),

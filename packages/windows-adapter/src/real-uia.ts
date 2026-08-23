@@ -66,6 +66,11 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
    * window owned by a different process). Cleared on detach. */
   private lastAttachedTitle: string | null = null;
 
+  /** Consecutive root-only enumerations while the pid is alive. Two in a row
+   * means the attached surface has become a blind stub (C-F2 residue); one
+   * bounded title-evidenced migration runs before honesty kicks in. */
+  private consecutiveRootOnly = 0;
+
   async listWindows(): Promise<UiaWindowRef[]> {
     return this.bridge.request<UiaWindowInfo[]>("listWindows");
   }
@@ -76,6 +81,7 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
     titleContains?: string;
   }): Promise<void> {
     this.lastGoodNodeCount = null;
+    this.consecutiveRootOnly = 0;
     const info = await this.bridge.request<{ name?: string }>("attach", params);
     this.lastAttachedTitle =
       typeof info?.name === "string" && info.name.trim().length > 0
@@ -85,6 +91,7 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
 
   async detach(): Promise<void> {
     this.lastGoodNodeCount = null;
+    this.consecutiveRootOnly = 0;
     this.lastAttachedTitle = null;
     await this.bridge.request("detach");
   }
@@ -167,6 +174,34 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
             `reattach failed: ${msg}`,
         );
       }
+    }
+    // Blind-stub guard (SPEC-009 W6): two consecutive root-only enumerations
+    // while the process is alive mean the attached surface went blind without
+    // ever tripping the collapse heuristic (no good baseline exists). One
+    // bounded title-evidenced migration runs; if the surface stays blind we
+    // say so honestly instead of feeding exploration an empty world.
+    if (tree.nodes.length <= 1) {
+      this.consecutiveRootOnly += 1;
+      if (this.consecutiveRootOnly >= 2) {
+        try {
+          const fresh = await this.attemptReattach(status.pid);
+          if (fresh.nodes.length > 1) {
+            this.consecutiveRootOnly = 0;
+            this.lastGoodNodeCount = fresh.nodes.length;
+            return { ...fresh, reattached: true };
+          }
+          // Migration landed but the surface is STILL blind: honesty wins.
+          throw new Error("migration did not recover a live subtree");
+        } catch {
+          throw new WindowsBackendError(
+            "ROOT_ONLY_STUB",
+            `attached window enumerates as a root-only stub (pid ${status.pid} alive); ` +
+              `title-evidenced migration did not recover a live subtree`,
+          );
+        }
+      }
+    } else {
+      this.consecutiveRootOnly = 0;
     }
     this.lastGoodNodeCount = tree.nodes.length;
     return tree;
@@ -260,7 +295,9 @@ export class RealUiaBackend implements UiaBackend, UiaBackendWindowOps {
    * materialize as enumerable top-level surfaces; the budget is hard-capped.
    */
   private async attemptReattach(pid: number): Promise<UiaRichTree> {
-    const deadline = Date.now() + 3000;
+    // Win11 content rehosts can leave the surface unenumerable for several
+    // seconds (GA evidence: >3s); 10s is still firmly bounded.
+    const deadline = Date.now() + 10000;
     for (;;) {
       try {
         await this.reattachToLiveWindow(pid);

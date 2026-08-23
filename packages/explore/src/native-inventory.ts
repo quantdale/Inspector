@@ -31,6 +31,7 @@ interface PatternedElement extends UiElement {
   patterns?: string[];
   automationId?: string;
   controlType?: string;
+  surfaceDetaching?: boolean;
 }
 
 const has = (p: string[] | undefined, name: string): boolean =>
@@ -52,6 +53,10 @@ export function buildUiaInventory(
     if (actCaps.has("click") && has(el.patterns, "InvokePattern")) {
       const verdict = classifyAutonomy({ caps, kind: "click", label });
       if (!verdict.eligible) continue;
+      // Adapter-evidenced surface-detaching controls are declined
+      // autonomously (exploration continuity); they remain visible in
+      // observations for operators.
+      if (el.surfaceDetaching) continue;
       out.push({
         id: `uic_${strongHash(el.id ?? label)}`,
         kind: "click",

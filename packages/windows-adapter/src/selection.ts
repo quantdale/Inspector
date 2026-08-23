@@ -100,5 +100,5 @@ export async function selectWindowsBackend(
 }
 
 function makeRealBackend(): RealUiaBackend {
-  return new RealUiaBackend(new PowerShellUiaBridge());
+  return new RealUiaBackend(new PowerShellUiaBridge({ timeoutMs: 15000 }));
 }

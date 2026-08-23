@@ -16,6 +16,8 @@ export interface UiElement {
   clickable?: boolean;
   scrollable?: boolean;
   className?: string;
+  /** Windows (SPEC-009 W6): evidenced surface-detaching control. */
+  surfaceDetaching?: boolean;
 }
 
 export function uiTreeOf(obs: Observation): UiElement[] {

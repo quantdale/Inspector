@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "runId": "run_adb8f97d0c054a9d9949b671815c7fe6",
+  "adapter": "windows",
+  "seed": 21,
+  "stoppedReason": "adapter-error",
+  "actionsExecuted": 34,
+  "statesVisited": 26,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": [
+    "observe failed: window rehost suspected (85 -> 1 nodes, pid 19844 alive); reattach failed: no top-level window remains for pid 19844"
+  ]
+}

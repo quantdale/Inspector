@@ -22,7 +22,8 @@ export type WindowsErrorCode =
   | "DEAD_WINDOW"
   | "MODAL_BLOCKING"
   | "WINDOW_NOT_FOUND"
-  | "REATTACH_FAILED";
+  | "REATTACH_FAILED"
+  | "ROOT_ONLY_STUB";
 
 /**
  * Typed backend error so consumers can branch on code instead of parsing

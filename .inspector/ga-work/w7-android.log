@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "runId": "run_0d4d67f54064443b81a0cd6b42e6fa80",
+  "adapter": "android",
+  "seed": 77,
+  "stoppedReason": "wall-budget",
+  "actionsExecuted": 45,
+  "statesVisited": 19,
+  "resets": 0,
+  "anomalies": 0,
+  "findings": [],
+  "bundles": [],
+  "warnings": []
+}
