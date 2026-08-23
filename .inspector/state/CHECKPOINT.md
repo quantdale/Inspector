@@ -3,12 +3,18 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE**
+- Status: **IN PROGRESS — M10 R0**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
 
 ## Last trusted implementation state
+
+M9 native exploration is complete at `6ebc414`. M10 is now active. The
+implementation decision is to add a dedicated, checksummed exploration
+campaign/checkpoint stream and durable reset events, while retaining the
+generic `checkpoints` table for low-level `RunController` step-sequence
+recovery. The next gate is the R0 migration plus typed snapshot contract.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 

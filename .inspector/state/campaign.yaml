@@ -24,19 +24,16 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M9
-  milestone_name: Platform-neutral autonomous exploration
-  spec: specs/009-native-autonomous-exploration/SPEC.md
-  tasks: specs/009-native-autonomous-exploration/SPEC.md
-  task_group: COMPLETE
-  waypoint: COMPLETE
-  waypoint_status: COMPLETE
+  milestone_id: M10
+  milestone_name: Resumable exploration campaigns
+  spec: specs/010-resumable-exploration/SPEC.md
+  tasks: specs/010-resumable-exploration/TASKS.md
+  task_group: R0
+  waypoint: M10.R0.checkpoint-contract
+  waypoint_status: IN_PROGRESS
   next_action: >-
-    M9 COMPLETE. Capability-driven hunts proven on real Calculator/vim/
-    Settings; replay-faithful drivers for android/cli/windows; android depth
-    2->19 states; automation failures can never masquerade as defects;
-    full exact-tree gate PASS. Next milestone M10 proposed
-    (resumable exploration campaigns).
+    Define and implement the versioned exploration campaign/checkpoint contract
+    and migration, then continue through R1-R9 without stopping at the spec.
 
 progress:
   completed_milestones:
@@ -356,7 +353,25 @@ next_milestone_after_completion:
     GA ledgers (exploration graphs are not resumable). Directly multiplies
     M9's value: long unattended native+web hunts survive host restarts
     without losing explored-state graphs.
-  status: PROPOSED_NEXT
+  status: ACTIVATED
+
+m10:
+  campaign: RESUMABLE_EXPLORATION
+  status: IN_PROGRESS
+  started_at: "2026-08-23"
+  spec: specs/010-resumable-exploration/SPEC.md
+  task_groups:
+    R0: IN_PROGRESS
+    R1: PENDING
+    R2: PENDING
+    R3: PENDING
+    R4: PENDING
+    R5: PENDING
+    R6: PENDING
+    R7: PENDING
+    R8: PENDING
+    R9: PENDING
+  blockers: []
 
 ga_readiness:
   campaign: RC1_FIELD_VALIDATION

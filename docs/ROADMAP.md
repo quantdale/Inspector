@@ -230,6 +230,36 @@ app (Calculator or Paint), and com.android.settings on an AVD through the
 standard evidence/finding pipeline; per-platform replay-faithful reproduction
 is either wired or findings honestly remain CANDIDATE.
 
+## M10 — Resumable exploration campaigns (product development)
+
+Spec: `specs/010-resumable-exploration/SPEC.md`
+
+**Status: IN PROGRESS (2026-08-23).**
+
+Goal: close the remaining SPEC-003 E7 gap so a controller or host process
+restart does not make an autonomous web or native hunt forget its exploration
+graph, decision history, RNG position, finding deduplication, or consumed
+budgets.
+
+Deliverables:
+
+- versioned, validated exploration campaign/checkpoint persistence separate
+  from low-level run checkpoints;
+- serializable RNG and state/action graph restoration;
+- web and native resumable sessions with committed-step/unknown-action
+  reconciliation;
+- durable action/reset/finding/budget continuity;
+- `inspector hunt --resume <runId>` with adapter/target compatibility checks and
+  distinct diagnostic `runs resume` behavior;
+- deterministic interruption matrix, bounded restart soak, and real-backend
+  field proofs where the host environment supports them.
+
+Exit gate: a fresh Inspector process continues an interrupted web and at least
+one real native hunt with preserved coverage and budgets; repeated restart tests
+show no duplicate actions/findings, sequence/idempotency corruption, unsafe
+unknown-action retry, or checkpoint growth beyond retention; all repository
+gates and documentation/state synchronization pass.
+
 ## Explicitly not required before implementation completion
 
 These are valuable but belong to later hardening/productization unless needed by a milestone gate:
