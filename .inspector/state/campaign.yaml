@@ -28,18 +28,15 @@ active:
   milestone_name: Platform-neutral autonomous exploration
   spec: specs/009-native-autonomous-exploration/SPEC.md
   tasks: specs/009-native-autonomous-exploration/SPEC.md
-  task_group: W6
-  waypoint: W6-replay-faithful-reproduction
-  waypoint_status: IN_PROGRESS
-  remaining_waypoints:
-    - W6 replay-faithful native reproduction
-    - W7 android exploration depth
-    - W8 native finding proofs + M9 exit gate
+  task_group: COMPLETE
+  waypoint: COMPLETE
+  waypoint_status: COMPLETE
   next_action: >-
-    GA COMPLETE (GO_WITH_DOCUMENTED_DEBT for rc.2; NOT_PUBLISHED). M9 W0-W5
-    COMPLETE (capability-driven hunts proven on real Calculator/vim/Settings).
-    W6 in progress: platform-faithful native replay drivers. A real-discovered
-    finding must NEVER be confirmed by mock-backend replay.
+    M9 COMPLETE. Capability-driven hunts proven on real Calculator/vim/
+    Settings; replay-faithful drivers for android/cli/windows; android depth
+    2->19 states; automation failures can never masquerade as defects;
+    full exact-tree gate PASS. Next milestone M10 proposed
+    (resumable exploration campaigns).
 
 progress:
   completed_milestones:
@@ -51,6 +48,7 @@ progress:
     - M5
     - M6
     - M7
+    - M9
   completed_task_groups:
     - F0
     - F1
@@ -67,6 +65,9 @@ progress:
     - W3
     - W4
     - W5
+    - W6
+    - W7
+    - W8
     - R0
     - R1
     - R2
@@ -165,12 +166,21 @@ progress:
     - M7.S6.integration-facade
     - M7.S7.plugin-discovery
     - M7.S8.multi-worker-campaign
+    - M9.W0.vocabulary
+    - M9.W1.adapter-vocabularies
+    - M9.W2.autonomy-gate
+    - M9.W3.platform-inventories
+    - M9.W4.generic-session
+    - M9.W5.field-proofs
+    - M9.W6.replay-faithful-reproduction
+    - M9.W7.android-depth
+    - M9.W8.finding-proofs-exit-gate
   deferred_milestones:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M9 W5 field proofs)
-  last_gate: "unit 494 passed / 3 skipped; lint 0 errors; typecheck exit 0"
+  last_verified_commit: HEAD (M9 exit gate)
+  last_gate: "M9: unit 515/3skip; integration 137 passed (29 files) after bounded retry of the documented concurrent-startup flake class; lint 0 errors; typecheck exit 0"
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
 
@@ -338,7 +348,15 @@ stop_conditions:
   - irreconcilable_authoritative_contracts
   - deterministic_gate_failure_with_no_safe_forward_path
 
-next_milestone_after_completion: null
+next_milestone_after_completion:
+  milestone_id: M10
+  working_name: Resumable exploration campaigns
+  rationale: >-
+    Closes the spec-003 E7 gap named as top debt by both the HARDENING_1 and
+    GA ledgers (exploration graphs are not resumable). Directly multiplies
+    M9's value: long unattended native+web hunts survive host restarts
+    without losing explored-state graphs.
+  status: PROPOSED_NEXT
 
 ga_readiness:
   campaign: RC1_FIELD_VALIDATION
@@ -362,3 +380,54 @@ ga_readiness:
     stale.
   note: >-
     Historical blocks above are completed-campaign records — DO NOT mutate.
+
+m9:
+  campaign: NATIVE_EXPLORATION
+  status: COMPLETE
+  started_at: "2026-08-23"
+  completed_at: "2026-08-23"
+  spec: specs/009-native-autonomous-exploration/SPEC.md
+  exit_gate:
+    install_frozen_lockfile: PASS
+    lint: "PASS - 0 errors, 4 pre-existing warnings"
+    typecheck: PASS
+    unit: "515 passed / 3 skipped (45 files)"
+    integration: >-
+      Run 1: 123/137 with concurrent subprocess-startup flakes across six
+      spawn-heavy files (documented environmental class); every affected file
+      verified GREEN in isolation; bounded retry run 2: 137/137, exit 0.
+      No deterministic failure reclassified as flake.
+    environment:
+      node: v22.23.2
+      pnpm: 9.15.9
+      os: Windows 11 (MINGW64_NT-10.0-26200)
+  field_proofs:
+    windows_calculator: >-
+      56 actions / 50 states / clean no-candidates exhaustion / honest-zero;
+      Keep-on-top surface-detaching control annotated and declined
+      autonomously (ROOT_ONLY_STUB guard exercised)
+    cli_vim: >-
+      100 actions / 100 distinct terminal states / action-budget stop / no
+      orphan vim processes
+    android_settings: >-
+      45 actions / 19 distinct states (pre-W7 baseline was 2) / wall-budget
+      stop / honest-zero; depth via full-hierarchy parser + semantic
+      selectors + bounded scrolling
+  delivered:
+    - >-
+      capability vocabulary in protocol + all four adapters
+    - >-
+      external-side-effect two-layer autonomy gate
+    - >-
+      full-hierarchy UIAutomator parser with semantic selector schemes
+    - >-
+      bounded android scrolling via adapter vocabulary
+    - >-
+      generic native session with edge accounting + coverage-exhausted stop
+      distinction
+    - >-
+      platform-faithful replay drivers: android real backend with provenance
+      binding, cli fresh-session, windows semantic-descriptor
+    - >-
+      failure-class discipline: ACTION_FAILED automation misses never enter
+      the defect pipeline; provenance refusal on target mismatch

@@ -203,6 +203,14 @@ M8 is complete or explicitly `DEFERRED_ENVIRONMENT` with its reason and resumpti
 
 Spec: `specs/009-native-autonomous-exploration/SPEC.md`
 
+**Status: COMPLETE (2026-08-23).** Exit gate PASS on the final tree
+(unit 515 passed / 3 skipped; integration 137/137 after a bounded retry of
+the documented concurrent-startup flake class). Field proofs on real
+backends: Calculator 56 actions / 50 states; vim 100 actions / 100 states;
+com.android.settings 45 actions / 19 states (2-state pre-W7 baseline).
+Replay-faithful drivers for android/cli/windows with failure-class
+discipline. Remaining depth/replay polish continues under later milestones.
+
 Goal: close audit finding W6 — make product-level autonomous exploration
 (`inspector hunt`) capability-driven across CLI/PTY, Windows/UIA, and Android,
 replacing bespoke out-of-tree loops.

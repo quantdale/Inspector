@@ -1,30 +1,31 @@
 # Project Status
 
-Last updated: M9 native exploration in progress (GA COMPLETE)
+Last updated: M9 COMPLETE (2026-08-23)
 
 ## Campaign
 
-- Mode: **M9 — Platform-neutral autonomous exploration** (spec:
-  `specs/009-native-autonomous-exploration/SPEC.md`; state:
-  `.inspector/state/campaign.yaml`)
+- Mode: **M9 — Platform-neutral autonomous exploration: COMPLETE**.
+  Next proposed milestone: **M10 resumable exploration campaigns**
+  (`next_milestone_after_completion` in campaign.yaml).
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
-- Implementation campaign M0–M7: **COMPLETE**. HARDENING_1: **COMPLETE**
-  (66 defects closed). DOGFOOD_RC1: **COMPLETE**. RC1_FINALIZATION:
-  **COMPLETE** — `v0.1.0-rc.1` tagged at `ddeea86`, never moved.
+- Implementation campaign M0–M7 + M9: **COMPLETE**. HARDENING_1:
+  **COMPLETE**. DOGFOOD_RC1: **COMPLETE**. RC1_FINALIZATION: **COMPLETE** —
+  `v0.1.0-rc.1` tagged at `ddeea86`, never moved.
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
 
-## M9 progress (native exploration)
+## M9 outcome
 
-Capability-driven hunts are proven on real backends through the standard
-pipeline: Windows Calculator (40 actions / 14 states), real vim over ConPTY
-(80 actions / 80 distinct states), com.android.settings on an AVD (65 actions,
-honest-zero). Active waypoint W6 adds platform-faithful replay drivers so
-real-discovered findings can be reproduced without mock backends, plus W7
-Android exploration depth and W8 finding-pipeline proofs + exit gate.
-Known limitation until W6 lands: native findings stay honestly CANDIDATE.
+Capability-driven native exploration is product reality: `inspector hunt`
+explores real Windows/UIA, CLI/PTTY, and Android targets through the standard
+evidence/finding pipeline with platform-faithful replay drivers and
+failure-class discipline (automation misses never become defects). Field
+proofs on the final tree: Calculator 56 actions/50 states; vim 100 actions/
+100 states; com.android.settings 45 actions/19 states (2-state pre-W7
+baseline). Full exit gate PASS (unit 515/3skip; integration 137/137 after a
+bounded retry of the documented concurrent-startup flake class).
 
 ## Candidate staleness (GA decision)
 

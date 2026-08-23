@@ -1,6 +1,6 @@
 # SPEC-009 — Platform-Neutral Autonomous Exploration
 
-Status: ACTIVE
+Status: COMPLETE (M9 closed 2026-08-23; see implementation record at the end)
 Milestone: M9 (roadmap entry added in this change)
 Origin: DOGFOOD_RC1 audit finding W6 ("ExploreController supports web
 vocabulary only"); GA field-validation report residual debt #1.
@@ -153,3 +153,71 @@ A4. One integration test per platform proves the generic session drives the
     with evidence bundles produced.
 A5. Field exit proofs P-CLI/P-WIN/P-ANDROID executed against real backends
     with results recorded in campaign state.
+
+---
+
+# Implementation record — W6/W7/W8 (M9 completion)
+
+## W6 — replay-faithful native reproduction (LANDED)
+
+Critical invariant honored everywhere: a real-discovered finding is never
+confirmed by mock-backend replay; without a faithful driver findings stay
+CANDIDATE with an explicit `candidate-no-replay-driver` ledger entry.
+
+- **Android** (`packages/android/src/replay.ts`): driver refactored to an
+  EXPLICITLY selected backend ("mock" | "real" | injected instance) — no
+  silent mock fallback. Provenance binding refuses a package mismatch BEFORE
+  any device contact (`AndroidReplayTargetMismatchError`). Deterministic
+  baseline via bounded `am force-stop` + relaunch (never `pm clear`; seeded
+  APK keeps its explicit contract inside the adapter). Hunt wiring passes
+  `backend:"real"` bound to the discovered package.
+- **CLI/PTTY** (`packages/cli-adapter/src/replay.ts`): every attempt runs in a
+  FRESH deterministic PTY session (same program/cwd/env contract, fixture
+  `prepare` hook resets scratch state); constrained input vocabulary only;
+  backend "real" requires an explicit factory so the native binding stays
+  lazy.
+- **Windows/UIA** (`packages/windows-adapter/src/replay.ts`): replay identity
+  resolves against a FRESH tree — RuntimeId fast path, then AutomationId,
+  then controlType+exact name; coordinates never persisted. An unresolvable
+  locator yields ACTION_FAILED (automation failure) and NEVER a
+  TARGET_FAILURE defect signal; genuine invoke failures yield TARGET_FAILURE
+  signals for the pipeline. Missing window fails before any action.
+- Session wiring (`runNativeHunt`): async factory support; findings carry
+  adapter-family provenance into records/bundles.
+
+## W7 — Android exploration depth (LANDED)
+
+- `uiautomator.ts` rewritten as a deterministic nested-tree walker (handles
+  paired + self-closing nodes, entity decoding), preserving resource-id,
+  text, content-desc, class, clickable/scrollable/enabled/checkable, bounds,
+  and a structural path per node.
+- Semantic selector strategy with nth-disambiguation: `#id` →
+  `@desc:<v>|<class>` → `~text:<v>|<class>` → `%path=<p>`; resolution re-dumps
+  and derives tap coordinates at action time; hidden/disabled nodes are never
+  resolvable (stale screens fail honestly).
+- Bounded scrolling exposed through the vocabulary (`swipe` down|up),
+  geometry derived from a scrollable container in the fresh dump.
+
+## W8 — exploration strategy + proofs (LANDED)
+
+- Session: state/action edge accounting (prefer untried edges from the
+  current state), LRU fallback, `coverage-exhausted` vs `no-candidates`
+  distinguished, honest adapter-error stop on backend enumeration failures,
+  observe deadlines configurable for real devices (30s native).
+- Windows backend: ROOT_ONLY_STUB blind-stub guard (two consecutive root-only
+  enumerations trigger ONE title-evidenced migration, then honest typed
+  failure), surface-detaching controls annotated by evidence and declined
+  autonomously ("Keep on top" forensics), UIA bridge default timeout 15s.
+
+## Intentional narrowings (documented, evidence-backed)
+
+- PTY `terminal-resize`: NOT declared in the vocabulary this milestone
+  (readScreen remains scrollback-tail; resize without a cell model adds no
+  exploration value). Deferred with the cell-buffer work.
+- Windows `expandCollapse`/`select` kinds: folded into `click` (InvokePattern)
+  for this milestone; the adapter retains expandCollapse ops internally.
+- Android `swipe` is container-bounded scrolling only; no arbitrary gestures.
+- Keep-on-top class transitions on Win11 remain non-enumerable after the
+  rehost; the adapter now annotates such evidenced controls and the explorer
+  declines them autonomously (forensics:
+  `.inspector/ga-work/hunts/uia-soak/transition-forensics.mts`).

@@ -114,3 +114,35 @@ tree: post-tag audit (745433b+acbf924 = state-only + formatting-only), fresh
 reproduction from ddeea86 with byte-identical tarball — records stand.
 
 Remaining: phases 3–31 per `.inspector/state/GA-READINESS.yaml`.
+
+## M9 NATIVE AUTONOMOUS EXPLORATION - COMPLETE (2026-08-23)
+
+- SPEC-009 W0-W8 all landed; spec Status: COMPLETE.
+- W6 replay-faithful reproduction: android driver refactored to explicit
+  backend selection (mock | real | injected) with pre-contact provenance
+  refusal and force-stop reset (never pm clear); CLI fresh-session replay
+  driver; windows semantic-descriptor driver (rid fast path, AutomationId
+  fallback, type+name last) where an unresolvable locator is an
+  ACTION_FAILED automation failure and NEVER a TARGET_FAILURE defect.
+  Failure-class and wrong-target refusal tests are deterministic.
+- W7 android depth: full-hierarchy UIAutomator parser (nested nodes,
+  entity decoding, structural paths), semantic selector schemes with nth
+  disambiguation, bounded container scrolling through the adapter
+  vocabulary. Field result: com.android.settings 45 actions / 19 distinct
+  states (pre-W7 baseline was 2 states).
+- W8 proofs + exit gate: native finding pipeline proven (CONFIRMED via
+  faithful replay; REJECTED when non-reproducible; automation misses never
+  become defects). Field proofs on the final tree:
+  Windows Calculator 56 actions / 50 states (clean exhaustion;
+  Keep-on-top surface-detaching control annotated and declined
+  autonomously; ROOT_ONLY_STUB blind-stub guard added to RealUiaBackend);
+  CLI vim 100 actions / 100 distinct terminal states, no orphan processes.
+- Exit gate on final tree: install PASS; lint 0 errors / 4 pre-existing
+  warnings; typecheck PASS; unit 515 passed / 3 skipped (45 files);
+  integration run 1 had 14 concurrent subprocess-startup flakes across six
+  spawn-heavy files (documented environmental class) - every affected file
+  verified GREEN in isolation - bounded retry run 2: 137/137 PASSED.
+  No deterministic failure was reclassified as flake.
+- Next proposed milestone: M10 resumable exploration campaigns (spec-003 E7
+  gap). rc.2 publication status remains NOT_PUBLISHED; v0.1.0-rc.1 tag
+  untouched; M8 iOS remains DEFERRED_ENVIRONMENT.
