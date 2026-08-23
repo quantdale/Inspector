@@ -227,6 +227,11 @@ export async function runNativeHunt(
       input: {
         ...(pick.selector !== undefined ? { selector: pick.selector } : {}),
         ...(pick.value !== undefined ? { value: pick.value } : {}),
+        // SPEC-009 W6: semantic replay descriptors ride with the action so
+        // platform drivers can re-resolve targets after restarts/rehosts.
+        ...(pick.automationId !== undefined ? { automationId: pick.automationId } : {}),
+        ...(pick.controlName !== undefined ? { controlName: pick.controlName } : {}),
+        ...(pick.controlType !== undefined ? { controlType: pick.controlType } : {}),
       },
     };
 

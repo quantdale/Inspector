@@ -183,6 +183,8 @@ export class WindowsAdapterHandler implements AdapterHandler {
               ? (isSensitiveKey(n.automationId || n.id) ? REDACTED : label)
               : undefined,
           text: n.type === "Edit" ? undefined : label,
+          automationId: n.automationId || undefined,
+          controlType: n.type,
           ...(Array.isArray(n.patterns) && n.patterns.length > 0
             ? { patterns: n.patterns }
             : {}),

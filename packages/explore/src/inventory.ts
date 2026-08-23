@@ -33,6 +33,10 @@ export interface CandidateAction {
   /** When > 1, execute the action this many times in a row (sequence generation). */
   repeat?: number;
   metadata?: Record<string, unknown>;
+  /** SPEC-009 W6: semantic replay descriptors (Windows/UIA). */
+  automationId?: string;
+  controlName?: string;
+  controlType?: string;
 }
 
 /** Escape a value interpolated into a CSS attribute selector. */

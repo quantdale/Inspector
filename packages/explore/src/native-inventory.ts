@@ -26,9 +26,11 @@ function eligible(
   return classifyAutonomy({ caps, kind, label }).eligible;
 }
 
-/** UIA pattern names projected by the windows adapter's rich observe. */
+  /** UIA pattern names projected by the windows adapter's rich observe. */
 interface PatternedElement extends UiElement {
   patterns?: string[];
+  automationId?: string;
+  controlType?: string;
 }
 
 const has = (p: string[] | undefined, name: string): boolean =>
@@ -58,6 +60,12 @@ export function buildUiaInventory(
         actionKey: `click:${el.id}`,
         sourceElementId: el.id,
         priority: 5,
+        // SPEC-009 W6: semantic descriptors for cross-restart replay. The
+        // RuntimeId selector is the fast path; the driver falls back to
+        // these when the fresh tree no longer contains the rid.
+        automationId: el.automationId || undefined,
+        controlName: label || undefined,
+        controlType: el.controlType,
       });
     }
     if (actCaps.has("fill") && el.role === "input" && has(el.patterns, "ValuePattern")) {

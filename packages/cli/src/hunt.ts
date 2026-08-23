@@ -302,6 +302,10 @@ async function runNativeHuntCommand(
         launchPackage,
         resetStrategy: "force-stop",
       });
+  } else if (req.adapter === "windows") {
+    const { WindowsUiaReplayDriver } = await import("../../windows-adapter/src/replay.js");
+    const targetTitle = req.target;
+    replayDriverFactory = () => new WindowsUiaReplayDriver({ targetTitle });
   }
 
   const result = await runNativeHunt(
