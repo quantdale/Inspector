@@ -132,6 +132,7 @@ export class RunController {
     // action count instead of starting from zero.
     this.engine.seedActionCount(store.countRunActions(ctx.runId));
     this.engine.seedResetCount(store.countExplorationEvents(ctx.runId, "reset"));
+    this.engine.seedArtifactBytes(store.sumRunArtifactBytes(ctx.runId));
   }
 
   get runId(): string {
@@ -264,6 +265,15 @@ export class RunController {
           source: this.ctx.caps.adapter,
           capturedAt: outcome.observedAt,
           summary: { stateAfter: outcome.stateAfter, status: outcome.status },
+          artifacts: (outcome.artifactRefs ?? [])
+            .map((sha256) => this.artifactStore.meta(this.ctx.runId, sha256))
+            .filter((meta): meta is NonNullable<typeof meta> => meta !== undefined)
+            .map((meta) => ({
+              sha256: meta.sha256,
+              mime: meta.mime,
+              size: meta.size,
+              path: meta.path,
+            })),
         },
       ],
     });

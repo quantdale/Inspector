@@ -29,14 +29,14 @@ active:
   status: ACTIVE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P5
-  waypoint: M11.P5.product-correctness-safety
+  task_group: P6
+  waypoint: M11.P6.electron-and-terminal-productization
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Close product-blocking oracle, filesystem containment, redaction, budget,
-    artifact, and web attribution debt required before the new workflows are
-    considered product-ready. M8 remains deferred to a macOS/Xcode
-    environment; no release publication is authorized.
+    Bind a production Electron runtime when available, record an honest
+    environment deferral otherwise, and improve PTY/TUI state semantics. M8
+    remains deferred to a macOS/Xcode environment; no release publication is
+    authorized.
 
 progress:
   completed_milestones:
@@ -201,12 +201,13 @@ progress:
     - M11.P2.explicit-explore
     - M11.P3.safe-repair-cli
     - M11.P4.campaign-cli
+    - M11.P5.product-correctness-safety
   deferred_milestones:
     - M8
 
 verification:
   last_verified_commit: c0835d7
-  last_gate: "M10: frozen install PASS; lint 0 errors/4 pre-existing warnings; typecheck PASS; unit 518 passed/3 skipped; integration 144/144 across 31 files; deterministic resume matrix, bounded restart soak, and real web/Android field proofs PASS"
+  last_gate: "M11.P5: targeted oracle/redaction/artifact/containment/core/web gates PASS; lint 0 errors/4 pre-existing warnings; typecheck PASS"
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
 
@@ -237,13 +238,15 @@ known_debt:
     fake target assignments, SQLite leases by default, global/per-worker
     budgets, and durable idempotent state.
   - >-
-    STILL_OPEN / M11.P5: repair containment/redaction, universal automation
-    failure oracle coverage, and artifact/web attribution debt remains.
+    CLOSED_BY_M11.P5: universal automation-failure oracle regression coverage,
+    filesystem-aware repair containment (including symlink/junction ancestry),
+    deterministic freeform redaction, durable repair-attempt and artifact-byte
+    accounting, bounded atomic artifact cleanup, and timestamped web action
+    window attribution.
   - >-
-    STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
-    redaction, fully durable unattended budgets, atomic artifact orphan
-    cleanup, web settle attribution, layered CI, and release/distribution
-    smoke remain to be implemented or proven.
+    STILL_OPEN / M11.P6-P7: production Electron field proof or environment
+    deferral, richer PTY/TUI viewport state, layered CI, and clean
+    release/distribution smoke.
   - >-
     STILL_OPEN: web exploration replay is expensive (~4-6 minutes in the
     existing full E2E gate); this is product-acceptable but not optimized.
@@ -264,10 +267,8 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - repair_containment_redaction_and_budget_productization
-    - repair_containment_redaction_and_budget_productization
-    - crash_artifact_cleanup_and_web_settle_attribution
-    - campaign_cli_surface
+    - electron_production_field_proof_or_environment_deferral
+    - pty_tui_viewport_model
     - layered_ci_and_clean_distribution_smoke
   environment_deferred:
     - ios_macos_xcode_runtime
@@ -469,7 +470,7 @@ m11:
     P2: COMPLETE
     P3: COMPLETE
     P4: COMPLETE
-    P5: IN_PROGRESS
+    P5: COMPLETE
     P6: PENDING
     P7: PENDING
   blockers: []

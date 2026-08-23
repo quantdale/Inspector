@@ -6,6 +6,7 @@ import { Store } from "@inspector/store-sqlite";
 import { ArtifactStore } from "@inspector/artifact-store";
 import { resolveAdapterBin, type AdapterBinRef } from "@inspector/adapter-sdk";
 import { CliError } from "./args.js";
+import { cleanupOrphanTemps } from "./atomic.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Workspace tsconfig so a dev-mode tsx subprocess can resolve @inspector/*
@@ -89,6 +90,7 @@ export function remapWorkspaceConflict(error: unknown): unknown {
 export function openWorkspace(cwd: string): Workspace {
   const base = workspaceDirFrom(cwd);
   const store = Store.open(join(base, "runs.db"));
+  cleanupOrphanTemps(base);
   const artifacts = new ArtifactStore(join(base, "artifacts"));
   return { store, artifacts, base };
 }

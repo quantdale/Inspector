@@ -6,6 +6,7 @@ import {
   redactUrl,
   stripUrlCredentials,
   redactUrlsInText,
+  redactFreeformText,
   stripUrlCredentialsInText,
 } from "./redaction.js";
 
@@ -114,5 +115,13 @@ describe("text scanning", () => {
     expect(stripUrlCredentialsInText("FATAL IntentionalAppCrash")).toBe(
       "FATAL IntentionalAppCrash",
     );
+  });
+
+  it("redacts freeform bearer, API-key, cookie, and credential values", () => {
+    const line = "Authorization: Bearer abc.def token=secret API_KEY=sk-live-123456789012 cookie: sid=abc https://host/p?api_key=xyz";
+    const out = redactFreeformText(line);
+    expect(out).not.toMatch(/abc\.def|secret|sk-live|sid=abc|api_key=xyz/i);
+    expect(out).toContain("Authorization:");
+    expect(out).toContain("https://host/p");
   });
 });

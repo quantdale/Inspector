@@ -27,7 +27,7 @@ import {
   AdapterCrashError,
   redactRecord,
   redactUrl,
-  redactUrlsInText,
+  redactFreeformText,
 } from "@inspector/adapter-sdk";
 import { startSeedServer, type SeedServer } from "./seeded-app.js";
 
@@ -151,7 +151,8 @@ export class WebAdapterHandler implements AdapterHandler {
   private runId = "run";
   private environmentId = "env";
   private consoleErrors: Array<{ text: string; ts: number }> = [];
-  private pageErrors: Array<{ message: string; stack?: string }> = [];
+  private pageErrors: Array<{ message: string; stack?: string; at: number; sequence: number }> = [];
+  private pageErrorSequence = 0;
   private network: Array<Record<string, unknown>> = [];
   private seq = 0;
   private traceIndex = 0;
@@ -307,14 +308,16 @@ export class WebAdapterHandler implements AdapterHandler {
     this.page.on("console", (msg) => {
       if (msg.type() === "error")
         this.consoleErrors.push({
-          text: redactUrlsInText(msg.text()),
+      text: redactFreeformText(msg.text()),
           ts: Date.now(),
         });
     });
     this.page.on("pageerror", (err) =>
       this.pageErrors.push({
-        message: redactUrlsInText(err.message),
-        stack: err.stack ? redactUrlsInText(err.stack) : undefined,
+        message: redactFreeformText(err.message),
+        stack: err.stack ? redactFreeformText(err.stack) : undefined,
+        at: Date.now(),
+        sequence: ++this.pageErrorSequence,
       }),
     );
     this.page.on("request", (req) =>
@@ -427,7 +430,7 @@ export class WebAdapterHandler implements AdapterHandler {
       title,
       uiTree,
       consoleErrors: this.consoleErrors,
-      pageErrors: this.pageErrors,
+      pageErrors: this.pageErrors.map(({ message, stack }) => ({ message, stack })),
       network: this.network,
       storage,
     };
@@ -495,9 +498,13 @@ export class WebAdapterHandler implements AdapterHandler {
     // adapter always reports an outcome instead of losing the race to the
     // client-side deadline (which would surface as an adapter error).
     const timeout = actionTimeout(action.deadlineMs);
-    // Errors that arrive during THIS action window (including between action
-    // resolution and classification) mark it as a target failure.
-    const errorsBefore = this.pageErrors.length;
+    // Attribute page errors by a timestamped action window and monotonic event
+    // sequence, rather than by the current array length. A browser event can
+    // be delivered after the action promise resolves; the bounded settle
+    // window below gives that event a deterministic ownership check. An error
+    // recorded before this action remains unrelated even if delivery is late.
+    const actionStartedAt = Date.now();
+    const pageErrorSequenceBefore = this.pageErrorSequence;
     try {
       switch (action.kind) {
         case "click":
@@ -561,13 +568,13 @@ export class WebAdapterHandler implements AdapterHandler {
       }
       // A synchronous throw inside a click/fill handler is reported as a
       // pageerror, but the CDP notification can land just after the action
-      // promise resolves. Give it one bounded settle before concluding
-      // success; the window is configurable (settleMs) and deliberately not
-      // inflated — errors arriving later surface on the next observation.
-      if (this.pageErrors.length === errorsBefore) {
-        await page.waitForTimeout(this.settleMs);
-      }
-      const lateError = this.pageErrors.slice(errorsBefore).at(-1);
+      // promise resolves. Wait only when the action has no owned event; the
+      // timestamp/sequence filter keeps unrelated earlier errors out.
+      const lateError = await this.pageErrorForAction(
+        page,
+        actionStartedAt,
+        pageErrorSequenceBefore,
+      );
       if (lateError) {
         return {
           actionId: action.id,
@@ -599,7 +606,11 @@ export class WebAdapterHandler implements AdapterHandler {
       // action window even when the automation call itself failed. A Playwright
       // automation error (missing element, timeout) is an ACTION_FAILED, not an
       // application defect, so the explorer must not treat it as a bug.
-      const duringAction = this.pageErrors.slice(errorsBefore).at(-1);
+      const duringAction = await this.pageErrorForAction(
+        page,
+        actionStartedAt,
+        pageErrorSequenceBefore,
+      );
       if (duringAction) {
         return {
           actionId: action.id,
@@ -621,6 +632,24 @@ export class WebAdapterHandler implements AdapterHandler {
         error: { code: "ACTION_FAILED", message },
       };
     }
+  }
+
+  private async pageErrorForAction(
+    page: Page,
+    actionStartedAt: number,
+    pageErrorSequenceBefore: number,
+  ): Promise<{ message: string; stack?: string; at: number; sequence: number } | undefined> {
+    const owned = (): { message: string; stack?: string; at: number; sequence: number } | undefined =>
+      this.pageErrors
+        .filter(
+          (error) =>
+            error.sequence > pageErrorSequenceBefore && error.at >= actionStartedAt,
+        )
+        .at(-1);
+    const current = owned();
+    if (current || this.settleMs === 0) return current;
+    await page.waitForTimeout(this.settleMs).catch(() => undefined);
+    return owned();
   }
 
   async health(): Promise<HealthResponse> {

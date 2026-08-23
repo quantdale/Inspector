@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
+import { mkdtempSync } from "node:fs";
 import { resolveContainedPath, PathPolicyError } from "./worktree.js";
 
 // ---------------------------------------------------------------------------
@@ -12,7 +13,7 @@ import { resolveContainedPath, PathPolicyError } from "./worktree.js";
 // check alone).
 // ---------------------------------------------------------------------------
 
-const ROOT = resolve(join(tmpdir(), "inspector-repair-prop-root"));
+const ROOT = resolve(mkdtempSync(join(tmpdir(), "inspector-repair-prop-root-")));
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

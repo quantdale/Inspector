@@ -133,6 +133,11 @@ export class PolicyEngine {
     this.counters.resets = Math.max(this.counters.resets, count);
   }
 
+  /** Seed artifact accounting from the durable observation index on restart. */
+  seedArtifactBytes(bytes: number): void {
+    this.counters.artifactBytes = Math.max(this.counters.artifactBytes, bytes);
+  }
+
   recordArtifactBytes(bytes: number): PolicyDecision {
     const limit = this.policy.budgets.max_artifact_megabytes * 1024 * 1024;
     if (this.counters.artifactBytes + bytes > limit) {

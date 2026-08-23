@@ -16,6 +16,11 @@ const SENSITIVE_KEY_SUFFIXES = [
   "authorization",
   "cookie",
   "credential",
+  "api_key",
+  "apikey",
+  "access_key",
+  "client_secret",
+  "set-cookie",
 ] as const;
 
 const URL_RE = /https?:\/\/[^\s"'<>()[\]]+/g;
@@ -86,4 +91,32 @@ export function redactUrlsInText(text: string): string {
  */
 export function stripUrlCredentialsInText(text: string): string {
   return rewriteUrls(text, stripUrlCredentials);
+}
+
+/**
+ * Redact freeform logs/screens/page errors before they enter observations or
+ * durable artifacts. URL query parameters, bearer/auth headers, common
+ * credential environment variables, cookie values, and recognizable API-key
+ * forms are masked while surrounding diagnostic text is retained.
+ */
+export function redactFreeformText(text: string): string {
+  let out = redactUrlsInText(text);
+  out = out.replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, `$1${REDACTED}`);
+  out = out.replace(
+    /(\b(?:authorization|proxy-authorization)\s*:\s*)(?:Basic|Bearer)\s+[^\s,;]+/gi,
+    `$1${REDACTED}`,
+  );
+  out = out.replace(
+    /(\b(?:cookie|set-cookie)\s*[:=]\s*)([^\s;]+)/gi,
+    `$1${REDACTED}`,
+  );
+  out = out.replace(
+    /(\b(?:api[_-]?key|access[_-]?key|client[_-]?secret|secret|token|password|passwd|credential)\s*[:=]\s*)(["']?)[^\s"',;]+\2/gi,
+    `$1$2${REDACTED}$2`,
+  );
+  out = out.replace(
+    /\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GITHUB_TOKEN|GH_TOKEN|NPM_TOKEN|DATABASE_URL)\s*=\s*[^\s]+/gi,
+    (match) => `${match.slice(0, match.indexOf("=") + 1)}${REDACTED}`,
+  );
+  return out.replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{12,}|xox[baprs]-[A-Za-z0-9-]{12,})\b/g, REDACTED);
 }

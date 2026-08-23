@@ -267,6 +267,12 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_repair_finding
     ON repair_records(finding_id, started_at);
   `,
+  // M11 repair progress: the coordinator attempt count is durable while the
+  // patch agent is still running, so a controller restart cannot make a
+  // repair appear to have spent zero attempts.
+  `
+  ALTER TABLE repair_records ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
 import { RepairWorkspace, PathPolicyError, ProvenanceError } from "./worktree.js";
 
 const runGit = promisify(execFile);
@@ -81,6 +81,30 @@ describe("RepairWorkspace hardening", () => {
       expect(await ws.readFile("src/deep/app.txt")).toBe("patched\n");
       // autocrlf may give the checked-out file CRLF endings; compare loosely
       expect((await ws.readFile("app.txt")).trim()).toBe("hello");
+    } finally {
+      await ws.dispose();
+    }
+  });
+
+  it("D1: rejects symlink escapes for existing and newly-created files", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const outside = mkdtempSync(join(tmpdir(), "inspector-wt-symlink-outside-"));
+    const ws = await RepairWorkspace.create(repoRoot, revision);
+    try {
+      const link = join(ws.path, "linked");
+      symlinkSync(outside, link, "junction");
+      await expect(ws.writeFile("linked/escaped.txt", "pwned")).rejects.toThrow(PathPolicyError);
+      await expect(ws.readFile("linked/escaped.txt")).rejects.toThrow(PathPolicyError);
+      expect(existsSync(join(outside, "escaped.txt"))).toBe(false);
+
+      const nested = join(ws.path, "nested");
+      mkdirSync(nested, { recursive: true });
+      const nestedLink = join(nested, "link");
+      symlinkSync(outside, nestedLink, "junction");
+      await expect(ws.writeFile("nested/link/deeper/escaped.txt", "pwned")).rejects.toThrow(
+        PathPolicyError,
+      );
+      expect(existsSync(join(outside, "deeper", "escaped.txt"))).toBe(false);
     } finally {
       await ws.dispose();
     }

@@ -288,6 +288,26 @@ describe("core hardening wave 2", () => {
     await controller.close();
   });
 
+  it("C4b (M11): a restarted controller restores durable artifact-byte accounting", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const firstEngine = new PolicyEngine(basePolicy);
+    const first = await hardeningController({ artifactBytes: 4096 }, firstEngine);
+    await first.controller.submitAction({ ...act("h_art_restart"), runId: first.runId });
+    await first.controller.close();
+
+    const secondEngine = new PolicyEngine(basePolicy);
+    const client = inProcessAdapter(mockHandler({ artifactBytes: 4096 }));
+    const second = new RunController(store!, artifacts!, secondEngine, {
+      runId: first.runId,
+      envId: first.envId,
+      adapter: client,
+      caps,
+    });
+    expect(secondEngine.counters.artifactBytes).toBe(4096);
+    await second.close();
+  });
+
   it("C5 (D5): same-millisecond checkpoint ties restore the newest stepSeq on resume", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));

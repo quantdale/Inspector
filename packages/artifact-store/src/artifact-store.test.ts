@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, utimesSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ArtifactStore } from "./index.js";
@@ -59,5 +59,20 @@ describe("artifact store", () => {
     const m = store.write({ runId: "runA", content: Buffer.from("x"), mime: "text/plain" });
     expect(m.path).toContain(join("runA", "artifacts"));
     expect(store.meta("runB", m.sha256)).toBeUndefined();
+  });
+
+  it("cleans only old interrupted staging files on reopen", () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-art-"));
+    const artifactDir = join(dir, "run1", "artifacts");
+    mkdirSync(artifactDir, { recursive: true });
+    const orphan = join(artifactDir, ".payload.json.tmp-old");
+    writeFileSync(orphan, "partial");
+    const old = new Date(Date.now() - 120_000);
+    utimesSync(orphan, old, old);
+    const valid = join(artifactDir, "valid-evidence");
+    writeFileSync(valid, "evidence");
+    new ArtifactStore(dir);
+    expect(existsSync(orphan)).toBe(false);
+    expect(existsSync(valid)).toBe(true);
   });
 });

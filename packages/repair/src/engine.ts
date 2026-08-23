@@ -30,6 +30,8 @@ export interface RepairEngineOptions {
    * against weakened tests), e.g. fixtures the repair is expected to touch.
    */
   allowedTestPaths?: string[];
+  /** Durable progress hook invoked after every repair-attempt decision. */
+  onAttempt?: (attempt: PatchAttempt, attemptCount: number) => void;
 }
 
 /** Basename/segment patterns for test files that patches may not touch. */
@@ -192,7 +194,7 @@ export class RepairEngine {
             this.contextBuilder.toPatchContext(source, ctxBase),
           );
           if (!patch || patch.files.length === 0) {
-            attempts.push(this.attempt(index, agent.id, "ABORTED", "agent produced no patch"));
+            this.appendAttempt(attempts, this.attempt(index, agent.id, "ABORTED", "agent produced no patch"));
             this.findingEngine.transition(finding, "CONFIRMED");
             continue;
           }
@@ -204,7 +206,8 @@ export class RepairEngine {
             (f) => isTestPath(f.path) && !allowList.has(normalizeRelPath(f.path)),
           );
           if (tampered.length > 0) {
-            attempts.push(
+            this.appendAttempt(
+              attempts,
               this.attempt(
                 index,
                 agent.id,
@@ -265,7 +268,8 @@ export class RepairEngine {
               : flowLost
                 ? "masking suspected: a previously crashing action still fails after patch (behavior disabled instead of repaired)"
                 : "masking probe failed: benign flow broken (patch masks or breaks)";
-            attempts.push(
+            this.appendAttempt(
+              attempts,
               this.attempt(
                 index,
                 agent.id,
@@ -289,7 +293,8 @@ export class RepairEngine {
             check.scenario.steps,
           );
           if (!regressionPasses) {
-            attempts.push(
+            this.appendAttempt(
+              attempts,
               this.attempt(
                 index,
                 agent.id,
@@ -306,7 +311,8 @@ export class RepairEngine {
             continue;
           }
 
-          attempts.push(
+          this.appendAttempt(
+            attempts,
             this.attempt(
               index,
               agent.id,
@@ -331,14 +337,16 @@ export class RepairEngine {
           await workspace.rollback().catch(() => undefined);
           this.restoreConfirmed(finding);
           if (err instanceof PathPolicyError) {
-            attempts.push(
+            this.appendAttempt(
+              attempts,
               this.attempt(index, agent.id, "REJECTED", `source-write policy: ${err.message}`),
             );
             sawConcretePatch = true;
             sawPolicyBlock = true;
             continue;
           }
-          attempts.push(
+          this.appendAttempt(
+            attempts,
             this.attempt(index, agent.id, "ABORTED", `attempt ${index} failed: ${errorMessage(err)}`),
           );
           sawConcretePatch = true;
@@ -442,6 +450,11 @@ export class RepairEngine {
     };
   }
 
+  private appendAttempt(attempts: PatchAttempt[], attempt: PatchAttempt): void {
+    attempts.push(attempt);
+    this.opts.onAttempt?.(attempt, attempts.length);
+  }
+
   private async finish(opts: {
     finding: Finding;
     outcome: RepairOutcome;
@@ -479,7 +492,7 @@ export class RepairEngine {
       startedAt,
       finishedAt: new Date().toISOString(),
     };
-    if (reason) record.attempts.push(this.attempt(0, "engine", "ABORTED", reason));
+    if (reason) this.appendAttempt(record.attempts, this.attempt(0, "engine", "ABORTED", reason));
     try {
       mkdirSync(this.opts.evidenceDir, { recursive: true });
       writeFileSync(

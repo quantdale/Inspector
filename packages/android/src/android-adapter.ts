@@ -8,7 +8,7 @@ import {
   type Action,
   type HealthResponse,
 } from "@inspector/protocol";
-import { AdapterCrashError, type AdapterHandler, stripUrlCredentialsInText } from "@inspector/adapter-sdk";
+import { AdapterCrashError, type AdapterHandler, redactFreeformText } from "@inspector/adapter-sdk";
 import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -240,10 +240,9 @@ export class AndroidAdapterHandler implements AdapterHandler {
       artifacts.push({ sha256: meta.sha256, mime: meta.mime, size: meta.size, path: meta.path });
     }
 
-    // Freeform logcat text is left intact except for URL credential stripping
-    // (known debt: value-level secret redaction in freeform logs).
+    // Redact freeform logcat before it enters durable observations.
     const logcat = want.has("logcat")
-      ? (await this.backend.logcat(serial)).map(stripUrlCredentialsInText)
+      ? (await this.backend.logcat(serial)).map(redactFreeformText)
       : [];
 
     return {

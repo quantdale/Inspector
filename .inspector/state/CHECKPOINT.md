@@ -20,12 +20,10 @@ web/Android interruption proofs are in place. Frozen install, lint, typecheck,
 unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
-M11 is activated at the current tree. P0 state reconciliation is recorded in
-the durable campaign file and this checkpoint. P1 (`verify`/`regress`) is now
-complete on the existing replay, oracle, finding, and evidence machinery; the
-next implementation waypoint is P2 (`explore`). The repository was clean at `023dabf` before M11
-changes. `git fetch origin` was attempted on 2026-08-23 but GitHub was
-unreachable from this environment; local `origin/main` remains at that SHA.
+M11 is activated at the current tree. P0-P5 are complete and P6 is the active
+waypoint. The repository was clean at `023dabf` before M11 changes. `git fetch
+origin` was attempted on 2026-08-23 but GitHub was unreachable from this
+environment; local `origin/main` remains at that SHA.
 
 ### M11 P1 — verify/regress checkpoint
 
@@ -86,6 +84,28 @@ unreachable from this environment; local `origin/main` remains at that SHA.
 - Targeted integration: **1 passed** (`campaign.integration.test.ts`).
 - P4 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
   warnings**.
+
+### M11 P5 — product correctness and safety checkpoint
+
+- Tightened the universal automation-failure boundary with deterministic
+  hidden-element, stale-selector, UIA/ADB/PTY miss, and true-crash oracle
+  regressions; automation misses cannot satisfy target-failure reproduction.
+- Replaced lexical-only repair path checks with realpath-aware nearest-existing
+  ancestor containment, covering symlink/junction escapes, traversal, absolute,
+  UNC/drive, case-normalization, and `.git` policy cases.
+- Redacted freeform PTY/logcat/web text for URL secrets, bearer/auth headers,
+  cookies, credential variables, and recognizable API-key forms while keeping
+  non-sensitive diagnostic context.
+- Made JSON evidence/manifests atomic with bounded old-orphan cleanup; repair
+  attempts and run artifact-byte accounting now survive process restart.
+- Web page-error ownership now uses timestamped event buffering and action
+  sequence windows, preserving the bounded settle window without attributing
+  earlier errors to later automation misses.
+- Targeted gates: **41 unit tests across oracle/redaction/artifact/containment,
+  15 core hardening tests, 17 store/repair integration tests, 18 web
+  integration tests, typecheck PASS, lint 0 errors / 4 pre-existing warnings**.
+- Next waypoint: P6 production Electron binding/fixture proof or honest
+  environment deferral, plus richer PTY/TUI viewport state.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 

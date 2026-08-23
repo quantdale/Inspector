@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const run = promisify(execFile);
@@ -53,6 +53,51 @@ export function resolveContainedPath(rootDir: string, relPath: string): string {
   const prefix = root.endsWith(sep) ? root : root + sep;
   if (full !== root && !full.startsWith(prefix)) {
     throw new PathPolicyError(`path escapes the workspace root: ${relPath}`);
+  }
+
+  // Lexical containment is not sufficient when a repository contains a
+  // symlink, junction, or other reparse point. Resolve the root and the
+  // nearest existing path component before allowing a read/write. For a new
+  // file, the nearest existing ancestor is the strongest check available
+  // before mkdir/write creates the missing suffix. Any real path lookup
+  // failure is a policy refusal rather than an optimistic fallback.
+  let realRoot: string;
+  try {
+    realRoot = realpathSync.native(root);
+  } catch {
+    throw new PathPolicyError(`workspace root cannot be resolved: ${root}`);
+  }
+
+  let probe = full;
+  while (!existsSync(probe)) {
+    const parent = dirname(probe);
+    if (parent === probe) {
+      throw new PathPolicyError(`workspace path cannot be resolved: ${relPath}`);
+    }
+    probe = parent;
+  }
+
+  let realProbe: string;
+  try {
+    // realpath follows symlinks and Windows junction/reparse points. The
+    // native implementation preserves the platform's canonical spelling.
+    realProbe = realpathSync.native(probe);
+    // lstat makes dangling symlinks fail closed instead of looking like a
+    // missing ordinary path during the ancestor walk.
+    lstatSync(probe);
+  } catch {
+    throw new PathPolicyError(`workspace path cannot be resolved: ${relPath}`);
+  }
+
+  const comparisonRoot = process.platform === "win32" ? realRoot.toLowerCase() : realRoot;
+  const comparisonProbe = process.platform === "win32" ? realProbe.toLowerCase() : realProbe;
+  const realRelative = relative(comparisonRoot, comparisonProbe);
+  if (
+    isAbsolute(realRelative) ||
+    realRelative === ".." ||
+    realRelative.startsWith(`..${sep}`)
+  ) {
+    throw new PathPolicyError(`path escapes the real workspace root: ${relPath}`);
   }
   return full;
 }

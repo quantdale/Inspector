@@ -3,11 +3,8 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { newId, isId } from "@inspector/protocol";
 import {
   UnattendedCampaign,
@@ -17,6 +14,7 @@ import {
 } from "@inspector/scale";
 import { CliError, intFlag, type ParsedInvocation } from "./args.js";
 import { warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { writeJsonAtomic } from "./atomic.js";
 
 const CAMPAIGN_SCHEMA = "inspector-cli/campaign/1";
 const CAMPAIGN_LIST_SCHEMA = "inspector-cli/campaign-list/1";
@@ -415,15 +413,7 @@ function readManifest(path: string): CampaignManifest {
 }
 
 function writeManifest(path: string, manifest: CampaignManifest): void {
-  mkdirSync(resolve(path, ".."), { recursive: true });
-  const temp = `${path}.tmp-${newId()}`;
-  writeFileSync(temp, JSON.stringify(manifest, null, 2), "utf8");
-  try {
-    renameSync(temp, path);
-  } catch (err) {
-    try { unlinkSync(temp); } catch { /* preserve primary error */ }
-    throw err;
-  }
+  writeJsonAtomic(path, manifest);
 }
 
 function parseItems(raw: string, seed: number, steps: number, mode: WorkItem["mode"]): WorkItem[] {

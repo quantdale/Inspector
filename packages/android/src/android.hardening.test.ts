@@ -196,9 +196,9 @@ describe("android hardening: logcat redaction (D7)", () => {
     await handler.lifecycle({ op: "create" });
     const obs = await handler.observe({ observe: ["logcat"] });
     const summary = obs.summary as { logcat: string[] };
-    // Credentials-only stripping for freeform logcat (documented debt: query
-    // strings in freeform text are left intact).
+    // Freeform logcat redacts credentials and secret query values.
     expect(summary.logcat[0]).not.toContain("user:pass");
+    expect(summary.logcat[0]).not.toContain("token=abc");
     expect(summary.logcat[0]).toContain("api.example.com");
   });
 });

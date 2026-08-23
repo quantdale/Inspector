@@ -11,7 +11,7 @@ import {
 import {
   AdapterCrashError,
   type AdapterHandler,
-  stripUrlCredentialsInText,
+  redactFreeformText,
 } from "@inspector/adapter-sdk";
 import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
@@ -121,16 +121,15 @@ export class CliAdapterHandler implements AdapterHandler {
     const screen = await this.backend.readScreen(this.sessionId);
     const alive = await this.backend.isAlive(this.sessionId);
     const mode = !alive ? "mode-exited" : screen[0]?.startsWith("guest>") ? "mode-guest" : "mode-auth";
-    // Freeform screen text is left intact except for URL credential stripping
-    // (known debt: value-level secret redaction in freeform terminal output).
+    // Freeform screen text is redacted before it becomes model/evidence input.
     const uiTree = [
-      { tag: "line", role: "text", id: mode, name: mode, text: stripUrlCredentialsInText(screen[0] ?? "") },
+      { tag: "line", role: "text", id: mode, name: mode, text: redactFreeformText(screen[0] ?? "") },
       ...screen.map((rawText, i) => ({
         tag: "line",
         role: "text",
         id: `line-${i}`,
         name: `line-${i}`,
-        text: stripUrlCredentialsInText(rawText),
+        text: redactFreeformText(rawText),
       })),
     ];
     return {

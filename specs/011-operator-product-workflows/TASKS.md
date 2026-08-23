@@ -5,6 +5,6 @@
 - [x] P2 — implement explicit durable `explore` workflow
 - [x] P3 — expose safe `repair` with configured patch-agent/provider contract
 - [x] P4 — expose bounded `campaign run|list|show|stop|resume`
-- [ ] P5 — close oracle, containment, redaction, budget, artifact, and web attribution debt required by productization
+- [x] P5 — close oracle, containment, redaction, budget, artifact, and web attribution debt required by productization
 - [ ] P6 — production Electron binding/proof or honest environment deferral; improve PTY/TUI state
 - [ ] P7 — layered CI, release/distribution smoke, acceptance matrix, docs, and M11 exit gate

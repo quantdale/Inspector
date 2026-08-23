@@ -103,9 +103,10 @@ describe("cli hardening: screen redaction (D7)", () => {
     const obs = await handler.observe({});
     const uiTree = (obs.summary as { uiTree: Array<{ text?: string }> }).uiTree;
     const joined = uiTree.map((e) => e.text ?? "").join("\n");
-    // Credentials-only stripping for freeform screen text (documented debt:
-    // query strings in freeform terminal output are left intact).
+    // Freeform screen text redacts both URL credentials and secret query
+    // values before it reaches durable observations.
     expect(joined).not.toContain("user:pass");
+    expect(joined).not.toContain("token=abc");
     expect(joined).toContain("api.example.com");
   });
 });

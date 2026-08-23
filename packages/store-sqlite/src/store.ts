@@ -191,6 +191,7 @@ export interface RepairWorkflowRecord {
   revision: string;
   status: WorkflowRecordStatus;
   outcome: string;
+  attempts: number;
   startedAt: string;
   completedAt: string | null;
   resultJson: string | null;
@@ -636,6 +637,19 @@ export class Store {
       .prepare(`SELECT COUNT(*) AS c FROM actions WHERE run_id = ?`)
       .get(runId) as { c: number };
     return row.c;
+  }
+
+  /** Sum durable observation artifact sizes for restart-safe policy budgets. */
+  sumRunArtifactBytes(runId: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(SUM(oa.size), 0) AS bytes
+           FROM observation_artifacts oa
+           JOIN observations o ON o.id = oa.observation_id
+          WHERE o.run_id = ?`,
+      )
+      .get(runId) as { bytes: number };
+    return row.bytes;
   }
 
   /** Actions whose committed step is newer than an explorer snapshot. */
@@ -1220,11 +1234,12 @@ export class Store {
       .prepare(
         `INSERT INTO repair_records(
            id, finding_id, repo_root, revision, status, outcome, started_at,
-           completed_at, result_json, artifact_path
-         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           attempts, completed_at, result_json, artifact_path
+         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            status = excluded.status,
            outcome = excluded.outcome,
+           attempts = excluded.attempts,
            completed_at = excluded.completed_at,
            result_json = excluded.result_json,
            artifact_path = excluded.artifact_path`,
@@ -1237,6 +1252,7 @@ export class Store {
         record.status,
         record.outcome,
         record.startedAt,
+        record.attempts,
         record.completedAt,
         record.resultJson,
         record.artifactPath,
@@ -1249,7 +1265,7 @@ export class Store {
     return this.db
       .prepare(
         `SELECT id, finding_id AS findingId, repo_root AS repoRoot, revision,
-           status, outcome, started_at AS startedAt, completed_at AS completedAt,
+           status, outcome, attempts, started_at AS startedAt, completed_at AS completedAt,
            result_json AS resultJson, artifact_path AS artifactPath
          FROM repair_records ${where} ORDER BY started_at DESC LIMIT ?`,
       )
@@ -1260,7 +1276,7 @@ export class Store {
     return this.db
       .prepare(
         `SELECT id, finding_id AS findingId, repo_root AS repoRoot, revision,
-           status, outcome, started_at AS startedAt, completed_at AS completedAt,
+           status, outcome, attempts, started_at AS startedAt, completed_at AS completedAt,
            result_json AS resultJson, artifact_path AS artifactPath
          FROM repair_records WHERE id = ?`,
       )

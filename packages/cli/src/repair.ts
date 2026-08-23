@@ -1,9 +1,6 @@
 import {
   existsSync,
   mkdirSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -26,11 +23,12 @@ import {
   type RepairWorkspace,
 } from "@inspector/repair";
 import type { RepairWorkflowRecord } from "@inspector/store-sqlite";
-import { stripUrlCredentialsInText } from "@inspector/adapter-sdk";
+import { redactFreeformText } from "@inspector/adapter-sdk";
 import { CliError, intFlag, requirePositional, type ParsedInvocation } from "./args.js";
 import { loadReplaySubject } from "./replay-workflow.js";
 import { openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 import { warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { writeJsonAtomic } from "./atomic.js";
 
 const REPAIR_SCHEMA = "inspector-cli/repair/1";
 const ORACLE_SIGNAL_KINDS = new Set<OracleSignalKind>([
@@ -200,6 +198,7 @@ export async function repairCommand(
       revision: resolvedRevision,
       status: "running",
       outcome: "RUNNING",
+      attempts: 0,
       startedAt,
       completedAt: null,
       resultJson: null,
@@ -218,6 +217,18 @@ export async function repairCommand(
         driverFor: provider.driverFor,
         oracleSuite: provider.oracleSuite,
         maskingProbe: provider.maskingProbe,
+        onAttempt: (attempt, attemptCount) => {
+          durable = {
+            ...durable,
+            attempts: attemptCount,
+            resultJson: JSON.stringify({
+              phase: "attempt",
+              latestAttempt: attempt,
+              attempts: attemptCount,
+            }),
+          };
+          store.putRepairWorkflowRecord(durable);
+        },
       });
       record = await engine.repair(
         subject.finding,
@@ -257,6 +268,7 @@ export async function repairCommand(
       resolvedRevision,
       provider: provider.patchAgent.id,
       outcome: record.outcome,
+      attempts: record.attempts.length,
       automaticallyApplied: false,
       primaryCheckoutModified: false,
       record,
@@ -413,21 +425,6 @@ function repairExitCode(outcome: RepairRecord["outcome"]): number {
   return 2;
 }
 
-function writeJsonAtomic(path: string, value: unknown): void {
-  const temp = `${path}.tmp-${newId()}`;
-  writeFileSync(temp, JSON.stringify(value, null, 2), "utf8");
-  try {
-    renameSync(temp, path);
-  } catch (err) {
-    try {
-      unlinkSync(temp);
-    } catch {
-      /* bounded cleanup; the primary write error remains authoritative */
-    }
-    throw err;
-  }
-}
-
 function requiredValue(flags: Record<string, string | true>, name: string): string {
   const value = flags[name];
   if (value === undefined || value === true || value.trim().length === 0) {
@@ -465,7 +462,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function redact(value: string): string {
-  return stripUrlCredentialsInText(value).replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+  return redactFreeformText(value);
 }
 
 function errorMessage(value: unknown): string {

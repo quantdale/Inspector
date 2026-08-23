@@ -1,9 +1,9 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "@inspector/protocol";
 import { OracleEngine } from "@inspector/finding";
 import type { RegressionRecord } from "@inspector/store-sqlite";
-import { stripUrlCredentialsInText } from "@inspector/adapter-sdk";
+import { redactFreeformText } from "@inspector/adapter-sdk";
 import { CliError, intFlag, type ParsedInvocation } from "./args.js";
 import {
   loadReplaySubject,
@@ -13,6 +13,7 @@ import {
 } from "./replay-workflow.js";
 import { openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 import { warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { writeJsonAtomic } from "./atomic.js";
 
 const REGRESS_SCHEMA = "inspector-cli/regress/1";
 
@@ -172,25 +173,34 @@ async function executeScenario(input: {
   store: import("@inspector/store-sqlite").Store;
 }): Promise<ScenarioResult> {
   const { record, adapter, revision, key, req, dir, store } = input;
-  const id = newId();
-  const startedAt = new Date().toISOString();
-  let durable: RegressionRecord = {
-    id,
-    scenarioKey: key,
-    findingId: record.id,
-    runId: record.runId,
-    adapter,
-    revision,
-    status: "running",
-    classification: "skipped",
-    attempts: 0,
-    successes: 0,
-    errors: 0,
-    startedAt,
-    completedAt: null,
-    resultJson: null,
-    artifactPath: null,
-  };
+  const existing = store.getRegressionRecordByScenarioKey(key);
+  const id = existing?.id ?? newId();
+  const startedAt = existing?.startedAt ?? new Date().toISOString();
+  let durable: RegressionRecord = existing
+    ? {
+        ...existing,
+        status: "running",
+        classification: "skipped",
+        completedAt: null,
+        artifactPath: null,
+      }
+    : {
+        id,
+        scenarioKey: key,
+        findingId: record.id,
+        runId: record.runId,
+        adapter,
+        revision,
+        status: "running",
+        classification: "skipped",
+        attempts: 0,
+        successes: 0,
+        errors: 0,
+        startedAt,
+        completedAt: null,
+        resultJson: null,
+        artifactPath: null,
+      };
   store.putRegressionRecord(durable);
 
   let subject;
@@ -198,9 +208,7 @@ async function executeScenario(input: {
     subject = loadReplaySubject(store, join(dir, ".inspector"), record.id);
   } catch (err) {
     const classification: ScenarioClassification =
-      err instanceof WorkflowProvenanceError && err.classification === "incompatible-target"
-        ? "incompatible-target"
-        : "environment-failure";
+      err instanceof WorkflowProvenanceError ? "incompatible-target" : "environment-failure";
     return finishScenario(store, durable, classification, {
       scenarioId: id,
       scenarioKey: key,
@@ -231,11 +239,12 @@ async function executeScenario(input: {
     }, dir);
   }
 
-  const attempts: Array<{ attempt: number; outcome: string; matchedOracleIds: string[]; error?: string }> = [];
-  let successes = 0;
-  let errors = 0;
+  const attempts: Array<{ attempt: number; outcome: string; matchedOracleIds: string[]; error?: string }> =
+    resumeAttempts(durable.resultJson);
+  let successes = durable.successes;
+  let errors = durable.errors;
   const oracle = OracleEngine.defaults();
-  for (let index = 1; index <= req.attempts; index += 1) {
+  for (let index = durable.attempts + 1; index <= req.attempts; index += 1) {
     try {
       const driver = await replayDriverFor(subject, join(dir, ".inspector"));
       const result = await driver.replay(subject.bundle.minimizedSteps);
@@ -308,7 +317,7 @@ function finishScenario(
     attemptsDetail,
     completedAt,
   };
-  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2), "utf8");
+  writeJsonAtomic(artifactPath, artifact);
   store.putRegressionRecord({
     ...record,
     status: "completed",
@@ -368,7 +377,24 @@ function renderSummary(summary: RegressSummary, ctx: CommandContext): void {
 }
 
 function redact(value: string): string {
-  return stripUrlCredentialsInText(value).replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+  return redactFreeformText(value);
+}
+
+function resumeAttempts(raw: string | null): Array<{ attempt: number; outcome: string; matchedOracleIds: string[]; error?: string }> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as { attempts?: unknown };
+    if (!Array.isArray(parsed.attempts)) return [];
+    return parsed.attempts.filter(
+      (attempt): attempt is { attempt: number; outcome: string; matchedOracleIds: string[]; error?: string } =>
+        typeof attempt === "object" && attempt !== null &&
+        typeof (attempt as { attempt?: unknown }).attempt === "number" &&
+        typeof (attempt as { outcome?: unknown }).outcome === "string" &&
+        Array.isArray((attempt as { matchedOracleIds?: unknown }).matchedOracleIds),
+    );
+  } catch {
+    return [];
+  }
 }
 
 function errorMessage(value: unknown): string {

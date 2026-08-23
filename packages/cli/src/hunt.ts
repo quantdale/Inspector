@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   RunManager,
@@ -38,6 +38,7 @@ import {
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
 import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorkspaceConflict } from "./workspace.js";
+import { writeJsonAtomic } from "./atomic.js";
 
 /** Progress sink; stderr so stdout stays parseable. */
 export type ProgressFn = (line: string) => void;
@@ -328,7 +329,7 @@ export function writeEvidenceBundles(
   const paths = new Map<string, string>();
   for (const bundle of bundles) {
     const path = join(dir, `${bundle.finding.id}.json`);
-    writeFileSync(path, JSON.stringify(bundle, null, 2));
+    writeJsonAtomic(path, bundle);
     paths.set(bundle.finding.id, path);
   }
   return paths;

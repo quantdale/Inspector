@@ -1,9 +1,9 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "@inspector/protocol";
 import { FindingEngine, OracleEngine, type ReplayResult } from "@inspector/finding";
 import type { VerificationRecord } from "@inspector/store-sqlite";
-import { stripUrlCredentialsInText } from "@inspector/adapter-sdk";
+import { redactFreeformText } from "@inspector/adapter-sdk";
 import { CliError, intFlag, requirePositional, type ParsedInvocation } from "./args.js";
 import {
   loadReplaySubject,
@@ -13,6 +13,7 @@ import {
 } from "./replay-workflow.js";
 import { openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 import { warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { writeJsonAtomic } from "./atomic.js";
 
 const VERIFY_SCHEMA = "inspector-cli/verify/1";
 
@@ -247,6 +248,18 @@ export async function verifyCommand(
       attemptsDetail: attempts,
       bundlePath: subject.bundlePath,
     }, dir, ctx);
+  } catch (err) {
+    if (record.status === "running") {
+      record = {
+        ...record,
+        status: "failed",
+        classification: "environment-failure",
+        completedAt: new Date().toISOString(),
+        resultJson: JSON.stringify({ error: redact(errorMessage(err)) }),
+      };
+      store.putVerificationRecord(record);
+    }
+    throw err;
   } finally {
     store.close();
   }
@@ -266,7 +279,7 @@ async function finishVerification(
   mkdirSync(artifactDir, { recursive: true });
   const artifactPath = join(artifactDir, `${record.id}.json`);
   const artifact = { schema: VERIFY_SCHEMA, ...result, completedAt };
-  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2), "utf8");
+  writeJsonAtomic(artifactPath, artifact);
   const final: VerificationRecord = {
     ...record,
     status: "completed",
@@ -327,7 +340,7 @@ async function replayBounded(
 }
 
 function redact(value: string): string {
-  return stripUrlCredentialsInText(value).replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+  return redactFreeformText(value);
 }
 
 function errorMessage(value: unknown): string {

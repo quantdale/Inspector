@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -63,6 +64,8 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 // Names may carry an extension; separators, drive letters, and percent-encoded
 // traversal are rejected outright.
 const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const MAX_ORPHAN_TEMPS = 256;
+const ORPHAN_MIN_AGE_MS = 60_000;
 
 function assertRunId(runId: string): void {
   if (typeof runId !== "string" || !RUN_ID_PATTERN.test(runId)) {
@@ -95,6 +98,40 @@ function lstatType(path: string): "absent" | "file" | "dir" | "other" {
   return "other";
 }
 
+/** Remove only old staging files left by an interrupted atomic artifact write. */
+function cleanupOrphanTemps(root: string): void {
+  if (!exists(root)) return;
+  const cutoff = Date.now() - ORPHAN_MIN_AGE_MS;
+  const pending = [root];
+  let removed = 0;
+  while (pending.length > 0 && removed < MAX_ORPHAN_TEMPS) {
+    const dir = pending.pop()!;
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      if (removed >= MAX_ORPHAN_TEMPS) break;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(path);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.includes(".tmp-")) continue;
+      try {
+        if (lstatSync(path).mtimeMs < cutoff) {
+          unlinkSync(path);
+          removed += 1;
+        }
+      } catch {
+        /* A concurrent writer/remover owns the outcome. */
+      }
+    }
+  }
+}
+
+function exists(path: string): boolean {
+  try { lstatSync(path); return true; } catch { return false; }
+}
+
 export class ArtifactStore {
   private readonly index = new Map<string, ArtifactMetadata>();
   private readonly baseAbs: string;
@@ -111,6 +148,7 @@ export class ArtifactStore {
       throw new PathPolicyError(`baseDir must not be a filesystem root: ${resolved}`);
     }
     this.baseAbs = resolved;
+    cleanupOrphanTemps(this.baseAbs);
   }
 
   /** Refuse any resolved path that is not strictly inside the store base. */
