@@ -13,6 +13,7 @@ export type ExploreActionKind =
   | "forward"
   | "reload"
   | "wait"
+  | "swipe"
   | "fault";
 
 export interface CandidateAction {

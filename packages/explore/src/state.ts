@@ -10,6 +10,12 @@ export interface UiElement {
   disabled?: boolean;
   value?: string;
   text?: string;
+  /** Android (SPEC-009 W7): content-desc and structural path. */
+  desc?: string;
+  path?: string;
+  clickable?: boolean;
+  scrollable?: boolean;
+  className?: string;
 }
 
 export function uiTreeOf(obs: Observation): UiElement[] {

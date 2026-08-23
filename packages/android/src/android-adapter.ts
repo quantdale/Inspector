@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import type { AdbBackend, AndroidFaults } from "./types.js";
-import { parseUiautomatorDump } from "./uiautomator.js";
+import { parseUiautomatorDump, resolveElement } from "./uiautomator.js";
 import { SEED_PACKAGE } from "./mock-backend.js";
 
 /**
@@ -37,20 +37,23 @@ export const ANDROID_CAPABILITIES: CapabilityDoc = {
   adapter: "android-uiautomator",
   capabilities: {
     observe: ["uiTree", "screenshot", "logcat"],
-    act: ["click", "fill", "press", "fault"],
+    act: ["click", "fill", "press", "swipe", "fault"],
     lifecycle: ["create", "reset", "close"],
     faults: ["crash"],
     coverage: [],
-    // SPEC-009 W1: semantic vocabulary. Targets are addressed by the short
-    // resource-id (after ":id/"). BACK is a plain keyevent; lifecycle
-    // restart/kill stays OUT of the autonomous vocabulary.
+    // SPEC-009 W1/W7: semantic vocabulary. Targets are addressed via the
+    // selector schemes in uiautomator.resolveElement (resource-id, content-
+    // desc, text+class, structural path); coordinates are derived at action
+    // time from a FRESH dump and never persisted. BACK is a plain keyevent;
+    // scrolling is bounded to scrollable containers; lifecycle restart/kill
+    // stays OUT of the autonomous vocabulary.
     vocabulary: [
       {
         kind: "click",
         targetScheme: "android-resource-id",
         risk: "interact",
         autonomousEligible: true,
-        description: "Tap the center of an id-bearing visible element",
+        description: "Tap the resolved center of a visible element",
       },
       {
         kind: "fill",
@@ -65,6 +68,13 @@ export const ANDROID_CAPABILITIES: CapabilityDoc = {
         risk: "interact",
         autonomousEligible: true,
         description: "Keyevent; BACK (4) is the explorer-sanctioned value",
+      },
+      {
+        kind: "swipe",
+        risk: "interact",
+        autonomousEligible: true,
+        description:
+          "Bounded scroll inside a scrollable container (value: down|up)",
       },
     ],
   },
@@ -182,32 +192,41 @@ export class AndroidAdapterHandler implements AdapterHandler {
 
     // A failed or partial uiautomator dump must never ship as a valid empty
     // tree: mark the observation with a structured error instead.
-    let uiTree: Array<Record<string, unknown>> = [];
-    let observeError: { source: string; message: string } | undefined;
-    try {
-      const dump = await this.dumpXml(serial);
-      if (!dump.trim()) {
-        throw new Error("uiautomator dump failed: empty output");
+      let uiTree: Array<Record<string, unknown>> = [];
+      let observeError: { source: string; message: string } | undefined;
+      try {
+        const dump = await this.dumpXml(serial);
+        if (!dump.trim()) {
+          throw new Error("uiautomator dump failed: empty output");
+        }
+        if (!dump.includes("</hierarchy>")) {
+          throw new Error("uiautomator dump failed: truncated output");
+        }
+        // Full hierarchy projection (SPEC-009 W7): every node keeps its
+        // structural path, clickability, scrollability, and descriptor so
+        // exploration can target id-less containers and scroll areas.
+        uiTree = parseUiautomatorDump(dump).map((el) => ({
+          tag: el.className,
+          role: el.role,
+          name: el.name,
+          id: el.id,
+          hidden: el.hidden,
+          disabled: el.disabled,
+          value: el.value,
+          text: el.text,
+          desc: el.desc,
+          path: el.path,
+          resourceId: el.resourceId,
+          clickable: el.clickable || undefined,
+          scrollable: el.scrollable || undefined,
+          center: el.center,
+        }));
+      } catch (e) {
+        observeError = {
+          source: "uiautomator-dump",
+          message: e instanceof Error ? e.message : String(e),
+        };
       }
-      if (!dump.includes("</hierarchy>")) {
-        throw new Error("uiautomator dump failed: truncated output");
-      }
-      uiTree = parseUiautomatorDump(dump).map((el) => ({
-        tag: el.tag,
-        role: el.role,
-        name: el.name,
-        id: el.id,
-        hidden: el.hidden,
-        disabled: el.disabled,
-        value: el.value,
-        text: el.text,
-      }));
-    } catch (e) {
-      observeError = {
-        source: "uiautomator-dump",
-        message: e instanceof Error ? e.message : String(e),
-      };
-    }
 
     const artifacts: Array<{ sha256: string; mime: string; size: number; path: string }> = [];
     if (want.has("screenshot")) {
@@ -291,6 +310,32 @@ export class AndroidAdapterHandler implements AdapterHandler {
             throw protocolError("VALIDATION", `invalid keyevent code: ${value}`);
           }
           await this.backend.shell(this.serial, `input keyevent ${code}`);
+          break;
+        }
+        case "swipe": {
+          // SPEC-009 W7: bounded semantic scrolling. Direction comes from the
+          // constrained vocabulary (down/up), geometry from a scrollable
+          // container in the FRESH dump (fallback: conservative screen band).
+          // Coordinates are derived at action time only - never persisted.
+          const dump = await this.dumpXml(this.serial);
+          const elements = parseUiautomatorDump(dump);
+          const scroller = elements.find((e) => e.scrollable && !e.hidden);
+          const x = scroller
+            ? Math.round((scroller.center.x * 2) / 2)
+            : 540;
+          if (value === "up") {
+            const top = scroller ? Math.max(scroller.center.y - 400, 100) : 400;
+            await this.backend.shell(
+              this.serial,
+              `input swipe ${x} ${top} ${x} ${top + 900} 250`,
+            );
+          } else {
+            const bottomY = scroller ? Math.min(scroller.center.y + 400, 1500) : 1500;
+            await this.backend.shell(
+              this.serial,
+              `input swipe ${x} ${bottomY} ${x} ${Math.max(bottomY - 1100, 200)} 250`,
+            );
+          }
           break;
         }
         case "fault": {
@@ -378,13 +423,18 @@ export class AndroidAdapterHandler implements AdapterHandler {
     await this.backend.shell(serial, cmd);
   }
 
-  /** Resolve "#id" to tappable element center via a fresh UI dump. */
-  private async resolveTarget(selector: string): Promise<{ center: { x: number; y: number } }> {
+  /** Resolve a semantic selector to a tappable element via a fresh dump.
+   * Schemes (see uiautomator.resolveElement): resource-id, content-desc,
+   * text+class, structural path - coordinates are derived at action time. */
+  private async resolveTarget(selector: string): Promise<{
+    center: { x: number; y: number };
+  }> {
     if (!this.serial) throw protocolError("VALIDATION", "environment not created");
-    const id = selector.replace(/^#/, "");
     const dump = await this.dumpXml(this.serial);
-    const el = parseUiautomatorDump(dump).find((e) => e.id === id && !e.hidden && !e.disabled);
-    if (!el) throw new Error(`element not found or not visible: ${selector}`);
+    const el = resolveElement(parseUiautomatorDump(dump), selector);
+    if (!el || el.hidden || el.disabled) {
+      throw new Error(`element not found or not visible: ${selector}`);
+    }
     return el;
   }
 

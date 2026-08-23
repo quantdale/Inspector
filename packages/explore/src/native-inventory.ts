@@ -88,37 +88,84 @@ export function buildAndroidInventory(
 ): CandidateAction[] {
   const out: CandidateAction[] = [];
   const actCaps = new Set(caps.capabilities.act ?? []);
-  for (const el of uiTree) {
-    if (el.hidden || el.disabled || !el.id) continue;
+
+  // Selector disambiguation state: identical semantic selectors get @nth.
+  const seenSel = new Map<string, number>();
+  const selectorFor = (el: UiElement): string => {
+    let base: string;
+    if (el.id) base = `#${el.id}`;
+    else if (el.desc) base = `@desc:${el.desc}|${el.tag}`;
+    else if (el.text && el.text.length <= 60) base = `~text:${el.text}|${el.tag}`;
+    else if (typeof el.path === "string") base = `%path=${el.path}`;
+    else return "";
+    const n = seenSel.get(base) ?? 0;
+    seenSel.set(base, n + 1);
+    return n === 0 ? base : `${base}@${n}`;
+  };
+
+  for (const el of uiTree as (UiElement & { clickable?: boolean })[]) {
+    if (el.hidden || el.disabled) continue;
     const label = el.text ?? el.name ?? "";
-    if (actCaps.has("click") && (el.role === "button" || (label && label.length <= 40))) {
+    const tappable = el.clickable === true || el.role === "button" || Boolean(el.id);
+
+    if (actCaps.has("click") && tappable) {
       if (!eligible(caps, "click", label)) continue;
+      const sel = selectorFor(el);
+      if (!sel) continue;
       out.push({
-        id: `ac_${strongHash(el.id + label)}`,
+        id: `ac_${strongHash(sel)}`,
         kind: "click",
-        selector: `#${el.id}`,
+        selector: sel,
         risk: "interact",
-        actionKey: `click:${el.id}`,
+        actionKey: `click:${sel}`,
         sourceElementId: el.id,
-        priority: el.role === "button" ? 5 : 4,
+        priority: el.clickable ? 6 : el.role === "button" ? 5 : 4,
       });
     }
     if (actCaps.has("fill") && el.role === "input") {
       if (!eligible(caps, "fill", label)) continue;
-      for (const v of boundaryValues(el.id)) {
+      const sel = selectorFor(el);
+      if (!sel) continue;
+      for (const v of boundaryValues(el.id ?? label ?? "field")) {
         out.push({
-          id: `af_${strongHash(el.id + v)}`,
+          id: `af_${strongHash(sel + v)}`,
           kind: "fill",
-          selector: `#${el.id}`,
+          selector: sel,
           value: v,
           risk: "interact",
-          actionKey: `fill:${el.id}:${strongHash(v)}`,
+          actionKey: `fill:${sel}:${strongHash(v)}`,
           sourceElementId: el.id,
           priority: 4,
         });
       }
     }
   }
+
+  // Bounded scrolling inside declared scrollable containers (W7).
+  if (actCaps.has("swipe") && eligible(caps, "swipe", undefined)) {
+    const hasScroller = (uiTree as (UiElement & { scrollable?: boolean })[]).some(
+      (e) => e.scrollable && !e.hidden,
+    );
+    if (hasScroller) {
+      out.push({
+        id: "as_down",
+        kind: "swipe",
+        value: "down",
+        risk: "interact",
+        actionKey: "scroll:down",
+        priority: 2,
+      });
+      out.push({
+        id: "as_up",
+        kind: "swipe",
+        value: "up",
+        risk: "interact",
+        actionKey: "scroll:up",
+        priority: 1,
+      });
+    }
+  }
+
   if (actCaps.has("press") && eligible(caps, "press", undefined)) {
     out.push({
       id: "ab_back",

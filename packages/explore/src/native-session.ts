@@ -43,6 +43,7 @@ export interface NativeHuntResult {
     | "wall-budget"
     | "finding-cap"
     | "no-candidates"
+    | "coverage-exhausted"
     | "novelty-plateau"
     | "adapter-error";
   actionsExecuted: number;
@@ -156,6 +157,7 @@ export async function runNativeHunt(
 
   const seen = new Set();
   const useCount = new Map();
+  const triedEdges = new Set();
   let plateau = 0;
   let actionsExecuted = 0;
   let stoppedReason: NativeHuntResult["stoppedReason"] = "action-budget";
@@ -181,7 +183,8 @@ export async function runNativeHunt(
     seen.add(fp);
     plateau = novel ? 0 : plateau + 1;
     if (config.noveltyPlateauLimit !== undefined && plateau >= config.noveltyPlateauLimit) {
-      stoppedReason = "novelty-plateau";
+      // Distinguish an empty inventory from a fully-explored one.
+      stoppedReason = uiTree.length > 0 ? "coverage-exhausted" : "no-candidates";
       break;
     }
 
@@ -193,15 +196,23 @@ export async function runNativeHunt(
       stoppedReason = "no-candidates";
       break;
     }
-    // Least-recently-executed rotation within the top priority band keeps
-    // coverage broad without hammering one control (platform-neutral).
-    candidates.sort(
-      (a, b) =>
-        (useCount.get(a.actionKey) ?? 0) - (useCount.get(b.actionKey) ?? 0) ||
-        b.priority - a.priority,
+
+    // SPEC-009 W8 strategy: prefer actions NOT yet executed FROM THIS STATE
+    // (state/action edge accounting), then least-executed overall, then
+    // declared priority. Platform-neutral: everything derives from caps.
+    const fresh = candidates.filter(
+      (c) => !triedEdges.has(`${fp}::${c.actionKey}`),
     );
-    const band = candidates.slice(0, Math.min(candidates.length, 8));
+    const ranked = (fresh.length > 0 ? fresh : candidates)
+      .slice()
+      .sort(
+        (a, b) =>
+          b.priority - a.priority ||
+          (useCount.get(a.actionKey) ?? 0) - (useCount.get(b.actionKey) ?? 0),
+      );
+    const band = ranked.slice(0, Math.min(ranked.length, 6));
     const pick: CandidateAction = rng.pick(band);
+    triedEdges.add(`${fp}::${pick.actionKey}`);
 
     const action: Action = {
       id: newId("act"),

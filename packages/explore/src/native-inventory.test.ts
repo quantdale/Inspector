@@ -66,31 +66,51 @@ describe("SPEC-009 A3: UIA inventory", () => {
   });
 });
 
-describe("SPEC-009 A3: Android inventory", () => {
+describe("SPEC-009 A3/W7: Android inventory", () => {
   const androidCaps: CapabilityDoc = {
     protocolVersion: "0.1",
     adapter: "android-uiautomator",
     capabilities: {
       observe: ["uiTree"],
-      act: ["click", "press"],
+      act: ["click", "press", "swipe"],
       lifecycle: [],
       vocabulary: [
         { kind: "click", targetScheme: "android-resource-id", risk: "interact", autonomousEligible: true },
         { kind: "press", targetScheme: "android-resource-id", risk: "interact", autonomousEligible: true },
+        { kind: "swipe", risk: "interact", autonomousEligible: true },
       ],
     },
   };
 
-  it("taps id-bearing rows, offers BACK, respects deny labels and hidden nodes", () => {
-    const tree: UiElement[] = [
+  it("taps id rows, id-less clickable rows via text/class, denies side-effect labels", () => {
+    const tree = [
       el({ id: "title", name: "Network settings", text: "Network settings" }),
+      // Id-less clickable container row (the common Settings pattern).
+      el({ tag: "LinearLayout", role: "container", id: "", name: "", text: "", clickable: true }),
       el({ id: "danger", name: "Uninstall updates", text: "Uninstall updates" }),
       el({ id: "off", name: "x", text: "x", hidden: true }),
+      // Text-bearing child inside a nested structure.
+      el({ id: "", name: "Connected devices", text: "Connected devices", tag: "TextView", path: "0/1" }),
+      // Scrollable container enables the bounded scroll vocabulary.
+      el({ id: "recycler", role: "list", name: "", scrollable: true }),
     ];
     const out = buildAndroidInventory(tree, androidCaps, { allowFaults: false });
-    expect(out.some((c) => c.actionKey === "click:title")).toBe(true);
-    expect(out.some((c) => c.actionKey === "click:danger")).toBe(false);
-    expect(out.some((c) => c.actionKey === "press:back")).toBe(true);
+    const keys = out.map((c) => c.actionKey);
+    expect(keys).toContain("click:#title");
+    expect(keys).toContain("click:~text:Connected devices|TextView");
+    expect(keys.some((k) => k.includes("danger"))).toBe(false); // Uninstall denied
+    expect(keys).toContain("scroll:down");
+    expect(keys).toContain("scroll:up");
+    expect(keys).toContain("press:back");
+    // Duplicate semantic selectors disambiguate with @nth suffixes.
+    const dupTexts = keys.filter((k) => k.startsWith("click:~text:"));
+    expect(new Set(dupTexts).size).toBe(dupTexts.length);
+  });
+
+  it("no scroller -> no scroll candidates even when swipe is in vocabulary", () => {
+    const tree = [el({ id: "only", name: "Only row", text: "Only row" })];
+    const out = buildAndroidInventory(tree, androidCaps, { allowFaults: false });
+    expect(out.some((c) => c.actionKey?.startsWith("scroll:"))).toBe(false);
   });
 });
 
