@@ -203,6 +203,50 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE findings ADD COLUMN class_key TEXT;
   CREATE INDEX IF NOT EXISTS idx_findings_run_class ON findings(run_id, class_key);
   `,
+  // M11 operator workflows: durable verification and regression execution
+  // records. The scenario key makes repeated regressions idempotent for the
+  // same finding/adapter/revision while retaining every verification attempt.
+  `
+  CREATE TABLE IF NOT EXISTS verification_records (
+    id TEXT PRIMARY KEY,
+    finding_id TEXT NOT NULL,
+    run_id TEXT,
+    adapter TEXT NOT NULL,
+    revision TEXT,
+    status TEXT NOT NULL,
+    classification TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    successes INTEGER NOT NULL DEFAULT 0,
+    errors INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    result_json TEXT,
+    artifact_path TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_verification_finding
+    ON verification_records(finding_id, started_at);
+  CREATE TABLE IF NOT EXISTS regression_records (
+    id TEXT PRIMARY KEY,
+    scenario_key TEXT NOT NULL UNIQUE,
+    finding_id TEXT NOT NULL,
+    run_id TEXT,
+    adapter TEXT NOT NULL,
+    revision TEXT,
+    status TEXT NOT NULL,
+    classification TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    successes INTEGER NOT NULL DEFAULT 0,
+    errors INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    result_json TEXT,
+    artifact_path TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_regression_finding
+    ON regression_records(finding_id, started_at);
+  CREATE INDEX IF NOT EXISTS idx_regression_run
+    ON regression_records(run_id, started_at);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

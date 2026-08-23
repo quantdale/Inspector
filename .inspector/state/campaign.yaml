@@ -29,13 +29,13 @@ active:
   status: ACTIVE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P1
-  waypoint: M11.P1.verify-and-regress
+  task_group: P2
+  waypoint: M11.P2.explicit-explore
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Implement verify/regress on the existing durable finding/replay/oracle
-    machinery. M8 remains deferred
-    to a macOS/Xcode environment; no release publication is authorized.
+    Implement the explicit durable explore workflow on the existing hunt and
+    resumable exploration machinery. M8 remains deferred to a macOS/Xcode
+    environment; no release publication is authorized.
 
 progress:
   completed_milestones:
@@ -195,6 +195,8 @@ progress:
     - M10.R7.restart-matrix-soak
     - M10.R8.field-proofs
     - M10.R9.final-gate
+    - M11.P0.activation
+    - M11.P1.verify-and-regress
   deferred_milestones:
     - M8
 
@@ -215,9 +217,12 @@ known_debt:
     action/reset/finding/wall budgets, and checkpoint recovery are durable and
     resumable for web and native campaigns.
   - >-
-    STILL_OPEN / M11.P1-P4: verify, regress, explore, repair, and scale
-    campaign operations are not yet exposed as complete installed-CLI
-    workflows.
+    CLOSED_BY_M11.P1: verify and regress are now exposed as durable installed
+    CLI workflows with replay provenance, stable JSON, and deterministic exit
+    classes.
+  - >-
+    STILL_OPEN / M11.P2-P4: explore, repair, and scale campaign operations are
+    not yet exposed as complete installed-CLI workflows.
   - >-
     STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
     redaction, fully durable unattended budgets, atomic artifact orphan
@@ -243,7 +248,7 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - operator_cli_workflows
+    - explore_repair_and_campaign_cli_workflows
     - repair_containment_redaction_and_budget_productization
     - crash_artifact_cleanup_and_web_settle_attribution
     - campaign_cli_surface
@@ -444,8 +449,8 @@ m11:
   spec: specs/011-operator-product-workflows/SPEC.md
   task_groups:
     P0: COMPLETE
-    P1: IN_PROGRESS
-    P2: PENDING
+    P1: COMPLETE
+    P2: IN_PROGRESS
     P3: PENDING
     P4: PENDING
     P5: PENDING

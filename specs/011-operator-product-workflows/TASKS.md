@@ -1,7 +1,7 @@
 # SPEC-011 — Task Graph
 
 - [x] P0 — activate M11, reconcile M10/current state, and create debt audit
-- [ ] P1 — implement `verify` and `regress` with stable JSON/exit contracts
+- [x] P1 — implement `verify` and `regress` with stable JSON/exit contracts
 - [ ] P2 — implement explicit durable `explore` workflow
 - [ ] P3 — expose safe `repair` with configured patch-agent/provider contract
 - [ ] P4 — expose bounded `campaign run|list|show|stop|resume`

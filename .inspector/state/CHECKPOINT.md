@@ -21,11 +21,26 @@ unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
 M11 is activated at the current tree. P0 state reconciliation is recorded in
-the durable campaign file and this checkpoint; the next implementation
-waypoint is P1 (`verify`/`regress`) on the existing replay, oracle, finding,
-and evidence machinery. The repository was clean at `023dabf` before M11
+the durable campaign file and this checkpoint. P1 (`verify`/`regress`) is now
+complete on the existing replay, oracle, finding, and evidence machinery; the
+next implementation waypoint is P2 (`explore`). The repository was clean at `023dabf` before M11
 changes. `git fetch origin` was attempted on 2026-08-23 but GitHub was
 unreachable from this environment; local `origin/main` remains at that SHA.
+
+### M11 P1 — verify/regress checkpoint
+
+- Added durable verification and regression records (SQLite migration 9).
+- Added `inspector verify <findingId>` with provenance validation, original
+  adapter-family replay, bounded repeated oracle evaluation, lifecycle updates,
+  evidence artifacts, JSON schema `inspector-cli/verify/1`, and deterministic
+  exit classes.
+- Added `inspector regress` with finding/run/adapter/revision filters,
+  idempotent scenario keys, durable per-attempt progress, explicit skip and
+  failure classifications, JSON schema `inspector-cli/regress/1`, and stable
+  exit classes.
+- Targeted integration: **2 passed** (`verify-regress.integration.test.ts`).
+- M11 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
+  warnings**.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 

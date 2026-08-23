@@ -27,7 +27,12 @@
       "@inspector/finding": ["packages/finding/src/index.ts"],
       "@inspector/explore": ["packages/explore/src/index.ts"],
       "@inspector/oracle": ["packages/oracle/src/index.ts"],
-      "@inspector/repair": ["packages/repair/src/index.ts"]
+      "@inspector/repair": ["packages/repair/src/index.ts"],
+      "@inspector/scale": ["packages/scale/src/index.ts"],
+      "@inspector/adapter-web": ["packages/adapter-web/src/index.ts"],
+      "@inspector/cli-adapter": ["packages/cli-adapter/src/index.ts"],
+      "@inspector/windows-adapter": ["packages/windows-adapter/src/index.ts"],
+      "@inspector/android": ["packages/android/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts"],

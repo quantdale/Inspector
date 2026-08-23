@@ -97,9 +97,18 @@ importers:
       '@inspector/finding':
         specifier: workspace:*
         version: link:../finding
+      '@inspector/oracle':
+        specifier: workspace:*
+        version: link:../oracle
       '@inspector/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@inspector/repair':
+        specifier: workspace:*
+        version: link:../repair
+      '@inspector/scale':
+        specifier: workspace:*
+        version: link:../scale
       '@inspector/store-sqlite':
         specifier: workspace:*
         version: link:../store-sqlite

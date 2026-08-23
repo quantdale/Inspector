@@ -8,6 +8,8 @@ import { runDoctorProbes, renderDoctorReport } from "./doctor.js";
 import { huntCommand, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
 import { findingsCommand } from "./findings.js";
 import { runsCommand } from "./runs.js";
+import { verifyCommand } from "./verify.js";
+import { regressCommand } from "./regress.js";
 import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 
 // Public workspace/spawn helpers re-exported for library consumers.
@@ -96,6 +98,16 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
       return runsCommand(rest, ctx);
     case "findings":
       return findingsCommand(rest, ctx);
+    case "verify":
+      return verifyCommand(
+        parseArgs(rest, ["--attempts", "--min-successes", "--timeout-ms", "--revision"], []),
+        ctx,
+      );
+    case "regress":
+      return regressCommand(
+        parseArgs(rest, ["--run", "--finding", "--adapter", "--revision", "--attempts", "--min-successes", "--limit"], []),
+        ctx,
+      );
     case "version":
       out(resolveVersion());
       return { code: 0 };

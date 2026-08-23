@@ -147,6 +147,43 @@ export interface FindingRecord {
   classKey?: string | null;
 }
 
+export type WorkflowRecordStatus = "running" | "completed" | "failed";
+
+export interface VerificationRecord {
+  id: string;
+  findingId: string;
+  runId: string | null;
+  adapter: string;
+  revision: string | null;
+  status: WorkflowRecordStatus;
+  classification: string;
+  attempts: number;
+  successes: number;
+  errors: number;
+  startedAt: string;
+  completedAt: string | null;
+  resultJson: string | null;
+  artifactPath: string | null;
+}
+
+export interface RegressionRecord {
+  id: string;
+  scenarioKey: string;
+  findingId: string;
+  runId: string | null;
+  adapter: string;
+  revision: string | null;
+  status: WorkflowRecordStatus;
+  classification: string;
+  attempts: number;
+  successes: number;
+  errors: number;
+  startedAt: string;
+  completedAt: string | null;
+  resultJson: string | null;
+  artifactPath: string | null;
+}
+
 /**
  * One oracle's outcome for a single evaluation event. Persisted per
  * docs/ORACLE-SYSTEM.md so evidence bundles and campaign provenance can
@@ -1031,6 +1068,138 @@ export class Store {
     return this.db
       .prepare(`${FINDING_SELECT} ORDER BY updated_at DESC LIMIT ?`)
       .all(limit) as FindingRecord[];
+  }
+
+  putVerificationRecord(record: VerificationRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO verification_records(
+           id, finding_id, run_id, adapter, revision, status, classification,
+           attempts, successes, errors, started_at, completed_at, result_json,
+           artifact_path
+         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           classification = excluded.classification,
+           attempts = excluded.attempts,
+           successes = excluded.successes,
+           errors = excluded.errors,
+           completed_at = excluded.completed_at,
+           result_json = excluded.result_json,
+           artifact_path = excluded.artifact_path`,
+      )
+      .run(
+        record.id,
+        record.findingId,
+        record.runId,
+        record.adapter,
+        record.revision,
+        record.status,
+        record.classification,
+        record.attempts,
+        record.successes,
+        record.errors,
+        record.startedAt,
+        record.completedAt,
+        record.resultJson,
+        record.artifactPath,
+      );
+  }
+
+  private selectVerificationRecords(where: string): string {
+    return `SELECT id, finding_id AS findingId, run_id AS runId, adapter,
+      revision, status, classification, attempts, successes, errors,
+      started_at AS startedAt, completed_at AS completedAt,
+      result_json AS resultJson, artifact_path AS artifactPath
+      FROM verification_records ${where}`;
+  }
+
+  listVerificationRecords(findingId?: string, limit = 100): VerificationRecord[] {
+    if (findingId === undefined) {
+      return this.db
+        .prepare(`${this.selectVerificationRecords(" ")} ORDER BY started_at DESC LIMIT ?`)
+        .all(limit) as VerificationRecord[];
+    }
+    return this.db
+      .prepare(`${this.selectVerificationRecords("WHERE finding_id = ?")} ORDER BY started_at DESC LIMIT ?`)
+      .all(findingId, limit) as VerificationRecord[];
+  }
+
+  getLatestVerificationRecord(findingId: string): VerificationRecord | undefined {
+    return this.db
+      .prepare(`${this.selectVerificationRecords("WHERE finding_id = ?")} ORDER BY started_at DESC LIMIT 1`)
+      .get(findingId) as VerificationRecord | undefined;
+  }
+
+  putRegressionRecord(record: RegressionRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO regression_records(
+           id, scenario_key, finding_id, run_id, adapter, revision, status,
+           classification, attempts, successes, errors, started_at,
+           completed_at, result_json, artifact_path
+         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(scenario_key) DO UPDATE SET
+           status = excluded.status,
+           classification = excluded.classification,
+           attempts = excluded.attempts,
+           successes = excluded.successes,
+           errors = excluded.errors,
+           completed_at = excluded.completed_at,
+           result_json = excluded.result_json,
+           artifact_path = excluded.artifact_path`,
+      )
+      .run(
+        record.id,
+        record.scenarioKey,
+        record.findingId,
+        record.runId,
+        record.adapter,
+        record.revision,
+        record.status,
+        record.classification,
+        record.attempts,
+        record.successes,
+        record.errors,
+        record.startedAt,
+        record.completedAt,
+        record.resultJson,
+        record.artifactPath,
+      );
+  }
+
+  private selectRegressionRecords(where: string): string {
+    return `SELECT id, scenario_key AS scenarioKey, finding_id AS findingId,
+      run_id AS runId, adapter, revision, status, classification, attempts,
+      successes, errors, started_at AS startedAt, completed_at AS completedAt,
+      result_json AS resultJson, artifact_path AS artifactPath
+      FROM regression_records ${where}`;
+  }
+
+  listRegressionRecords(filters: {
+    runId?: string;
+    findingId?: string;
+    adapter?: string;
+    revision?: string;
+    limit?: number;
+  } = {}): RegressionRecord[] {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters.runId !== undefined) { clauses.push("run_id = ?"); params.push(filters.runId); }
+    if (filters.findingId !== undefined) { clauses.push("finding_id = ?"); params.push(filters.findingId); }
+    if (filters.adapter !== undefined) { clauses.push("adapter = ?"); params.push(filters.adapter); }
+    if (filters.revision !== undefined) { clauses.push("revision = ?"); params.push(filters.revision); }
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+    params.push(filters.limit ?? 1000);
+    return this.db
+      .prepare(`${this.selectRegressionRecords(where)} ORDER BY started_at DESC LIMIT ?`)
+      .all(...params) as RegressionRecord[];
+  }
+
+  getRegressionRecordByScenarioKey(scenarioKey: string): RegressionRecord | undefined {
+    return this.db
+      .prepare(`${this.selectRegressionRecords("WHERE scenario_key = ?")}`)
+      .get(scenarioKey) as RegressionRecord | undefined;
   }
 
   getFindingByClassKey(runId: string, classKey: string): FindingRecord | undefined {

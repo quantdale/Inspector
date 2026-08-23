@@ -208,6 +208,11 @@ export class MockUiaBackend implements UiaBackend, UiaBackendWindowOps {
     return Promise.resolve();
   }
 
+  closeWindow(): Promise<void> {
+    this.deviceCrashed = true;
+    return Promise.resolve();
+  }
+
   // ---- Window ops (mirror the real backend's semantics for conformance) ----
 
   async listWindows(): Promise<UiaWindowRef[]> {
