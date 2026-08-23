@@ -1,9 +1,11 @@
 schema_version: 1
 project: Inspector
+# The block below is the HISTORICAL implementation-campaign record
+# (M0-M7 + M8 deferral). Current campaign state lives under 'active'.
 campaign:
   mode: IMPLEMENTATION
   status: COMPLETE
-  current_milestone: M8
+  current_milestone: M8-DEFERRED (historical; M9 active — see 'active')
   objective: >-
     Autonomously execute the Inspector roadmap M0-M7 on the single 'main'
     branch; hardening remains a separately invoked campaign.
@@ -26,17 +28,18 @@ active:
   milestone_name: Platform-neutral autonomous exploration
   spec: specs/009-native-autonomous-exploration/SPEC.md
   tasks: specs/009-native-autonomous-exploration/SPEC.md
-  task_group: W0-W5
-  waypoint: W5-field-proofs
+  task_group: W6
+  waypoint: W6-replay-faithful-reproduction
   waypoint_status: IN_PROGRESS
+  remaining_waypoints:
+    - W6 replay-faithful native reproduction
+    - W7 android exploration depth
+    - W8 native finding proofs + M9 exit gate
   next_action: >-
-    GA campaign COMPLETE (GO_WITH_DOCUMENTED_DEBT for 0.1.0-rc.2; publication
-    NOT_PUBLISHED). M9 W0-W4 landed (vocabulary, autonomy gate, inventories,
-    generic session, hunt wiring) with unit+integration coverage. W5 field
-    proofs: P-WIN PASS (Calculator, 40 actions/14 states), P-CLI PASS (real
-    vim/ConPTY, 80 actions/80 states), P-ANDROID functional (65 actions,
-    honest zero; coverage depth + per-platform replay drivers = remaining
-    waypoints W6+).
+    GA COMPLETE (GO_WITH_DOCUMENTED_DEBT for rc.2; NOT_PUBLISHED). M9 W0-W5
+    COMPLETE (capability-driven hunts proven on real Calculator/vim/Settings).
+    W6 in progress: platform-faithful native replay drivers. A real-discovered
+    finding must NEVER be confirmed by mock-backend replay.
 
 progress:
   completed_milestones:
@@ -166,10 +169,10 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M7 checkpoint commit)
-  last_gate: M7
+  last_verified_commit: HEAD (M9 W5 field proofs)
+  last_gate: "unit 494 passed / 3 skipped; lint 0 errors; typecheck exit 0"
   last_gate_result: PASS
-  last_gate_at: "2026-08-20"
+  last_gate_at: "2026-08-23"
 
 blockers: []
 known_debt:

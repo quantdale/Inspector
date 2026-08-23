@@ -1,18 +1,30 @@
 # Project Status
 
-Last updated: RC1 field validation (GA readiness) in progress
+Last updated: M9 native exploration in progress (GA COMPLETE)
 
 ## Campaign
 
-- Mode: **RC1_FIELD_VALIDATION** (GA readiness; ledger:
-  `.inspector/state/GA-READINESS.yaml`)
+- Mode: **M9 — Platform-neutral autonomous exploration** (spec:
+  `specs/009-native-autonomous-exploration/SPEC.md`; state:
+  `.inspector/state/campaign.yaml`)
+- RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
+  for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
+  `docs/GA-FIELD-VALIDATION-REPORT.md`.
 - Implementation campaign M0–M7: **COMPLETE**. HARDENING_1: **COMPLETE**
-  (66 defects closed). DOGFOOD_RC1: **COMPLETE** (six real targets hunted
-  unscripted). RC1_FINALIZATION: **COMPLETE** — `v0.1.0-rc.1` tagged and
-  pushed at `ddeea86`; publication remains **NOT_PUBLISHED**.
+  (66 defects closed). DOGFOOD_RC1: **COMPLETE**. RC1_FINALIZATION:
+  **COMPLETE** — `v0.1.0-rc.1` tagged at `ddeea86`, never moved.
+- rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
-- Publication boundary respected: local artifacts + annotated tag only —
-  no npm publish, no GitHub Release, no hosted uploads.
+
+## M9 progress (native exploration)
+
+Capability-driven hunts are proven on real backends through the standard
+pipeline: Windows Calculator (40 actions / 14 states), real vim over ConPTY
+(80 actions / 80 distinct states), com.android.settings on an AVD (65 actions,
+honest-zero). Active waypoint W6 adds platform-faithful replay drivers so
+real-discovered findings can be reproduced without mock backends, plus W7
+Android exploration depth and W8 finding-pipeline proofs + exit gate.
+Known limitation until W6 lands: native findings stay honestly CANDIDATE.
 
 ## Candidate staleness (GA decision)
 

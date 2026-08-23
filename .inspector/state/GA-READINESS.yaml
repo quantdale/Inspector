@@ -3,14 +3,18 @@ project: Inspector
 
 ga_readiness:
   campaign: RC1_FIELD_VALIDATION
-  status: ACTIVE
+  status: COMPLETE
   opened_at: "2026-08-22"
+  decided_at: "2026-08-23"
+  release_decision: GO_WITH_DOCUMENTED_DEBT
+  decision_candidate_version: 0.1.0-rc.2
+  publication_status: NOT_PUBLISHED
   base_tag: v0.1.0-rc.1
   base_sha: ddeea863905c1e185601ec95daffe7472bfa28de
   candidate_sha: ddeea863905c1e185601ec95daffe7472bfa28de
-  release_decision: UNDECIDED
   detail_file: .inspector/state/GA-READINESS.yaml
   evidence_dir: .inspector/ga-work/
+  report: docs/GA-FIELD-VALIDATION-REPORT.md
 
 phase_0_post_tag_audit:
   status: COMPLETE
