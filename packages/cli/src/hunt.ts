@@ -18,7 +18,7 @@ import {
   type OracleSignal,
   type OracleSignalKind,
 } from "@inspector/finding";
-import { ExploreController, WebReplayDriver, runNativeHunt, mulberry32 } from "@inspector/explore";
+import { ExploreController, WebReplayDriver, runNativeHunt, type NativeSessionDeps, mulberry32 } from "@inspector/explore";
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
 import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorkspaceConflict } from "./workspace.js";
@@ -286,8 +286,26 @@ async function runNativeHuntCommand(
 ): Promise<HuntRunResult> {
   void base;
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
+
+  // SPEC-009 W6: platform-faithful replay. Android findings discovered on a
+  // real device are reproduced against a REAL adb backend bound to the SAME
+  // package (force-stop reset; never pm clear, never mock).
+  let replayDriverFactory: NativeSessionDeps["replayDriverFactory"];
+  if (req.adapter === "android") {
+    const { AndroidReplayDriver } = await import("../../android/src/replay.js");
+    const launchPackage = req.target ?? "com.android.settings";
+    const createOptions = { launchPackage };
+    replayDriverFactory = () =>
+      new AndroidReplayDriver({
+        backend: "real",
+        createOptions,
+        launchPackage,
+        resetStrategy: "force-stop",
+      });
+  }
+
   const result = await runNativeHunt(
-    { run, findingEngine },
+    { run, findingEngine, ...(replayDriverFactory ? { replayDriverFactory } : {}) },
     {
       seed: req.seed,
       maxActions: req.maxActions,

@@ -74,7 +74,7 @@ async function processFailure(
   outcome: ActionOutcome,
   path: Action[],
   sinks: Sinks,
-  replayDriverFactory?: () => ReplayDriver,
+  replayDriverFactory?: () => ReplayDriver | Promise<ReplayDriver>,
 ): Promise<void> {
   const message = outcome.error?.message ?? "deterministic oracle failure";
   const classKey = `TARGET_FAILURE|${message}`;
@@ -102,7 +102,7 @@ async function processFailure(
   }
 
   const rep = await engine
-    .reproduce(finding, [...path], replayDriverFactory(), {
+    .reproduce(finding, [...path], await replayDriverFactory(), {
       attempts: 2,
       minSuccesses: 1,
     })
@@ -134,8 +134,9 @@ async function processFailure(
 export interface NativeSessionDeps {
   run: RunController;
   findingEngine: FindingEngine;
-  /** Platform replay driver factory; omit to keep findings at CANDIDATE. */
-  replayDriverFactory?: () => ReplayDriver;
+  /** Platform-faithful replay driver factory; may be async (real backends
+   * probe). Omit to keep findings at honest CANDIDATE status. */
+  replayDriverFactory?: () => ReplayDriver | Promise<ReplayDriver>;
 }
 
 export async function runNativeHunt(
