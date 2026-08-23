@@ -440,7 +440,8 @@ next_milestone_after_completion:
     Converts the completed exploration/finding/reproduction/repair/scale
     engines into the operator workflows already promised by PRODUCT.md,
     without restarting HARDENING_1 or publishing a release.
-  status: ACTIVATED
+  status: COMPLETE
+  completed_at: "2026-08-23"
 
 m10:
   campaign: RESUMABLE_EXPLORATION
