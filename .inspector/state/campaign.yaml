@@ -29,12 +29,12 @@ active:
   status: ACTIVE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P2
-  waypoint: M11.P2.explicit-explore
+  task_group: P3
+  waypoint: M11.P3.safe-repair-cli
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Implement the explicit durable explore workflow on the existing hunt and
-    resumable exploration machinery. M8 remains deferred to a macOS/Xcode
+    Expose the existing isolated RepairEngine through an explicit configured
+    patch-agent CLI workflow. M8 remains deferred to a macOS/Xcode
     environment; no release publication is authorized.
 
 progress:
@@ -197,6 +197,7 @@ progress:
     - M10.R9.final-gate
     - M11.P0.activation
     - M11.P1.verify-and-regress
+    - M11.P2.explicit-explore
   deferred_milestones:
     - M8
 
@@ -221,8 +222,11 @@ known_debt:
     CLI workflows with replay provenance, stable JSON, and deterministic exit
     classes.
   - >-
-    STILL_OPEN / M11.P2-P4: explore, repair, and scale campaign operations are
-    not yet exposed as complete installed-CLI workflows.
+    CLOSED_BY_M11.P2: explicit explore is now a durable discovery-only CLI
+    workflow with coverage/novelty output and resumable campaign metadata.
+  - >-
+    STILL_OPEN / M11.P3-P4: repair and scale campaign operations are not yet
+    exposed as complete installed-CLI workflows.
   - >-
     STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
     redaction, fully durable unattended budgets, atomic artifact orphan
@@ -248,7 +252,7 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - explore_repair_and_campaign_cli_workflows
+    - repair_and_campaign_cli_workflows
     - repair_containment_redaction_and_budget_productization
     - crash_artifact_cleanup_and_web_settle_attribution
     - campaign_cli_surface
@@ -450,8 +454,8 @@ m11:
   task_groups:
     P0: COMPLETE
     P1: COMPLETE
-    P2: IN_PROGRESS
-    P3: PENDING
+    P2: COMPLETE
+    P3: IN_PROGRESS
     P4: PENDING
     P5: PENDING
     P6: PENDING

@@ -325,6 +325,53 @@ describe("cli", () => {
     expect(detail.evidenceBundlePath).not.toBeNull();
   }, 60000);
 
+  it("runs the explicit durable explore workflow without patching permission", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-explore-"));
+    const exploration = await runCli(
+      [
+        "explore",
+        "--adapter",
+        "fake",
+        "--seed",
+        "7",
+        "--max-actions",
+        "60",
+        "--max-findings",
+        "2",
+        "--json",
+      ],
+      dir,
+    );
+    expect(exploration.code).toBe(0);
+    const summary = JSON.parse(exploration.stdout) as {
+      schema: string;
+      command: string;
+      runId: string;
+      campaign: { durable: boolean; checkpointed: boolean; resumeSupported: boolean };
+      coverage: { actionsExecuted: number; statesVisited: number; noveltyStates: number };
+      patching: { enabled: boolean };
+    };
+    expect(summary.schema).toBe("inspector-cli/explore/1");
+    expect(summary.command).toBe("explore");
+    expect(summary.campaign).toMatchObject({
+      durable: true,
+      checkpointed: true,
+      resumeSupported: true,
+    });
+    expect(summary.coverage.actionsExecuted).toBeGreaterThan(0);
+    expect(summary.coverage.noveltyStates).toBe(summary.coverage.statesVisited);
+    expect(summary.patching.enabled).toBe(false);
+
+    const store = Store.open(join(dir, ".inspector", "runs.db"));
+    try {
+      const run = store.getRun(summary.runId);
+      expect(run?.meta_json).toContain('"workflow":"explore"');
+      expect(store.getExplorationCampaign(summary.runId)).toBeTruthy();
+    } finally {
+      store.close();
+    }
+  }, 60000);
+
   it("refuses to resume a closed run and resumes an interrupted one", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));
 

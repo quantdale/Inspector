@@ -167,16 +167,18 @@ export function fakeExploreConfig(req: HuntRequest): Omit<HuntRequest, "resumeRu
 interface DurableHuntMeta {
   schema: "inspector-hunt/1";
   version: 1;
+  workflow: "hunt" | "explore";
   request: Omit<HuntRequest, "resumeRunId">;
   explorerKind: "web" | "native" | "fake";
   explorerVersion: string;
 }
 
-function durableHuntMeta(req: HuntRequest): DurableHuntMeta {
+function durableHuntMeta(req: HuntRequest, workflow: "hunt" | "explore"): DurableHuntMeta {
   const { resumeRunId: _resumeRunId, ...request } = req;
   return {
     schema: "inspector-hunt/1",
     version: 1,
+    workflow,
     request,
     explorerKind: req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native",
     explorerVersion: EXPLORER_VERSION,
@@ -202,6 +204,10 @@ function parseDurableHuntMeta(raw: string | null, runId: string): DurableHuntMet
   }
   if (!isRecord(value) || value.schema !== "inspector-hunt/1" || value.version !== 1 || !isRecord(value.request) || value.explorerVersion !== EXPLORER_VERSION) {
     throw new CliError("not-resumable", `run ${runId} has an incompatible autonomous hunt configuration; refusing to guess`);
+  }
+  const workflow = value.workflow === undefined ? "hunt" : value.workflow;
+  if (workflow !== "hunt" && workflow !== "explore") {
+    throw new CliError("not-resumable", `run ${runId} has an invalid autonomous workflow; refusing to guess`);
   }
   const request = value.request;
   const adapters = new Set(["web", "fake", "cli", "windows", "android"]);
@@ -233,6 +239,7 @@ function parseDurableHuntMeta(raw: string | null, runId: string): DurableHuntMet
   return {
     schema: "inspector-hunt/1",
     version: 1,
+    workflow,
     request: request as DurableHuntMeta["request"],
     explorerKind: explorerKind as DurableHuntMeta["explorerKind"],
     explorerVersion: value.explorerVersion,
@@ -1041,6 +1048,26 @@ export async function huntCommand(
   parsed: ParsedInvocation,
   ctx: CommandContext,
 ): Promise<{ code: number; data?: unknown }> {
+  return runExplorationCommand(parsed, ctx, "hunt");
+}
+
+/**
+ * Explicit operator exploration workflow. It shares the proven hunt engine,
+ * but records a distinct workflow and emits coverage/novelty-oriented output.
+ * Exploration never grants patching permission and accepts no repair flag.
+ */
+export async function exploreCommand(
+  parsed: ParsedInvocation,
+  ctx: CommandContext,
+): Promise<{ code: number; data?: unknown }> {
+  return runExplorationCommand(parsed, ctx, "explore");
+}
+
+async function runExplorationCommand(
+  parsed: ParsedInvocation,
+  ctx: CommandContext,
+  workflow: "hunt" | "explore",
+): Promise<{ code: number; data?: unknown }> {
   let req = parseHuntRequest(parsed);
   const dir = workDirOf(ctx, parsed);
   const warning = warnRepoRootWorkspace(ctx, dir);
@@ -1066,6 +1093,12 @@ export async function huntCommand(
         throw new CliError("terminal-run", `run ${resumeRunId} is already ${storedRun.status}; a terminal autonomous hunt cannot resume`);
       }
       const meta = parseDurableHuntMeta(storedRun.meta_json, resumeRunId);
+      if (meta.workflow !== workflow) {
+        throw new CliError(
+          "incompatible-run",
+          `run ${resumeRunId} was created by '${meta.workflow}', not '${workflow}'; resume with the matching command`,
+        );
+      }
       req = mergeResumeRequest(parsed, req, meta);
       if (meta.request.adapter !== req.adapter) {
         throw new CliError("incompatible-run", `run ${req.resumeRunId} records adapter '${meta.request.adapter}', not '${req.adapter}'`);
@@ -1178,7 +1211,7 @@ export async function huntCommand(
               : fakeExploreConfig(req);
         run = await mgr.startRun({
           ...spawnSpec,
-          runMeta: durableHuntMeta(req),
+          runMeta: durableHuntMeta(req, workflow),
           exploration: {
             schemaVersion: 1,
             explorerKind,
@@ -1211,7 +1244,7 @@ export async function huntCommand(
       result.stoppedReason === "initial-observe-failed";
     const code = badStop || errorOutcomes.length > 0 ? 1 : 0;
 
-    const summary = {
+    const huntSummary = {
       ok: code === 0,
       ...(warning !== null ? { warning } : {}),
       runId: result.runId,
@@ -1232,11 +1265,49 @@ export async function huntCommand(
       bundles: [...bundlePaths.entries()].map(([findingId, path]) => ({ findingId, path })),
       warnings: result.warnings,
     };
+    const summary = workflow === "explore"
+      ? {
+          schema: "inspector-cli/explore/1" as const,
+          ok: huntSummary.ok,
+          command: "explore" as const,
+          warning,
+          runId: result.runId,
+          adapter: req.adapter,
+          seed: result.seed,
+          resumed: resuming,
+          stoppedReason: result.stoppedReason,
+          campaign: {
+            durable: true,
+            checkpointed: true,
+            resumeSupported: true,
+            runId: result.runId,
+          },
+          coverage: {
+            actionsExecuted: result.actionsExecuted,
+            statesVisited: result.statesVisited,
+            resets: result.resets,
+            noveltyStates: result.statesVisited,
+            anomalies: result.anomalyCount,
+          },
+          discovery: {
+            findingsObserved: result.findings.length,
+            confirmedFindings: result.findings.filter((f) => f.status === "CONFIRMED").length,
+            lifecycle: "observations-feed-finding-pipeline",
+          },
+          patching: {
+            enabled: false,
+            reason: "explore is discovery-only; repair requires a separate explicit command",
+          },
+          findings: huntSummary.findings,
+          bundles: huntSummary.bundles,
+          warnings: result.warnings,
+        }
+      : huntSummary;
 
     if (ctx.json) {
       ctx.out(JSON.stringify(summary, null, 2));
     } else {
-      ctx.out(`hunt complete: ${result.runId}`);
+      ctx.out(`${workflow} complete: ${result.runId}`);
       ctx.out(
         `  stopped: ${result.stoppedReason} | actions: ${result.actionsExecuted} | ` +
           `states: ${result.statesVisited} | resets: ${result.resets} | anomalies: ${result.anomalyCount}`,
@@ -1256,6 +1327,9 @@ export async function huntCommand(
       if (result.warnings.length > 0) {
         ctx.out(`  warnings: ${result.warnings.length}`);
         for (const w of result.warnings) ctx.out(`    - ${w}`);
+      }
+      if (workflow === "explore") {
+        ctx.out("  patching: disabled (use inspector repair with a confirmed finding)");
       }
       if (code !== 0) {
         ctx.out(

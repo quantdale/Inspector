@@ -42,6 +42,17 @@ unreachable from this environment; local `origin/main` remains at that SHA.
 - M11 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
   warnings**.
 
+### M11 P2 — explicit explore checkpoint
+
+- Added `inspector explore` as a distinct workflow over the existing hunt and
+  resumable exploration engines; it persists `workflow: explore` provenance,
+  preserves `--resume`, and refuses cross-workflow resume mismatches.
+- Added JSON schema `inspector-cli/explore/1` with durable campaign,
+  coverage/novelty, finding-lifecycle, and explicit patching-disabled fields.
+- Added operator help and a deterministic fake-adapter CLI integration proof.
+- Targeted integration: **1 passed** (`cli.integration.test.ts` explore case).
+- P2 checkpoint gates: **typecheck PASS**.
+
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
 M7 exit gate satisfied: bounded multi-worker unattended campaign survives controller restart, preserves durable evidence/state, accounts for resources, exposes a stable integration facade.

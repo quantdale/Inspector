@@ -5,7 +5,7 @@ import type { ParsedInvocation } from "./args.js";
 import { commandHelp, generalUsage } from "./help.js";
 import { resolveVersion } from "./version.js";
 import { runDoctorProbes, renderDoctorReport } from "./doctor.js";
-import { huntCommand, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
+import { exploreCommand, huntCommand, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
 import { findingsCommand } from "./findings.js";
 import { runsCommand } from "./runs.js";
 import { verifyCommand } from "./verify.js";
@@ -92,6 +92,8 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
       return doctorCommand(rest, ctx);
     case "hunt":
       return huntCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume"], []), ctx);
+    case "explore":
+      return exploreCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume"], []), ctx);
     case "run":
       return runDemo(parseArgs(rest, ["--adapter"], []), ctx);
     case "runs":
