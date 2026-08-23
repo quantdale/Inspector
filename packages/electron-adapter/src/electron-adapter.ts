@@ -1,27 +1,31 @@
 import {
-  PROTOCOL_VERSION,
   type CapabilityDoc,
   type Observation,
   type ActionOutcome,
   type Action,
   type HealthResponse,
+  type InitializeRequest,
+  type ObserveRequest,
+  type HealthRequest,
+  type LifecycleRequest,
 } from "@inspector/protocol";
 import { AdapterCrashError, type AdapterHandler } from "@inspector/adapter-sdk";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebAdapterHandler, SEED_HTML } from "@inspector/adapter-web";
+import { ELECTRON_CAPABILITIES } from "./capabilities.js";
+import {
+  RealElectronHandler,
+  resolveElectronBackendMode,
+  type ElectronBackendMode,
+} from "./real-electron.js";
 
-export const ELECTRON_CAPABILITIES: CapabilityDoc = {
-  protocolVersion: PROTOCOL_VERSION,
-  adapter: "electron-chromium",
-  capabilities: {
-    observe: ["uiTree", "screenshot", "console", "network", "storage", "trace"],
-    act: ["click", "fill", "press", "select", "navigate", "back", "forward", "reload", "wait"],
-    lifecycle: ["create", "reset", "close"],
-    faults: ["crash"],
-    coverage: [],
-  },
-};
+export { ELECTRON_CAPABILITIES } from "./capabilities.js";
+export {
+  electronExecutablePath,
+  resolveElectronBackendMode,
+  type ElectronBackendMode,
+} from "./real-electron.js";
 
 export interface ElectronFaults {
   crashApp?: boolean;
@@ -33,10 +37,16 @@ export interface ElectronFaults {
  * sensing and acting and layers Electron-specific identity (app/package
  * naming, main-process log channel) on top. A production implementation binds
  * the renderer page to a real Electron `BrowserWindow`; the contract proven
- * here is identical.
+ * here is identical. The default `auto` mode selects the production handler
+ * when the Electron executable is installed, and otherwise retains the
+ * injectable browser implementation for environments that only run contract
+ * tests. A caller can force either mode explicitly.
  */
 export class ElectronAdapterHandler implements AdapterHandler {
-  private readonly web: WebAdapterHandler;
+  /** Kept for compatibility with injectable diagnostics and test fixtures. */
+  private readonly web: WebAdapterHandler | undefined;
+  private readonly delegate: AdapterHandler;
+  readonly backendMode: Exclude<ElectronBackendMode, "auto">;
   private readonly mainLog: string[] = [];
   /** One-shot latch: the injected crash fault fires exactly once. */
   private crashPending = false;
@@ -46,30 +56,49 @@ export class ElectronAdapterHandler implements AdapterHandler {
     faults: ElectronFaults = {},
     artifactBaseDir: string = join(tmpdir(), "inspector-electron-artifacts"),
     seedHtml: string = SEED_HTML,
+    backend: ElectronBackendMode = "auto",
   ) {
-    // The web handler derives its own unique per-instance artifact directory
-    // under this base (mkdtemp), so concurrent electron instances never share
-    // one artifact tree.
-    this.web = new WebAdapterHandler({}, artifactBaseDir, seedHtml);
+    const hasInjectedOptions = faults.crashApp === true || seedHtml !== SEED_HTML;
+    const selected: Exclude<ElectronBackendMode, "auto"> =
+      backend === "auto" && hasInjectedOptions
+        ? "injectable"
+        : backend === "auto"
+          ? resolveElectronBackendMode()
+          : backend;
+    if (selected === "real" && hasInjectedOptions) {
+      throw new Error("real Electron backend cannot use injected faults or seed HTML");
+    }
+    this.backendMode = selected;
+    if (selected === "real") {
+      this.web = undefined;
+      this.delegate = new RealElectronHandler(artifactBaseDir);
+    } else {
+      // The web handler derives its own unique per-instance artifact directory
+      // under this base (mkdtemp), so concurrent injectable instances never
+      // share one artifact tree.
+      this.web = new WebAdapterHandler({}, artifactBaseDir, seedHtml);
+      this.delegate = this.web;
+    }
     if (faults.crashApp) {
       this.crashPending = true;
       this.mainLog.push("ELECTRON_CRASH injected");
     }
   }
 
-  async initialize(): Promise<CapabilityDoc> {
+  async initialize(params: InitializeRequest = {}): Promise<CapabilityDoc> {
+    void params;
+    // Preserve the adapter-family identity at the wrapper boundary even when
+    // the injectable implementation delegates sensing to adapter-web.
     return ELECTRON_CAPABILITIES;
   }
 
-  async lifecycle(params: {
-    op: string;
-    options?: Record<string, unknown>;
-  }): Promise<{ ok: boolean }> {
-    return this.web.lifecycle(params);
+  async lifecycle(params: LifecycleRequest): Promise<{ ok: boolean }> {
+    return this.delegate.lifecycle(params);
   }
 
-  async observe(params: { observe?: string[] } = {}): Promise<Observation> {
-    const obs = await this.web.observe(params);
+  async observe(params: ObserveRequest = { observe: [] }): Promise<Observation> {
+    const obs = await this.delegate.observe(params);
+    if (this.backendMode === "real") return obs;
     return {
       ...obs,
       source: "adapter-electron",
@@ -89,19 +118,20 @@ export class ElectronAdapterHandler implements AdapterHandler {
       this.crashPending = false;
       throw new AdapterCrashError("adapter-crash: electron app quit (injected fault)");
     }
-    return this.web.act(params);
+    return this.delegate.act(params);
   }
 
-  async health(): Promise<HealthResponse> {
-    return this.web.health();
+  async health(params: HealthRequest = {}): Promise<HealthResponse> {
+    return this.delegate.health(params);
   }
 
-  async cancel(): Promise<void> {
-    await this.web.cancel();
+  async cancel(params: { actionId: string } = { actionId: "" }): Promise<void> {
+    await this.delegate.cancel(params);
   }
 
   /** Release the underlying browser/context/seed server (signal shutdown). */
   async shutdown(): Promise<void> {
-    await this.web.shutdown();
+    const shutdown = (this.delegate as AdapterHandler & { shutdown?: () => Promise<void> }).shutdown;
+    if (shutdown) await shutdown.call(this.delegate);
   }
 }

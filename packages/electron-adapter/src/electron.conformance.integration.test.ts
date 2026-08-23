@@ -20,7 +20,9 @@ async function startElectron(): Promise<AdapterClient> {
   return AdapterClient.spawn({
     command: process.execPath,
     args: ["--import", "tsx", bin],
-    env: { ...process.env },
+    // The injectable lane is the deterministic contract fixture. Production
+    // Electron is exercised separately when its executable is installed.
+    env: { ...process.env, INSPECTOR_ELECTRON_BACKEND: "injectable" },
   });
 }
 

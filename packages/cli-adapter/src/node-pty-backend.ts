@@ -1,8 +1,8 @@
-import type { PtyBackend, PtySession } from "./types.js";
+import type { PtyBackend, PtySession, TerminalSnapshot } from "./types.js";
+import { VirtualTerminal } from "./vt-screen.js";
 
-const SCREEN_HEIGHT = 12;
-const SCREEN_WIDTH = 120;
-const MAX_SCROLLBACK = 1000;
+export const DEFAULT_TERMINAL_ROWS = 24;
+export const DEFAULT_TERMINAL_COLS = 120;
 
 /**
  * Guarded shutdown for hosts that used the real PTY backend. Arms an
@@ -28,32 +28,16 @@ export function armPtyExitGuard(delayMs = 2000): void {
 interface RealSession {
   id: string;
   pty: import("@lydell/node-pty").IPty;
-  /** Completed output lines (scrollback). */
-  lines: string[];
-  /** Trailing partial line not yet terminated by a newline. */
-  pending: string;
+  terminal: VirtualTerminal;
   alive: boolean;
   exitReason?: string;
 }
 
-/** Strips ANSI/VT escape sequences so the screen buffer holds plain text. */
-function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]/g, "");
-}
-
 /**
  * Real PTY backend over @lydell/node-pty (ConPTY on Windows). Maintains a
- * fixed-height plain-text screen buffer from VT output, matching the
- * MockPtyBackend readScreen contract. Selected via INSPECTOR_PTY=real in
- * bin.ts; MockPtyBackend remains the default.
- *
- * readScreen fidelity limitation (known, deliberate): the "screen" is the
- * tail of ANSI-stripped scrollback, NOT a terminal cell grid. Full-screen
- * TUI redraws (cursor addressing, status bars, `-- INSERT --` markers) leave
- * stale fragments in the tail, so state detection for full-screen apps is
- * unreliable. A real cell-buffer emulator is required to fix this; see
- * .inspector/rc-work/hunts/vim-pty/results.md finding #1.
+ * fixed-size VT cell grid from real PTY output. The current viewport and
+ * scrollback are separate so full-screen TUI redraws do not leave stale tail
+ * fragments in the semantic state.
  */
 export class NodePtyBackend implements PtyBackend {
   private sessions = new Map<string, RealSession>();
@@ -72,8 +56,8 @@ export class NodePtyBackend implements PtyBackend {
     try {
       proc = pty.spawn(program, args, {
         name: "xterm-color",
-        cols: SCREEN_WIDTH,
-        rows: SCREEN_HEIGHT,
+        cols: DEFAULT_TERMINAL_COLS,
+        rows: DEFAULT_TERMINAL_ROWS,
         cwd: process.cwd(),
         env: process.env as Record<string, string>,
       });
@@ -81,7 +65,12 @@ export class NodePtyBackend implements PtyBackend {
       throw new Error(`pty spawn failed for ${program}: ${e instanceof Error ? e.message : String(e)}`);
     }
     const id = `pty-${this.seq++}`;
-    const s: RealSession = { id, pty: proc, lines: [], pending: "", alive: true };
+    const s: RealSession = {
+      id,
+      pty: proc,
+      terminal: new VirtualTerminal(DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS),
+      alive: true,
+    };
     proc.onData((data) => this.onOutput(s, data));
     proc.onExit(({ exitCode }) => {
       s.alive = false;
@@ -106,11 +95,20 @@ export class NodePtyBackend implements PtyBackend {
   async readScreen(sessionId: string): Promise<string[]> {
     const s = this.sessions.get(sessionId);
     if (!s) throw new Error("no such session");
-    const all = [...s.lines, ...(s.pending ? [s.pending] : [])];
-    const tail = all.slice(-(SCREEN_HEIGHT - 1));
-    const padded = [...tail];
-    while (padded.length < SCREEN_HEIGHT - 1) padded.push("");
-    return [...padded];
+    return s.terminal.snapshot().viewport;
+  }
+
+  async readTerminal(sessionId: string): Promise<TerminalSnapshot> {
+    const s = this.sessions.get(sessionId);
+    if (!s) throw new Error("no such session");
+    return s.terminal.snapshot();
+  }
+
+  async resize(sessionId: string, cols: number, rows: number): Promise<void> {
+    const s = this.sessions.get(sessionId);
+    if (!s || !s.alive) throw new Error("resize failed: session closed");
+    s.pty.resize(cols, rows);
+    s.terminal.resize(cols, rows);
   }
 
   async isAlive(sessionId: string): Promise<boolean> {
@@ -159,13 +157,6 @@ export class NodePtyBackend implements PtyBackend {
   }
 
   private onOutput(s: RealSession, data: string): void {
-    const text = stripAnsi(data);
-    const parts = text.split(/\r?\n/);
-    s.pending += parts[0];
-    for (let i = 1; i < parts.length; i++) {
-      s.lines.push(s.pending);
-      if (s.lines.length > MAX_SCROLLBACK) s.lines.splice(0, s.lines.length - MAX_SCROLLBACK);
-      s.pending = parts[i] ?? "";
-    }
+    s.terminal.feed(data);
   }
 }

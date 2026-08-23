@@ -26,7 +26,7 @@ export class MockPtyBackend implements PtyBackend {
   private sessions = new Map<string, MockSession>();
   private seq = 0;
 
-  async spawn(program: string): Promise<PtySession> {
+  async spawn(program: string, _args: string[] = []): Promise<PtySession> {
     this.assertAlive();
     if (program !== "seedcli") throw new Error(`unknown program: ${program}`);
     const id = `pty-${this.seq++}`;

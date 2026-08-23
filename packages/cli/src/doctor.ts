@@ -417,23 +417,33 @@ function electronAdapterBinFile(): string | null {
 async function probeElectron(): Promise<ProbeResult> {
   const adapterSrc = electronAdapterBinFile();
   const adapterPresent = adapterSrc !== null && existsSync(adapterSrc);
-  if (resolvable("electron")) {
+  const electronPackage = resolveFromContexts("electron");
+  const electronExecutable = electronPackage
+    ? join(
+        dirname(electronPackage.path),
+        "dist",
+        process.platform === "win32" ? "electron.exe" : "electron",
+      )
+    : null;
+  if (electronExecutable && existsSync(electronExecutable)) {
     return {
       name: "electron runtime",
       ok: true,
       required: false,
-      detail: `electron package resolvable${adapterPresent ? "; electron-adapter present" : ""}`,
+      detail: `production Electron executable available${adapterPresent ? "; electron-adapter present" : ""}`,
     };
   }
   return {
     name: "electron runtime",
     ok: false,
     required: false,
-    detail: adapterPresent
-      ? "electron-adapter binary present but the electron package is not installed"
-      : "electron package not resolvable",
+    detail: electronPackage
+      ? `electron package resolvable but production executable is unavailable${adapterPresent ? "; injectable adapter remains available" : ""}`
+      : adapterPresent
+        ? "electron-adapter binary present but the electron package is not installed"
+        : "electron package not resolvable",
     remediation:
-      "install electron (see packages/electron-adapter) to use the electron adapter",
+      "install the Electron executable for the pinned package (see packages/electron-adapter); the adapter will remain explicitly injectable until then",
   };
 }
 

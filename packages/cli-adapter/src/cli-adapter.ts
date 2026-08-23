@@ -17,14 +17,15 @@ import { ArtifactStore } from "@inspector/artifact-store";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, mkdtempSync } from "node:fs";
-import type { PtyBackend } from "./types.js";
+import { createHash } from "node:crypto";
+import type { PtyBackend, TerminalSnapshot } from "./types.js";
 
 export const CLI_CAPABILITIES: CapabilityDoc = {
   protocolVersion: PROTOCOL_VERSION,
   adapter: "cli-pty",
   capabilities: {
     observe: ["uiTree"],
-    act: ["fill", "press", "fault"],
+    act: ["fill", "press", "resize", "fault"],
     lifecycle: ["create", "reset", "close"],
     faults: ["crash"],
     coverage: [],
@@ -44,6 +45,13 @@ export const CLI_CAPABILITIES: CapabilityDoc = {
         risk: "interact",
         autonomousEligible: true,
         description: "Send a control key (e.g. Ctrl-C) to the terminal",
+      },
+      {
+        kind: "resize",
+        targetScheme: "pty-input",
+        risk: "interact",
+        autonomousEligible: false,
+        description: "Resize the deterministic terminal viewport",
       },
     ],
   },
@@ -118,7 +126,10 @@ export class CliAdapterHandler implements AdapterHandler {
   async observe(params: { observe?: string[] } = {}): Promise<Observation> {
     if (!this.sessionId) throw new Error("environment not created");
     void params;
-    const screen = await this.backend.readScreen(this.sessionId);
+    const terminal = this.backend.readTerminal
+      ? await this.backend.readTerminal(this.sessionId)
+      : undefined;
+    const screen = terminal?.viewport ?? await this.backend.readScreen(this.sessionId);
     const alive = await this.backend.isAlive(this.sessionId);
     const mode = !alive ? "mode-exited" : screen[0]?.startsWith("guest>") ? "mode-guest" : "mode-auth";
     // Freeform screen text is redacted before it becomes model/evidence input.
@@ -132,6 +143,7 @@ export class CliAdapterHandler implements AdapterHandler {
         text: redactFreeformText(rawText),
       })),
     ];
+    const terminalEvidence = terminal ? redactTerminal(terminal) : undefined;
     return {
       id: newId("obs"),
       runId: this.runId,
@@ -139,7 +151,13 @@ export class CliAdapterHandler implements AdapterHandler {
       sequence: this.seq++,
       source: "adapter-cli-pty",
       capturedAt: new Date().toISOString(),
-      summary: { url: `pty://seedcli`, title: "SeedCLI", uiTree, storage: {} },
+      summary: {
+        url: `pty://seedcli`,
+        title: "SeedCLI",
+        uiTree,
+        storage: {},
+        ...(terminalEvidence ? { terminal: terminalEvidence } : {}),
+      },
     };
   }
 
@@ -163,6 +181,17 @@ export class CliAdapterHandler implements AdapterHandler {
           throw protocolError("CAPABILITY_DENIED", `fault not permitted: ${fault}`);
         }
         throw new AdapterCrashError("adapter-crash: pty backend lost (injected fault)");
+      }
+
+      if (action.kind === "resize") {
+        const cols = Number(action.input?.cols ?? 120);
+        const rows = Number(action.input?.rows ?? 24);
+        if (!Number.isInteger(cols) || cols < 20 || cols > 300 || !Number.isInteger(rows) || rows < 4 || rows > 100) {
+          throw protocolError("VALIDATION", "resize requires cols 20..300 and rows 4..100");
+        }
+        if (!this.backend.resize) throw protocolError("CAPABILITY_DENIED", "PTY backend does not support resize");
+        await this.backend.resize(sessionId, cols, rows);
+        return { ...base, status: "success" };
       }
 
       const wasAlive = await this.backend.isAlive(sessionId);
@@ -265,4 +294,22 @@ export class CliAdapterHandler implements AdapterHandler {
     };
     return backend.sessionFor?.(sessionId);
   }
+}
+
+function redactTerminal(snapshot: TerminalSnapshot): Record<string, unknown> {
+  const viewport = snapshot.viewport.map((line) => redactFreeformText(line));
+  const scrollback = snapshot.scrollback.map((line) => redactFreeformText(line));
+  const cells = snapshot.cells.map((row) => row.map((cell) => redactFreeformText(cell)));
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ cols: snapshot.cols, rows: snapshot.rows, cells, cursor: snapshot.cursor }))
+    .digest("hex");
+  return {
+    cols: snapshot.cols,
+    rows: snapshot.rows,
+    viewport,
+    cells,
+    scrollback,
+    cursor: snapshot.cursor,
+    fingerprint,
+  };
 }
