@@ -26,17 +26,16 @@ autonomy:
 active:
   milestone_id: M11
   milestone_name: Operator-grade product workflows and distribution
-  status: ACTIVE
+  status: COMPLETE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
   task_group: P7
   waypoint: M11.P7.ci-distribution-acceptance
-  waypoint_status: IN_PROGRESS
+  waypoint_status: COMPLETE
   next_action: >-
-    Strengthen layered CI and release/distribution smoke, prove the installed
-    artifact and M11 acceptance matrix, synchronize product documentation, and
-    close the M11 exit gate. M8 remains deferred to a macOS/Xcode environment;
-    no release publication is authorized.
+    M11 exit gate complete. Preserve the installed-artifact and acceptance
+    evidence, keep M8 and Electron field proofs environment-deferred until
+    their required hosts are available, and do not publish a release.
 
 progress:
   completed_milestones:
@@ -50,6 +49,7 @@ progress:
     - M7
     - M9
     - M10
+    - M11
   completed_task_groups:
     - F0
     - F1
@@ -102,6 +102,7 @@ progress:
     - P4
     - P5
     - P6
+    - P7
     - A0
     - A1
     - A2
@@ -204,12 +205,13 @@ progress:
     - M11.P4.campaign-cli
     - M11.P5.product-correctness-safety
     - M11.P6.electron-and-terminal-productization
+    - M11.P7.ci-distribution-acceptance
   deferred_milestones:
     - M8
 
 verification:
-  last_verified_commit: a2d14ae
-  last_gate: "M11.P6: production Electron binding compiled; explicit injectable conformance 2/2; real PTY VT viewport integration PASS; real Electron proof honestly skipped because the executable is unavailable; lint 0 errors/4 pre-existing warnings; typecheck PASS"
+  last_verified_commit: 36ed89889be9a66cb5336c6603ba22f46fb76fc5
+  last_gate: "M11 exit gate: lint 0 errors/4 pre-existing warnings; typecheck PASS; unit 533 passed/3 skipped; integration 155 passed/1 skipped after bounded retries for concurrent subprocess startup; M11 acceptance PASS; installed release smoke PASS; layered Linux/Windows CI configured; Electron real field proof honestly deferred because the executable is unavailable; no release publication"
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
 
@@ -249,7 +251,12 @@ known_debt:
     CLOSED_BY_M11.P6: production Electron field proof is implemented with an
     honest environment deferral when the host lacks the executable.
     PTY/TUI viewport state is now modeled by a deterministic VT cell grid.
-    Layered CI and clean release/distribution smoke remain in M11.P7.
+  - >-
+    CLOSED_BY_M11.P7: layered Linux/Windows CI is configured; release artifacts
+    carry source/platform/dependency provenance and checksums; package-content
+    assertions reject workspace/test/secret/temp leakage; clean-prefix smoke
+    runs the installed CLI; stable JSON errors, the M11 acceptance matrix, and
+    final documentation/state synchronization are complete.
   - >-
     STILL_OPEN: web exploration replay is expensive (~4-6 minutes in the
     existing full E2E gate); this is product-acceptable but not optimized.
@@ -271,7 +278,7 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - layered_ci_and_clean_distribution_smoke
+    - web_exploration_replay_cost
   environment_deferred:
     - ios_macos_xcode_runtime
     - electron_runtime_field_proof_until_host_supports_it
@@ -463,7 +470,7 @@ m10:
 
 m11:
   campaign: OPERATOR_PRODUCT_WORKFLOWS_DISTRIBUTION
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-23"
   spec: specs/011-operator-product-workflows/SPEC.md
   task_groups:
@@ -474,7 +481,7 @@ m11:
     P4: COMPLETE
     P5: COMPLETE
     P6: COMPLETE
-    P7: PENDING
+    P7: COMPLETE
   blockers: []
 
 ga_readiness:

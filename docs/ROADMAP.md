@@ -268,7 +268,7 @@ gates and documentation/state synchronization pass.
 
 Spec: `specs/011-operator-product-workflows/SPEC.md`
 
-**Status: ACTIVE — P0-P6 COMPLETE, P7 IN PROGRESS (2026-08-23).** M11 converts the mature internal engines into
+**Status: COMPLETE — P0-P7 (2026-08-23).** M11 converted the mature internal engines into
 the workflows promised by `docs/PRODUCT.md` and validates them from the
 installed CLI. M10 remains historically COMPLETE; M8 remains
 `DEFERRED_ENVIRONMENT`.

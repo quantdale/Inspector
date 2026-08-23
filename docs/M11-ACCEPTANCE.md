@@ -16,10 +16,14 @@ result presented as a real-backend proof.
 | Electron production binding | `packages/electron-adapter/src/electron-production.integration.test.ts`: availability/refusal passes; real-runtime case is skipped because this host has no downloaded Electron executable | ENVIRONMENT_DEFERRED |
 | Electron injectable contract | `packages/electron-adapter/src/electron.conformance.integration.test.ts` (2/2), explicitly forced injectable | PASS (injectable only) |
 | Clean distribution | `pnpm release:smoke`: fresh npm prefix runs `--version`, `doctor`, fake hunt, findings/runs inspection, and `campaign list`; tarball content assertion passes | PASS |
-| Linux required CI gate | `.github/workflows/ci.yml`: frozen install, lint, typecheck, unit, deterministic integration | CONFIGURED |
-| Windows-sensitive CI gate | `.github/workflows/ci.yml`: real Windows runner path/repair/PTY/CLI/release smoke jobs | CONFIGURED (hosted-run evidence pending) |
+| Linux required CI gate | `.github/workflows/ci.yml`: frozen install, lint, typecheck, unit, deterministic integration | CONFIGURED (hosted execution not invoked in this no-push session) |
+| Windows-sensitive CI gate | `.github/workflows/ci.yml`: real Windows runner path/repair/PTY/CLI/release smoke jobs | CONFIGURED (hosted execution not invoked in this no-push session) |
 | iOS real backend | No macOS/Xcode/simulator available | ENVIRONMENT_DEFERRED (M8) |
 
 The local candidate artifact is built with `RELEASE_VERSION=0.1.0-m11.0` for
 verification only. Publication, release tagging, GitHub releases, and npm
 publishing remain unauthorized and are not part of this matrix.
+
+Local gate evidence: lint 0 errors/4 pre-existing warnings, typecheck PASS,
+unit 533 passed/3 skipped, integration 155 passed/1 skipped after bounded
+subprocess-startup retries, and installed-artifact smoke PASS.

@@ -3,7 +3,7 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **ACTIVE — M11 Operator-Grade Product Workflows & Distribution**
+- Status: **COMPLETE — M11 Operator-Grade Product Workflows & Distribution**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
@@ -20,10 +20,12 @@ web/Android interruption proofs are in place. Frozen install, lint, typecheck,
 unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
-M11 is activated at the current tree. P0-P6 are complete at `a2d14ae` and P7
-is the active waypoint. The repository was clean at `023dabf` before M11 changes. `git fetch
-origin` was attempted on 2026-08-23 but GitHub was unreachable from this
-environment; local `origin/main` remains at that SHA.
+M11 P0-P7 are complete at the implementation tree ending in `36ed898`; the
+final state and documentation synchronization follows in the closing commit.
+The repository was clean at `023dabf` before M11 changes. `git fetch origin`
+was attempted on 2026-08-23 but GitHub was unreachable from this environment;
+the local `origin/main` reference remains behind the completed local work and
+no push was performed.
 
 ### M11 P1 — verify/regress checkpoint
 
@@ -127,8 +129,35 @@ environment; local `origin/main` remains at that SHA.
 - P6 targeted gate: **8 unit tests passed; Electron conformance 2/2;
   production binding integration 1 passed/1 skipped; PTY integration PASS;
   typecheck PASS; lint 0 errors / 4 pre-existing warnings**.
-- Next waypoint: P7 layered CI, clean distribution smoke, acceptance matrix,
-  and documentation synchronization.
+- P7 final checkpoint is recorded below; M11 is complete.
+
+### M11 P7 — final CI, distribution, and acceptance checkpoint
+
+- Added layered CI in `.github/workflows/ci.yml`: the Linux required gate runs
+  frozen install, lint, typecheck, unit, and deterministic integration; a
+  Windows runner covers path/repair, PTY/CLI, and release-smoke behavior.
+  Hosted execution was not invoked because this session has no push authority.
+- Release packaging now emits `inspector-release/2` provenance with version,
+  source commit/dirty state, platform/architecture, Node/dependency
+  expectations, payload entries, and checksums. Tarball content assertions
+  reject workspaces, tests, evidence, secrets, temporary data, and undeclared
+  payloads.
+- Clean-prefix installed-artifact smoke passed for `--version`, `doctor
+  --json`, fake `hunt`, `findings list`, `runs list`, and `campaign list`.
+- The deterministic product chain passed: hunt → confirmed finding → verify
+  → regression → isolated repair → exact replay/regression pass → masking and
+  benign checks → accepted reviewable patch, with the primary checkout
+  untouched. Campaign restart/lease proofs, discovery-only explore/resume,
+  and real PTY viewport proofs also pass.
+- Final applicable evidence: **lint 0 errors / 4 pre-existing warnings;
+  typecheck PASS; unit 533 passed / 3 skipped; integration 155 passed / 1
+  skipped after bounded retries of the documented concurrent subprocess
+  startup-flake class; M11 acceptance PASS; release smoke PASS**.
+- Electron production binding and fixture are complete, but this host has no
+  downloaded Electron executable: the real-runtime proof remains
+  `ENVIRONMENT_DEFERRED`; injectable conformance is explicitly separate.
+  M8 iOS remains deferred to macOS/Xcode/simulator. No package, tag, release,
+  deployment, or other publication action was taken.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
@@ -156,12 +185,14 @@ Final gates at M7 checkpoint: **lint (0 errors), typecheck (exit 0), test (63 un
   automation-failure exclusion from target-defect promotion.
 - CLOSED BY M10: resumable web/native exploration graphs, RNG/decision state,
   finding continuity, checkpoint checksums/retention, and durable hunt budgets.
-- CLOSED BY M11 P1-P6: operator `verify`, `regress`, `explore`, `repair`, and
+- CLOSED BY M11 P1-P7: operator `verify`, `regress`, `explore`, `repair`, and
   campaign CLI workflows; repair containment/redaction; durable unattended
   accounting; atomic artifact cleanup; web action-window attribution;
-  production Electron binding; and terminal viewport semantics.
-- STILL OPEN FOR M11 P7: layered CI, clean distribution smoke, acceptance
-  matrix, and final documentation reconciliation.
+  production Electron binding; terminal viewport semantics; layered CI;
+  truthful release packaging; clean distribution smoke; stable CLI machine
+  errors; and the M11 acceptance matrix.
+- STILL OPEN: web exploration replay is expensive (~4-6 minutes in the
+  existing full E2E gate); this is product-acceptable but not optimized.
 - ENVIRONMENT-DEFERRED: iOS requires macOS/Xcode/simulator. Electron's
   production field proof is deferred because this host has no downloaded
   Electron executable; independent binding, fixture, refusal, and integration

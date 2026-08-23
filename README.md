@@ -65,8 +65,9 @@ for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
 Current status: **M11 — operator-grade product workflows and distribution
-active**. M10 resumable exploration and M11 P0-P6 are complete; P7 is closing
-layered CI, installed-artifact smoke, acceptance evidence, and documentation.
+complete**. M10 resumable exploration and all M11 product, safety, CI, and
+distribution gates are complete. A local candidate artifact was installed and
+smoke-tested; no rc.2 package, release, or tag was published.
 RC1 field validation is complete with a documented GO decision; the RC1 tag
 and release state remain unchanged and no rc.2 release has been published.
 

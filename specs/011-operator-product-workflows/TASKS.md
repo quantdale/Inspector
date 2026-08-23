@@ -7,13 +7,13 @@
 - [x] P4 — expose bounded `campaign run|list|show|stop|resume`
 - [x] P5 — close oracle, containment, redaction, budget, artifact, and web attribution debt required by productization
 - [x] P6 — production Electron binding/proof or honest environment deferral; improve PTY/TUI state
-- [ ] P7 — layered CI, release/distribution smoke, acceptance matrix, docs, and M11 exit gate
+- [x] P7 — layered CI, release/distribution smoke, acceptance matrix, docs, and M11 exit gate
 
 P7 work breakdown:
 
-- [ ] layered Linux required gate and Windows-sensitive CI job
-- [ ] provenance-rich release builder with package-content assertions/checksums
-- [ ] clean-prefix installed-artifact smoke for core and M11 commands
-- [ ] stable top-level JSON error envelope and command-output reconciliation
-- [ ] M11 acceptance matrix and final docs/state synchronization
-- [ ] full applicable gates and M11 exit evidence
+- [x] layered Linux required gate and Windows-sensitive CI job
+- [x] provenance-rich release builder with package-content assertions/checksums
+- [x] clean-prefix installed-artifact smoke for core and M11 commands
+- [x] stable top-level JSON error envelope and command-output reconciliation
+- [x] M11 acceptance matrix and final docs/state synchronization
+- [x] full applicable gates and M11 exit evidence

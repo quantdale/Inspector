@@ -1,6 +1,6 @@
 # SPEC-011 — Operator-Grade Product Workflows & Distribution
 
-Status: ACTIVE (M11 activated 2026-08-23)
+Status: COMPLETE (M11 exit gate passed 2026-08-23)
 Milestone: M11
 Depends on: SPEC-004, SPEC-007, SPEC-009, SPEC-010
 
