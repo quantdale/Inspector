@@ -184,6 +184,19 @@ export interface RegressionRecord {
   artifactPath: string | null;
 }
 
+export interface RepairWorkflowRecord {
+  id: string;
+  findingId: string;
+  repoRoot: string;
+  revision: string;
+  status: WorkflowRecordStatus;
+  outcome: string;
+  startedAt: string;
+  completedAt: string | null;
+  resultJson: string | null;
+  artifactPath: string | null;
+}
+
 /**
  * One oracle's outcome for a single evaluation event. Persisted per
  * docs/ORACLE-SYSTEM.md so evidence bundles and campaign provenance can
@@ -1200,6 +1213,58 @@ export class Store {
     return this.db
       .prepare(`${this.selectRegressionRecords("WHERE scenario_key = ?")}`)
       .get(scenarioKey) as RegressionRecord | undefined;
+  }
+
+  putRepairWorkflowRecord(record: RepairWorkflowRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO repair_records(
+           id, finding_id, repo_root, revision, status, outcome, started_at,
+           completed_at, result_json, artifact_path
+         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           outcome = excluded.outcome,
+           completed_at = excluded.completed_at,
+           result_json = excluded.result_json,
+           artifact_path = excluded.artifact_path`,
+      )
+      .run(
+        record.id,
+        record.findingId,
+        record.repoRoot,
+        record.revision,
+        record.status,
+        record.outcome,
+        record.startedAt,
+        record.completedAt,
+        record.resultJson,
+        record.artifactPath,
+      );
+  }
+
+  listRepairWorkflowRecords(findingId?: string, limit = 100): RepairWorkflowRecord[] {
+    const where = findingId === undefined ? "" : "WHERE finding_id = ?";
+    const params = findingId === undefined ? [limit] : [findingId, limit];
+    return this.db
+      .prepare(
+        `SELECT id, finding_id AS findingId, repo_root AS repoRoot, revision,
+           status, outcome, started_at AS startedAt, completed_at AS completedAt,
+           result_json AS resultJson, artifact_path AS artifactPath
+         FROM repair_records ${where} ORDER BY started_at DESC LIMIT ?`,
+      )
+      .all(...params) as RepairWorkflowRecord[];
+  }
+
+  getRepairWorkflowRecord(id: string): RepairWorkflowRecord | undefined {
+    return this.db
+      .prepare(
+        `SELECT id, finding_id AS findingId, repo_root AS repoRoot, revision,
+           status, outcome, started_at AS startedAt, completed_at AS completedAt,
+           result_json AS resultJson, artifact_path AS artifactPath
+         FROM repair_records WHERE id = ?`,
+      )
+      .get(id) as RepairWorkflowRecord | undefined;
   }
 
   getFindingByClassKey(runId: string, classKey: string): FindingRecord | undefined {

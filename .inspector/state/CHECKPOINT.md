@@ -53,6 +53,25 @@ unreachable from this environment; local `origin/main` remains at that SHA.
 - Targeted integration: **1 passed** (`cli.integration.test.ts` explore case).
 - P2 checkpoint gates: **typecheck PASS**.
 
+### M11 P3 — repair CLI checkpoint
+
+- Added `inspector repair <findingId>` with required explicit `--repo-root`,
+  exact resolved `--revision`, and explicit `--provider`/`--patch-agent`
+  module boundary implementing the existing PatchAgent, replay driver,
+  OracleSuite, and masking-probe contracts.
+- The command invokes `RepairEngine` unchanged for confirmed findings,
+  persists a running/completed SQLite repair record, preserves accepted and
+  rejected patch attempts in an atomic audit artifact, and reports that the
+  primary checkout was not modified or auto-applied.
+- Added a deterministic provider-boundary integration proof: exact detached
+  worktree, failing pre-patch regression, accepted patch, masking probe,
+  post-patch replay/regression, RESOLVED finding, clean untouched checkout.
+- No provider is synthesized when configuration is absent; the command
+  refuses with `provider-required`.
+- Targeted integration: **2 passed** (`repair-cli.integration.test.ts`).
+- P3 checkpoint gates: **typecheck PASS; lint 0 errors / 4 pre-existing
+  warnings**.
+
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
 M7 exit gate satisfied: bounded multi-worker unattended campaign survives controller restart, preserves durable evidence/state, accounts for resources, exposes a stable integration facade.

@@ -10,6 +10,7 @@ import { findingsCommand } from "./findings.js";
 import { runsCommand } from "./runs.js";
 import { verifyCommand } from "./verify.js";
 import { regressCommand } from "./regress.js";
+import { repairCommand } from "./repair.js";
 import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 
 // Public workspace/spawn helpers re-exported for library consumers.
@@ -108,6 +109,11 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
     case "regress":
       return regressCommand(
         parseArgs(rest, ["--run", "--finding", "--adapter", "--revision", "--attempts", "--min-successes", "--limit"], []),
+        ctx,
+      );
+    case "repair":
+      return repairCommand(
+        parseArgs(rest, ["--repo-root", "--revision", "--provider", "--patch-agent", "--max-attempts", "--error-text", "--selectors"], []),
         ctx,
       );
     case "version":

@@ -247,6 +247,26 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_regression_run
     ON regression_records(run_id, started_at);
   `,
+  // M11 repair workflow: one durable coordinator record per explicit repair
+  // invocation. The full RepairRecord JSON remains the immutable audit
+  // payload; this index makes in-progress and completed repairs queryable
+  // without reading artifact files.
+  `
+  CREATE TABLE IF NOT EXISTS repair_records (
+    id TEXT PRIMARY KEY,
+    finding_id TEXT NOT NULL,
+    repo_root TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    status TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    result_json TEXT,
+    artifact_path TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_repair_finding
+    ON repair_records(finding_id, started_at);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

@@ -29,13 +29,13 @@ active:
   status: ACTIVE
   spec: specs/011-operator-product-workflows/SPEC.md
   tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P3
-  waypoint: M11.P3.safe-repair-cli
+  task_group: P4
+  waypoint: M11.P4.campaign-cli
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Expose the existing isolated RepairEngine through an explicit configured
-    patch-agent CLI workflow. M8 remains deferred to a macOS/Xcode
-    environment; no release publication is authorized.
+    Expose the existing bounded scale campaign controller through campaign
+    run/list/show/stop/resume CLI operations. M8 remains deferred to a
+    macOS/Xcode environment; no release publication is authorized.
 
 progress:
   completed_milestones:
@@ -198,6 +198,7 @@ progress:
     - M11.P0.activation
     - M11.P1.verify-and-regress
     - M11.P2.explicit-explore
+    - M11.P3.safe-repair-cli
   deferred_milestones:
     - M8
 
@@ -225,8 +226,13 @@ known_debt:
     CLOSED_BY_M11.P2: explicit explore is now a durable discovery-only CLI
     workflow with coverage/novelty output and resumable campaign metadata.
   - >-
-    STILL_OPEN / M11.P3-P4: repair and scale campaign operations are not yet
-    exposed as complete installed-CLI workflows.
+    CLOSED_BY_M11.P3: explicit repair now invokes the existing RepairEngine
+    only with a configured provider, exact revision, detached worktree,
+    regression-first gates, masking/test-tamper policy, and durable audit.
+  - >-
+    STILL_OPEN / M11.P4: scale campaign operations are not yet exposed as a
+    complete installed-CLI workflow; repair containment/redaction and related
+    productization debt remains in M11.P5.
   - >-
     STILL_OPEN / M11.P5-P7: filesystem-aware containment, deterministic
     redaction, fully durable unattended budgets, atomic artifact orphan
@@ -252,7 +258,8 @@ debt_audit:
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
   still_open:
-    - repair_and_campaign_cli_workflows
+    - campaign_cli_workflow
+    - repair_containment_redaction_and_budget_productization
     - repair_containment_redaction_and_budget_productization
     - crash_artifact_cleanup_and_web_settle_attribution
     - campaign_cli_surface
@@ -455,8 +462,8 @@ m11:
     P0: COMPLETE
     P1: COMPLETE
     P2: COMPLETE
-    P3: IN_PROGRESS
-    P4: PENDING
+    P3: COMPLETE
+    P4: IN_PROGRESS
     P5: PENDING
     P6: PENDING
     P7: PENDING
