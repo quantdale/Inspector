@@ -20,7 +20,7 @@ web/Android interruption proofs are in place. Frozen install, lint, typecheck,
 unit, integration, targeted resume, and bounded soak gates all passed. M8
 remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
-M11 is activated at the current tree. P0-P5 are complete at `651a1fc` and P6
+M11 is activated at the current tree. P0-P6 are complete at `a2d14ae` and P7
 is the active waypoint. The repository was clean at `023dabf` before M11 changes. `git fetch
 origin` was attempted on 2026-08-23 but GitHub was unreachable from this
 environment; local `origin/main` remains at that SHA.
@@ -104,8 +104,31 @@ environment; local `origin/main` remains at that SHA.
 - Targeted gates: **41 unit tests across oracle/redaction/artifact/containment,
   15 core hardening tests, 17 store/repair integration tests, 18 web
   integration tests, typecheck PASS, lint 0 errors / 4 pre-existing warnings**.
-- Next waypoint: P6 production Electron binding/fixture proof or honest
-  environment deferral, plus richer PTY/TUI viewport state.
+- P6 is now checkpointed; the next waypoint is P7 layered CI,
+  distribution smoke, acceptance, and documentation synchronization.
+
+### M11 P6 — Electron binding and terminal viewport checkpoint
+
+- Added a production Electron handler using Playwright's Electron API,
+  including renderer inventory/actions, main-process and renderer logs,
+  page-error attribution, storage/screenshot/trace evidence, reset/restart,
+  target-failure classification, and a deterministic fixture application.
+- `auto` selects the real Electron executable only when it is installed;
+  explicit `real` fails closed when the executable is absent, and injectable
+  contract tests are explicitly selected rather than presented as real proof.
+- This host has the pinned Electron npm package but no downloaded executable.
+  The production test therefore records **1 availability/refusal pass and 1
+  real-runtime test skipped**; no real Electron claim is made. `doctor` reports
+  the missing executable as an optional warning.
+- Replaced PTY scrollback-tail-only state with a deterministic VT cell grid,
+  viewport/scrollback split, cursor/dimensions/fingerprint, bounded resize,
+  and a cursor-addressed full-screen fixture. Real PTY redraw/resize proof:
+  **1 integration test passed**.
+- P6 targeted gate: **8 unit tests passed; Electron conformance 2/2;
+  production binding integration 1 passed/1 skipped; PTY integration PASS;
+  typecheck PASS; lint 0 errors / 4 pre-existing warnings**.
+- Next waypoint: P7 layered CI, clean distribution smoke, acceptance matrix,
+  and documentation synchronization.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 
@@ -133,13 +156,16 @@ Final gates at M7 checkpoint: **lint (0 errors), typecheck (exit 0), test (63 un
   automation-failure exclusion from target-defect promotion.
 - CLOSED BY M10: resumable web/native exploration graphs, RNG/decision state,
   finding continuity, checkpoint checksums/retention, and durable hunt budgets.
-- STILL OPEN FOR M11: operator `verify`, `regress`, `explore`, `repair`, and
-  campaign CLI workflows; repair containment/redaction; process-durable
-  unattended budgets; atomic artifact orphan cleanup; web action-window
-  attribution; layered CI and clean distribution smoke.
-- ENVIRONMENT-DEFERRED: iOS requires macOS/Xcode/simulator. Electron must be
-  proven with the actual runtime or recorded as an honest M11 environment
-  deferral after independent binding/fixture work.
+- CLOSED BY M11 P1-P6: operator `verify`, `regress`, `explore`, `repair`, and
+  campaign CLI workflows; repair containment/redaction; durable unattended
+  accounting; atomic artifact cleanup; web action-window attribution;
+  production Electron binding; and terminal viewport semantics.
+- STILL OPEN FOR M11 P7: layered CI, clean distribution smoke, acceptance
+  matrix, and final documentation reconciliation.
+- ENVIRONMENT-DEFERRED: iOS requires macOS/Xcode/simulator. Electron's
+  production field proof is deferred because this host has no downloaded
+  Electron executable; independent binding, fixture, refusal, and integration
+  work is complete.
 - PRODUCT DECISION REQUIRED: none currently.
 
 Historical hardening and RC1/GA ledgers below remain historical evidence and
