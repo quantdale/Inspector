@@ -1,4 +1,5 @@
 import type { Database } from "better-sqlite3";
+import { createHash } from "node:crypto";
 import { openStore } from "./migrations.js";
 
 export type ActionStatus =
@@ -46,6 +47,7 @@ export interface ActionRecord {
   error_json: string | null;
   state_after: string | null;
   step_id: string | null;
+  metadata_json: string | null;
 }
 
 export interface ObservationRecord {
@@ -65,6 +67,48 @@ export interface CheckpointRecord {
   stepId: string | null;
   createdAt: string;
   payload_json: string;
+}
+
+export interface ExplorationCampaignRecord {
+  runId: string;
+  schemaVersion: number;
+  explorerKind: string;
+  explorerVersion: string;
+  adapter: string;
+  configJson: string;
+  createdAt: string;
+  status: string;
+}
+
+export interface ExplorationCheckpointRecord {
+  id: string;
+  runId: string;
+  schemaVersion: number;
+  explorerKind: string;
+  explorerVersion: string;
+  stepSequence: number;
+  actionCount: number;
+  createdAt: string;
+  payloadJson: string;
+  payloadSha256: string;
+}
+
+export type ExplorationEventStatus = "pending" | "committed" | "unknown";
+
+export interface ExplorationEventRecord {
+  id: string;
+  runId: string;
+  kind: string;
+  status: ExplorationEventStatus;
+  stepSequence: number;
+  createdAt: string;
+  resolvedAt: string | null;
+  payloadJson: string;
+}
+
+export interface CommittedActionRecord {
+  action: ActionRecord;
+  stepSequence: number;
 }
 
 export type FindingStatus =
@@ -99,6 +143,8 @@ export interface FindingRecord {
   minimizationJson: string | null;
   lastTransitionJson: string | null;
   adapter: string | null;
+  /** Exploration anomaly class; null for findings created outside a hunt. */
+  classKey?: string | null;
 }
 
 /**
@@ -163,6 +209,7 @@ const FINDING_SELECT = `SELECT id, run_id AS runId, status, title, confidence, s
   oracle_ids AS oracleIds, reproduction_json AS reproductionJson, artifact_refs AS artifactRefs,
   created_at AS createdAt, updated_at AS updatedAt, signature,
   minimization_json AS minimizationJson, last_transition_json AS lastTransitionJson, adapter
+  , class_key AS classKey
   FROM findings`;
 
 export class Store {
@@ -200,6 +247,53 @@ export class Store {
         input.meta ? JSON.stringify(input.meta) : null,
       );
     return this.getRun(input.id)!;
+  }
+
+  /** Register the immutable explorer contract before the first action. */
+  createExplorationCampaign(input: {
+    runId: string;
+    schemaVersion: number;
+    explorerKind: string;
+    explorerVersion: string;
+    adapter: string;
+    config: unknown;
+    createdAt?: string;
+  }): ExplorationCampaignRecord {
+    const createdAt = input.createdAt ?? new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO exploration_campaigns(
+           run_id, schema_version, explorer_kind, explorer_version, adapter,
+           config_json, created_at, status
+         ) VALUES(?, ?, ?, ?, ?, ?, ?, 'running')`,
+      )
+      .run(
+        input.runId,
+        input.schemaVersion,
+        input.explorerKind,
+        input.explorerVersion,
+        input.adapter,
+        JSON.stringify(input.config),
+        createdAt,
+      );
+    return this.getExplorationCampaign(input.runId)!;
+  }
+
+  getExplorationCampaign(runId: string): ExplorationCampaignRecord | undefined {
+    return this.db
+      .prepare(
+        `SELECT run_id AS runId, schema_version AS schemaVersion,
+           explorer_kind AS explorerKind, explorer_version AS explorerVersion,
+           adapter, config_json AS configJson, created_at AS createdAt, status
+         FROM exploration_campaigns WHERE run_id = ?`,
+      )
+      .get(runId) as ExplorationCampaignRecord | undefined;
+  }
+
+  setExplorationCampaignStatus(runId: string, status: string): void {
+    this.db
+      .prepare(`UPDATE exploration_campaigns SET status = ? WHERE run_id = ?`)
+      .run(status, runId);
   }
 
   getRun(id: string): RunRecord | undefined {
@@ -277,6 +371,7 @@ export class Store {
       stateAfter?: string | null;
       errorCode?: string | null;
       error?: unknown | null;
+      metadata?: unknown | null;
     };
     observations: Array<{
       id: string;
@@ -311,15 +406,16 @@ export class Store {
       this.db
         .prepare(
           `INSERT INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
-             status, requested_at, decided_at, error_code, error_json, state_after, step_id)
-           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           status, requested_at, decided_at, error_code, error_json, state_after, step_id, metadata_json)
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              status = excluded.status,
              decided_at = excluded.decided_at,
              error_code = excluded.error_code,
              error_json = excluded.error_json,
-             state_after = excluded.state_after,
-             step_id = excluded.step_id`,
+              state_after = excluded.state_after,
+              step_id = excluded.step_id,
+              metadata_json = excluded.metadata_json`,
         )
         .run(
           input.action.id,
@@ -336,6 +432,7 @@ export class Store {
           input.action.error ? JSON.stringify(input.action.error) : null,
           input.action.stateAfter ?? null,
           input.stepId,
+          input.action.metadata ? JSON.stringify(input.action.metadata) : null,
         );
 
       const insertObs = this.db.prepare(
@@ -382,6 +479,7 @@ export class Store {
     deadlineMs: number;
     idempotency: string;
     stepId?: string | null;
+    metadata?: unknown | null;
   }): { inserted: boolean; existing: ActionRecord | null } {
     const existing = this.getAction(input.id);
     if (existing) return { inserted: false, existing };
@@ -389,8 +487,8 @@ export class Store {
       this.db
         .prepare(
           `INSERT INTO actions(id, run_id, environment_id, kind, risk, deadline_ms, idempotency,
-             status, requested_at, step_id)
-           VALUES(?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+             status, requested_at, step_id, metadata_json)
+           VALUES(?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
         )
         .run(
           input.id,
@@ -402,12 +500,14 @@ export class Store {
           input.idempotency,
           new Date().toISOString(),
           input.stepId ?? null,
+          input.metadata ? JSON.stringify(input.metadata) : null,
         );
       return { inserted: true, existing: null };
     } catch (err) {
       if (
         err instanceof Error &&
-        err.message.includes("idx_actions_pending_idempotency")
+        (err.message.includes("idx_actions_pending_idempotency") ||
+          err.message.includes("UNIQUE constraint failed: actions.idempotency"))
       ) {
         throw new DuplicateActionIdempotencyError(
           `idempotency key '${input.idempotency}' is already held by an unresolved action in run ${input.runId}`,
@@ -488,6 +588,187 @@ export class Store {
     return row.c;
   }
 
+  /** Actions whose committed step is newer than an explorer snapshot. */
+  listCommittedActionsAfterStep(runId: string, stepSequence: number): CommittedActionRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT a.*, s.sequence AS stepSequence
+         FROM actions a JOIN steps s ON s.action_id = a.id
+         WHERE a.run_id = ? AND s.sequence > ?
+         ORDER BY s.sequence`,
+      )
+      .all(runId, stepSequence) as Array<ActionRecord & { stepSequence: number }>;
+    return rows.map(({ stepSequence: sequence, ...action }) => ({
+      action,
+      stepSequence: sequence,
+    }));
+  }
+
+  /** Reset/event records are durable budget admissions, including pending ones. */
+  listExplorationEvents(runId: string, kind?: string): ExplorationEventRecord[] {
+    const where = kind === undefined ? "" : " AND kind = ?";
+    const params = kind === undefined ? [runId] : [runId, kind];
+    return this.db
+      .prepare(
+        `SELECT id, run_id AS runId, kind, status, step_sequence AS stepSequence,
+           created_at AS createdAt, resolved_at AS resolvedAt, payload_json AS payloadJson
+         FROM exploration_events WHERE run_id = ?${where} ORDER BY created_at, rowid`,
+      )
+      .all(...params) as ExplorationEventRecord[];
+  }
+
+  appendExplorationEvent(input: {
+    id: string;
+    runId: string;
+    kind: string;
+    status: ExplorationEventStatus;
+    stepSequence: number;
+    payload: unknown;
+  }): ExplorationEventRecord {
+    const createdAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO exploration_events(
+           id, run_id, kind, status, step_sequence, created_at, payload_json
+         ) VALUES(?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.id,
+        input.runId,
+        input.kind,
+        input.status,
+        input.stepSequence,
+        createdAt,
+        JSON.stringify(input.payload),
+      );
+    return this.db
+      .prepare(
+        `SELECT id, run_id AS runId, kind, status, step_sequence AS stepSequence,
+           created_at AS createdAt, resolved_at AS resolvedAt, payload_json AS payloadJson
+         FROM exploration_events WHERE id = ?`,
+      )
+      .get(input.id) as ExplorationEventRecord;
+  }
+
+  resolveExplorationEvent(id: string, status: ExplorationEventStatus): void {
+    this.db
+      .prepare(
+        `UPDATE exploration_events SET status = ?, resolved_at = ? WHERE id = ?`,
+      )
+      .run(status, new Date().toISOString(), id);
+  }
+
+  countExplorationEvents(
+    runId: string,
+    kind: string,
+    statuses: ExplorationEventStatus[] = ["pending", "committed", "unknown"],
+  ): number {
+    if (statuses.length === 0) return 0;
+    const placeholders = statuses.map(() => "?").join(",");
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM exploration_events
+         WHERE run_id = ? AND kind = ? AND status IN (${placeholders})`,
+      )
+      .get(runId, kind, ...statuses) as { c: number };
+    return row.c;
+  }
+
+  writeExplorationCheckpoint(input: {
+    id: string;
+    runId: string;
+    schemaVersion: number;
+    explorerKind: string;
+    explorerVersion: string;
+    stepSequence: number;
+    actionCount: number;
+    payload: unknown;
+    retain?: number;
+  }): ExplorationCheckpointRecord {
+    const payloadJson = JSON.stringify(input.payload);
+    const payloadSha256 = createHash("sha256").update(payloadJson).digest("hex");
+    const createdAt = new Date().toISOString();
+    const retain = Math.max(1, Math.floor(input.retain ?? 8));
+    const tx = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO exploration_checkpoints(
+             id, run_id, schema_version, explorer_kind, explorer_version,
+             step_sequence, action_count, created_at, payload_json, payload_sha256
+           ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.runId,
+          input.schemaVersion,
+          input.explorerKind,
+          input.explorerVersion,
+          input.stepSequence,
+          input.actionCount,
+          createdAt,
+          payloadJson,
+          payloadSha256,
+        );
+      this.db
+        .prepare(
+          `DELETE FROM exploration_checkpoints
+           WHERE run_id = ? AND rowid NOT IN (
+             SELECT rowid FROM exploration_checkpoints
+             WHERE run_id = ? ORDER BY rowid DESC LIMIT ?
+           )`,
+        )
+        .run(input.runId, input.runId, retain);
+    });
+    tx();
+    return this.getExplorationCheckpoint(input.id)!;
+  }
+
+  getExplorationCheckpoint(id: string): ExplorationCheckpointRecord | undefined {
+    const record = this.db
+      .prepare(
+        `SELECT id, run_id AS runId, schema_version AS schemaVersion,
+           explorer_kind AS explorerKind, explorer_version AS explorerVersion,
+           step_sequence AS stepSequence, action_count AS actionCount,
+           created_at AS createdAt, payload_json AS payloadJson,
+           payload_sha256 AS payloadSha256
+         FROM exploration_checkpoints WHERE id = ?`,
+      )
+      .get(id) as ExplorationCheckpointRecord | undefined;
+    if (record) this.assertExplorationCheckpointChecksum(record);
+    return record;
+  }
+
+  getLatestExplorationCheckpoint(runId: string): ExplorationCheckpointRecord | undefined {
+    const record = this.db
+      .prepare(
+        `SELECT id, run_id AS runId, schema_version AS schemaVersion,
+           explorer_kind AS explorerKind, explorer_version AS explorerVersion,
+           step_sequence AS stepSequence, action_count AS actionCount,
+           created_at AS createdAt, payload_json AS payloadJson,
+           payload_sha256 AS payloadSha256
+         FROM exploration_checkpoints WHERE run_id = ? ORDER BY rowid DESC LIMIT 1`,
+      )
+      .get(runId) as ExplorationCheckpointRecord | undefined;
+    if (record) this.assertExplorationCheckpointChecksum(record);
+    return record;
+  }
+
+  countExplorationCheckpoints(runId: string): number {
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS c FROM exploration_checkpoints WHERE run_id = ?`)
+      .get(runId) as { c: number };
+    return row.c;
+  }
+
+  private assertExplorationCheckpointChecksum(record: ExplorationCheckpointRecord): void {
+    const actual = createHash("sha256").update(record.payloadJson).digest("hex");
+    if (actual !== record.payloadSha256) {
+      throw new Error(
+        `exploration checkpoint ${record.id} checksum mismatch; refusing to resume`,
+      );
+    }
+  }
+
   /** Highest durably committed step sequence for a run (0 when none). The
    * authoritative floor for the next sequence number after a restart: the
    * checkpoint payload can lag the last committed step when a process dies
@@ -515,7 +796,9 @@ export class Store {
   }
 
   /** Record the adapter's self-reported identity on its run and environment
-   * rows once initialize has answered. */
+   * rows once initialize has answered. The exploration campaign identity is
+   * updated in the same transaction so a crash between adapter negotiation
+   * and explorer startup cannot leave two conflicting provenance records. */
   recordAdapterIdentity(runId: string, envId: string, adapter: string): void {
     const tx = this.db.transaction(() => {
       this.db
@@ -524,6 +807,9 @@ export class Store {
       this.db
         .prepare(`UPDATE environments SET adapter = ? WHERE id = ?`)
         .run(adapter, envId);
+      this.db
+        .prepare(`UPDATE exploration_campaigns SET adapter = ? WHERE run_id = ?`)
+        .run(adapter, runId);
     });
     tx();
   }
@@ -696,8 +982,8 @@ export class Store {
       .prepare(
         `INSERT INTO findings(id, run_id, status, title, confidence, severity, revision,
            oracle_ids, reproduction_json, artifact_refs, created_at, updated_at,
-           signature, minimization_json, last_transition_json, adapter)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           signature, minimization_json, last_transition_json, adapter, class_key)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            status = excluded.status,
            title = excluded.title,
@@ -711,6 +997,7 @@ export class Store {
            minimization_json = excluded.minimization_json,
            last_transition_json = excluded.last_transition_json,
            adapter = excluded.adapter,
+           class_key = excluded.class_key,
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -730,6 +1017,7 @@ export class Store {
         f.minimizationJson,
         f.lastTransitionJson,
         f.adapter,
+        f.classKey ?? null,
       );
   }
 
@@ -743,6 +1031,12 @@ export class Store {
     return this.db
       .prepare(`${FINDING_SELECT} ORDER BY updated_at DESC LIMIT ?`)
       .all(limit) as FindingRecord[];
+  }
+
+  getFindingByClassKey(runId: string, classKey: string): FindingRecord | undefined {
+    return this.db
+      .prepare(`${FINDING_SELECT} WHERE run_id = ? AND class_key = ? ORDER BY updated_at DESC LIMIT 1`)
+      .get(runId, classKey) as FindingRecord | undefined;
   }
 
   /** Append one oracle evaluation record. Insert-only: evaluation history is

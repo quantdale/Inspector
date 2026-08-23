@@ -89,7 +89,7 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
     case "doctor":
       return doctorCommand(rest, ctx);
     case "hunt":
-      return huntCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings"], []), ctx);
+      return huntCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume"], []), ctx);
     case "run":
       return runDemo(parseArgs(rest, ["--adapter"], []), ctx);
     case "runs":

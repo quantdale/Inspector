@@ -1,4 +1,8 @@
-import type { Store, ActionRecord } from "@inspector/store-sqlite";
+import {
+  DuplicateActionIdempotencyError,
+  type Store,
+  type ActionRecord,
+} from "@inspector/store-sqlite";
 import type { ArtifactStore } from "@inspector/artifact-store";
 import { AdapterClient, stripUrlCredentialsInText } from "@inspector/adapter-sdk";
 import {
@@ -31,6 +35,19 @@ export interface StartRunOptions {
   spawnEnvDelta?: NodeJS.ProcessEnv;
   /** Per-observe deadline override (ms); see RunControllerContext. */
   observeTimeoutMs?: number;
+  /** Adapter startup deadline. Browser/device adapters can take longer than
+   * the ordinary request default while launching their host process. */
+  initializeTimeoutMs?: number;
+  /** Immutable product-level campaign configuration, if this is an explorer run. */
+  runMeta?: unknown;
+  /** Durable explorer identity/configuration registered before adapter startup. */
+  exploration?: {
+    schemaVersion: number;
+    explorerKind: string;
+    explorerVersion: string;
+    adapter?: string;
+    config: unknown;
+  };
 }
 
 export type SubmitResult =
@@ -114,6 +131,7 @@ export class RunController {
     // Budgets survive restarts: a fresh engine must inherit the durable
     // action count instead of starting from zero.
     this.engine.seedActionCount(store.countRunActions(ctx.runId));
+    this.engine.seedResetCount(store.countExplorationEvents(ctx.runId, "reset"));
   }
 
   get runId(): string {
@@ -171,15 +189,26 @@ export class RunController {
 
     // Idempotent admission: resubmitting a known action never crashes on the
     // primary key and never blindly resends an unresolved request.
-    const admission = this.store.insertPendingAction({
-      id: action.id,
-      runId: this.ctx.runId,
-      environmentId: this.ctx.envId,
-      kind: action.kind,
-      risk: action.risk,
-      deadlineMs: action.deadlineMs,
-      idempotency: action.idempotency,
-    });
+    let admission: ReturnType<Store["insertPendingAction"]>;
+    try {
+      admission = this.store.insertPendingAction({
+        id: action.id,
+        runId: this.ctx.runId,
+        environmentId: this.ctx.envId,
+        kind: action.kind,
+        risk: action.risk,
+        deadlineMs: action.deadlineMs,
+        idempotency: action.idempotency,
+        metadata: { input: action.input ?? null, metadata: action.metadata ?? null },
+      });
+    } catch (err) {
+      if (!(err instanceof DuplicateActionIdempotencyError)) throw err;
+      const unresolved = this.store
+        .getInFlightActions(this.ctx.runId)
+        .find((candidate) => candidate.idempotency === action.idempotency);
+      if (!unresolved) throw err;
+      return { kind: "duplicate", action: unresolved };
+    }
     if (!admission.inserted) {
       const existing = admission.existing!;
       if (existing.status === "pending" || existing.status === "unknown") {
@@ -225,6 +254,7 @@ export class RunController {
         stateAfter: outcome.stateAfter ?? null,
         errorCode: outcome.error?.code ?? null,
         error: outcome.error ?? null,
+        metadata: { input: action.input ?? null, metadata: action.metadata ?? null },
       },
       observations: [
         {
@@ -245,8 +275,11 @@ export class RunController {
   }
 
   async reset(): Promise<void> {
+    const budget = this.engine.recordReset();
+    if (!budget.allowed) {
+      throw new Error(budget.reason ?? "environment reset budget exhausted");
+    }
     await this.ctx.adapter.request("lifecycle", { op: "reset" }, 10000);
-    this.engine.recordReset();
     await this.observe(["state"]);
   }
 
@@ -300,9 +333,11 @@ export class RunController {
     if (teardownError) {
       this.store.setEnvironmentStatus(this.ctx.envId, "crashed");
       this.store.setRunStatus(this.ctx.runId, "failed");
+      this.store.setExplorationCampaignStatus(this.ctx.runId, "failed");
     } else {
       this.store.setEnvironmentStatus(this.ctx.envId, "closed");
       this.store.setRunStatus(this.ctx.runId, "closed");
+      this.store.setExplorationCampaignStatus(this.ctx.runId, "closed");
     }
   }
 }
@@ -318,7 +353,11 @@ export class RunManager {
     const runId = newId("run");
     const envId = newId("env");
     const provisional = adapterLabel(opts.adapterCommand);
-    this.store.createRun({ id: runId, adapter: provisional });
+    this.store.createRun({
+      id: runId,
+      adapter: provisional,
+      ...(opts.runMeta !== undefined ? { meta: opts.runMeta } : {}),
+    });
     this.store.createEnvironment({
       id: envId,
       runId,
@@ -335,10 +374,21 @@ export class RunManager {
           }
         : {}),
     });
+    if (opts.exploration) {
+      this.store.createExplorationCampaign({
+        runId,
+        schemaVersion: opts.exploration.schemaVersion,
+        explorerKind: opts.exploration.explorerKind,
+        explorerVersion: opts.exploration.explorerVersion,
+        adapter: opts.exploration.adapter ?? provisional,
+        config: opts.exploration.config,
+      });
+    }
     const opened = this.engine.openEnvironment();
     if (!opened.allowed) {
       this.store.setRunStatus(runId, "failed");
       this.store.setEnvironmentStatus(envId, "failed");
+      this.store.setExplorationCampaignStatus(runId, "failed");
       throw new Error(
         opened.reason ?? "environment concurrency budget exceeded",
       );
@@ -350,7 +400,7 @@ export class RunManager {
         args: opts.adapterArgs,
         env: opts.adapterEnv,
       });
-      const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
+      const caps = (await adapter.request("initialize", {}, opts.initializeTimeoutMs ?? 30000)) as CapabilityDoc;
       await adapter.request(
         "lifecycle",
         opts.createOptions
@@ -361,6 +411,7 @@ export class RunManager {
       // Honest identity: the adapter's own initialize answer replaces the
       // command-derived provisional label in the durable records.
       this.store.recordAdapterIdentity(runId, envId, caps.adapter);
+      this.store.setRunStatus(runId, "running");
       return new RunController(this.store, this.artifactStore, this.engine, {
         runId,
         envId,
@@ -377,6 +428,7 @@ export class RunManager {
       this.engine.closeEnvironment();
       this.store.setRunStatus(runId, "failed");
       this.store.setEnvironmentStatus(envId, "failed");
+      this.store.setExplorationCampaignStatus(runId, "failed");
       throw err;
     }
   }
@@ -391,10 +443,19 @@ export class RunManager {
       adapterCommand: string;
       adapterArgs?: string[];
       adapterEnv?: NodeJS.ProcessEnv;
+      observeTimeoutMs?: number;
+      initializeTimeoutMs?: number;
     },
   ): Promise<RunController> {
     const run = this.store.getRun(runId);
     if (!run) throw new Error(`run not found: ${runId}`);
+    const hasRecoverableInFlight = this.store.getInFlightActions(runId).length > 0;
+    if (
+      ["closed", "complete", "resolved"].includes(run.status) ||
+      (["failed", "crashed"].includes(run.status) && !hasRecoverableInFlight)
+    ) {
+      throw new Error(`run ${runId} is already terminal (${run.status}); refusing to resume`);
+    }
     const env = this.store.getEnvironmentForRun(runId);
     if (!env) throw new Error(`no environment for run: ${runId}`);
     // Durable resume spec (persisted by startRun): without it a fresh adapter
@@ -404,16 +465,24 @@ export class RunManager {
     let createRequest: { op: string; options?: Record<string, unknown> } = { op: "create" };
     if (env.spawn_env) {
       try {
-        spawnEnv = { ...(opts.adapterEnv ?? process.env), ...JSON.parse(env.spawn_env) };
+        const parsed = JSON.parse(env.spawn_env) as unknown;
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("spawn-env resume spec is not an object");
+        }
+        spawnEnv = { ...(opts.adapterEnv ?? process.env), ...(parsed as NodeJS.ProcessEnv) };
       } catch {
-        /* corrupt spec: fall back to caller env rather than guessing */
+        throw new Error(`run ${runId} has a malformed durable adapter spawn-env spec; refusing to guess`);
       }
     }
     if (env.create_options) {
       try {
-        createRequest = { op: "create", options: JSON.parse(env.create_options) };
+        const parsed = JSON.parse(env.create_options) as unknown;
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("create-options resume spec is not an object");
+        }
+        createRequest = { op: "create", options: parsed as Record<string, unknown> };
       } catch {
-        /* corrupt spec: bare create is still better than skipping create */
+        throw new Error(`run ${runId} has malformed durable adapter create options; refusing to guess`);
       }
     }
     const opened = this.engine.openEnvironment();
@@ -429,7 +498,17 @@ export class RunManager {
         args: opts.adapterArgs,
         env: spawnEnv,
       });
-      const caps = (await adapter.request("initialize", {})) as CapabilityDoc;
+      const caps = (await adapter.request("initialize", {}, opts.initializeTimeoutMs ?? 30000)) as CapabilityDoc;
+      const expectedAdapter = env.adapter || run.adapter;
+      if (
+        expectedAdapter &&
+        !["node", "tsx", "unknown", "adapter-fake"].includes(expectedAdapter) &&
+        caps.adapter !== expectedAdapter
+      ) {
+        throw new Error(
+          `adapter provenance mismatch while resuming ${runId}: expected '${expectedAdapter}', got '${caps.adapter}'`,
+        );
+      }
       // Re-create the environment on the fresh process. The original
       // environment died with the old host; re-observation below must hit a
       // LIVE environment, so "resume" means faithful re-creation, not a no-op.
@@ -443,8 +522,14 @@ export class RunManager {
           envId: env.id,
           adapter,
           caps,
+          ...(opts.observeTimeoutMs !== undefined
+            ? { observeTimeoutMs: opts.observeTimeoutMs }
+            : {}),
         },
       );
+      this.store.setRunStatus(runId, "running");
+      this.store.setEnvironmentStatus(env.id, "running");
+      this.store.setExplorationCampaignStatus(runId, "running");
       const inFlight = this.store.markInFlightUnknown(runId);
       for (let i = 0; i < inFlight.length; i++) {
         await controller.observe(["state"]);

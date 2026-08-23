@@ -177,6 +177,21 @@ describe("rng", () => {
     expect(a.int(100)).toBe(b.int(100));
   });
 
+  it("continues the exact draw stream from a serialized state", () => {
+    const uninterrupted = mulberry32(1234);
+    const interrupted = mulberry32(1234);
+    for (let i = 0; i < 7; i++) {
+      expect(interrupted.next()).toBe(uninterrupted.next());
+    }
+    const snapshot = interrupted.snapshot();
+    const resumed = mulberry32(snapshot.seed, snapshot);
+    expect(resumed.next()).toBe(uninterrupted.next());
+    expect(resumed.pick(["a", "b", "c"])).toBe(
+      uninterrupted.pick(["a", "b", "c"]),
+    );
+    expect(resumed.snapshot().draws).toBe(uninterrupted.snapshot().draws);
+  });
+
   it("diverges for different seeds", () => {
     const a = mulberry32(1);
     const b = mulberry32(2);
@@ -185,6 +200,34 @@ describe("rng", () => {
 
   it("hashString is stable", () => {
     expect(hashString("CRASH")).toBe(hashString("CRASH"));
+  });
+});
+
+describe("state graph snapshots", () => {
+  it("round-trips scoring-relevant nodes, edges, counts, and first targets", () => {
+    const original = new StateGraph();
+    original.visitState("s1", "screen-1", 0);
+    original.visitState("s2", "screen-2", 1);
+    original.visitState("s3", "screen-3", 2);
+    original.visitState("s1", "screen-1", 2);
+    original.recordEdge("s1", "click:x", "s2", 1);
+    original.recordEdge("s1", "click:x", "s3", 2);
+
+    const restored = StateGraph.fromSnapshot(JSON.parse(JSON.stringify(original.snapshot())));
+    expect(restored.snapshot()).toEqual(original.snapshot());
+    expect(restored.edgeCount("s1", "click:x")).toBe(2);
+    expect(restored.edges.get("s1::click:x")?.leadsToState).toBe("s2");
+  });
+
+  it("rejects duplicate or dangling persisted graph records", () => {
+    expect(() =>
+      StateGraph.fromSnapshot({
+        version: 1,
+        nodes: [{ fingerprint: "s1", screen: "scr", firstSeenActionIndex: 0, visits: 1, lastSeenActionIndex: 0 }],
+        edges: [{ fromState: "s1", actionKey: "x", count: 1, lastSeenActionIndex: 0, leadsToState: "missing" }],
+        screenCounts: [["scr", 1]],
+      }),
+    ).toThrow(/targets missing/i);
   });
 });
 

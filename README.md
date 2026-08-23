@@ -64,7 +64,9 @@ zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferr
 for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **release candidate 1; final gate pending**.
+Current status: **M10 — resumable exploration campaigns in progress**. RC1
+field validation is complete with a documented GO decision; the RC1 tag and
+release state remain unchanged and no rc.2 release has been published.
 
 ## Quickstart
 
@@ -97,10 +99,18 @@ workspace resolves to `--workspace <dir>` > `$INSPECTOR_WORKSPACE` > the current
 directory. Recorded runs live in `<workspace>/.inspector/runs.db`; inspect them
 with `pnpm cli runs list` and `runs show <runId>`.
 
-Note that autonomous CLI/windows/android *exploration* currently requires bespoke
-out-of-tree loops — the production explorer (`ExploreController`) speaks the web
-vocabulary only. The non-web adapters are production-backed and drivable, but the
-autonomous hunt command targets web (and fake) adapters today.
+Autonomous exploration is available through the same hunt contract for web,
+fake, CLI/PTTY, Windows/UIA, and Android targets. A hunt records a durable
+exploration campaign; after an abrupt controller death, continue it with:
+
+```bash
+pnpm cli hunt --resume <runId> --json
+```
+
+The original adapter, target provenance, explorer configuration, action graph,
+decision stream, findings, and consumed budgets are restored. In contrast,
+`pnpm cli runs resume <runId>` is intentionally diagnostic: it reattaches and
+re-observes an environment without continuing autonomous exploration.
 
 ## Platform capability summary
 

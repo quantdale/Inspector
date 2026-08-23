@@ -1,12 +1,12 @@
 # Project Status
 
-Last updated: M9 COMPLETE (2026-08-23)
+Last updated: M10 IN PROGRESS (2026-08-23)
 
 ## Campaign
 
-- Mode: **M9 — Platform-neutral autonomous exploration: COMPLETE**.
-  Next proposed milestone: **M10 resumable exploration campaigns**
-  (`next_milestone_after_completion` in campaign.yaml).
+- Mode: **M10 — Resumable exploration campaigns: IN PROGRESS**. M9 native
+  autonomous exploration is complete; M10 is the active campaign in
+  `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
@@ -26,6 +26,25 @@ proofs on the final tree: Calculator 56 actions/50 states; vim 100 actions/
 100 states; com.android.settings 45 actions/19 states (2-state pre-W7
 baseline). Full exit gate PASS (unit 515/3skip; integration 137/137 after a
 bounded retry of the documented concurrent-startup flake class).
+
+## M10 progress
+
+The active implementation has a versioned, checksummed exploration checkpoint
+stream (`inspector-exploration-checkpoint/1`) alongside low-level run steps.
+Serializable Mulberry32 state, StateGraph snapshots, committed-step
+reconciliation, durable reset/action budgets, web/native campaign restoration,
+finding-class persistence, and `inspector hunt --resume <runId>` are wired.
+Deterministic web and native interruption tests plus a bounded multi-restart
+soak pass. Real-backend proofs also pass: a Playwright seeded-web hunt was
+interrupted at run `run_4842e061213d4415971e879c3615973c` and resumed to its
+original 12-action cap (5 states, 1 reset, one confirmed PAGE_ERROR, 28
+monotonic steps, 8 retained checkpoints); a real ADB Settings hunt was
+interrupted at run `run_7eb518e2e11849a3bcd97a66f73abd0b` and resumed to its
+original 8-action cap (3 states, 16 monotonic steps, 8 retained checkpoints).
+The available machine has no `vim` executable, and the Calculator UIA create
+probe exceeded its 30-second lifecycle deadline; those backends remain
+environmental non-proofs, not substituted mock passes. The final repository
+gate and durable-state synchronization remain open.
 
 ## Candidate staleness (GA decision)
 

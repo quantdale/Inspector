@@ -128,6 +128,11 @@ export class PolicyEngine {
     return { allowed: true };
   }
 
+  /** Seed reset budget from durable exploration reset admissions after restart. */
+  seedResetCount(count: number): void {
+    this.counters.resets = Math.max(this.counters.resets, count);
+  }
+
   recordArtifactBytes(bytes: number): PolicyDecision {
     const limit = this.policy.budgets.max_artifact_megabytes * 1024 * 1024;
     if (this.counters.artifactBytes + bytes > limit) {

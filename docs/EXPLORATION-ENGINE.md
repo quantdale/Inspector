@@ -142,3 +142,19 @@ Track path hashes and semantic action counts. Penalize repeatedly traversed cycl
 ## Novelty exhaustion
 
 A run may declare exploration saturation when a rolling window shows no new states, transitions, significant coverage, oracle opportunities, or high-risk sequences despite strategy diversification.
+
+## Resumable campaign state
+
+The web and native loops persist a validated
+`inspector-exploration-checkpoint/1` snapshot in the dedicated exploration
+campaign stream. It contains the graph, deterministic PRNG continuation,
+recency/toxic/rejected action state, native tried-edge/use accounting, active
+reproducer segment, anomaly classes, and consumed budgets. The low-level
+action/step log remains authoritative when a controller dies between a durable
+action commit and the next explorer snapshot; reconciliation records committed
+edges and blocks pending/unknown actions instead of resubmitting them.
+
+`inspector hunt --resume <runId>` continues this campaign after validating the
+original adapter and target provenance. `inspector runs resume <runId>` remains
+the diagnostic environment-reattachment command and does not advance the
+exploration policy.

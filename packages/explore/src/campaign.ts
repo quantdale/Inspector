@@ -15,7 +15,7 @@ import type {
   OracleSignalKind,
   RegressionScenario,
 } from "@inspector/finding";
-import type { Store, FindingRecord } from "@inspector/store-sqlite";
+import type { Store, FindingRecord, ActionRecord } from "@inspector/store-sqlite";
 import {
   StateGraph,
   stateFingerprint,
@@ -34,6 +34,16 @@ import { FaultController } from "./faults.js";
 import { NoopPlanner, type Planner, type PlannerContext } from "./planner.js";
 import { DEFAULT_SEQUENCE_LENGTHS } from "./inputs.js";
 import { WebReplayDriver } from "./web-replay.js";
+import {
+  EXPLORER_VERSION,
+  configFingerprint,
+  loadLatestCheckpoint,
+  writeCheckpoint,
+  type ExplorationCheckpointPayload,
+  type ExplorerKind,
+  type FindingOutcomeSnapshot,
+} from "./checkpoint.js";
+import { restoreRng } from "./rng.js";
 
 export interface ExploreConfig {
   seed: number;
@@ -105,12 +115,14 @@ export interface ExploreDeps {
   replayDriverFactory?: () => ReplayDriver;
   config: ExploreConfig;
   caps?: CapabilityDoc;
+  /** Restore the durable exploration campaign instead of starting a new one. */
+  resume?: boolean;
 }
 
 const DEFAULT_OBSERVE = ["url", "uiTree", "storage", "pageErrors", "title"];
 
 export class ExploreController {
-  private readonly rng: Rng;
+  private rng: Rng;
   private readonly graph = new StateGraph();
   private readonly config: ExploreConfig;
   private readonly run: RunController;
@@ -138,6 +150,17 @@ export class ExploreController {
   private lastObs: Observation | null = null;
   private currentState = "";
   private currentScreen = "";
+  private actionKindSequence: string[] = [];
+  private readonly campaignStartedAt: string;
+  private checkpointStepSequence = 0;
+  /** Committed actions whose post-action observation was not present when a
+   * lagging checkpoint was reconciled. The first fresh observation after
+   * restore is authoritative for the immediately preceding committed step. */
+  private pendingPostActionEdges: Array<{ fromState: string; actionKey: string }> = [];
+  private processedFindingClassKeys = new Set<string>();
+  private findingOutcomes: FindingOutcome[] = [];
+  private readonly campaignEnabled: boolean;
+  private readonly resumed: boolean;
 
   private findingEngine?: FindingEngine;
   private replayDriverFactory?: () => ReplayDriver;
@@ -147,7 +170,33 @@ export class ExploreController {
     this.run = deps.run;
     this.config = deps.config;
     this.caps = deps.caps ?? deps.run.caps;
-    this.rng = mulberry32(deps.config.seed >>> 0);
+    const campaign = deps.store && typeof deps.store.getExplorationCampaign === "function"
+      ? deps.store.getExplorationCampaign(deps.run.runId)
+      : undefined;
+    this.campaignEnabled = campaign !== undefined && deps.store !== undefined;
+    const identity = {
+      runId: deps.run.runId,
+      explorerKind: "web" as ExplorerKind,
+      explorerVersion: EXPLORER_VERSION,
+      adapter: (deps.caps ?? deps.run.caps).adapter,
+      seed: deps.config.seed >>> 0,
+      configFingerprint: configFingerprint(deps.config),
+    };
+    const restored = deps.resume
+      ? (() => {
+          if (!deps.store || !campaign) {
+            throw new Error(
+              `run ${deps.run.runId} has no durable autonomous exploration campaign; use 'runs resume' only for environment reattachment`,
+            );
+          }
+          return loadLatestCheckpoint(deps.store, identity, this.budgetFor(deps.config));
+        })()
+      : null;
+    if (deps.resume && !restored) {
+      throw new Error(`run ${deps.run.runId} has no exploration checkpoint; refusing to start a fresh campaign with the same run id`);
+    }
+    this.rng = restored ? restoreRng(restored.rng) : mulberry32(deps.config.seed >>> 0);
+    this.resumed = restored !== null;
     this.faults = new FaultController(this.caps, {
       enableFaultInjection: !!deps.config.enableFaultInjection,
       disposable: deps.config.disposable ?? false,
@@ -158,6 +207,8 @@ export class ExploreController {
     this.findingEngine = deps.findingEngine;
     this.replayDriverFactory = deps.replayDriverFactory;
     this.store = deps.store;
+    this.campaignStartedAt = campaign?.createdAt ?? new Date().toISOString();
+    if (restored) this.restore(restored);
   }
 
   private get plateauWindow(): number {
@@ -170,6 +221,171 @@ export class ExploreController {
 
   private get observeFailureLimit(): number {
     return this.config.observeFailureLimit ?? 3;
+  }
+
+  private budgetFor(config: ExploreConfig): ExplorationCheckpointPayload["budget"] {
+    return {
+      maxActions: config.maxActions,
+      maxResets: config.maxResets ?? 0,
+      maxFindings: config.maxFindings ?? 0,
+      maxWallMs: config.maxWallMs ?? 0,
+    };
+  }
+
+  private restore(payload: ExplorationCheckpointPayload): void {
+    this.graph.restore(payload.graph);
+    this.actionKindSequence = payload.actionKindSequence.slice();
+    this.actionPath = payload.actionPath.slice();
+    this.recentActionKeys = payload.recentActionKeys.slice();
+    this.actionsExecuted = payload.actionsExecuted;
+    this.actionsSinceNewState = payload.actionsSinceNewState;
+    this.resets = payload.resets;
+    this.currentState = payload.currentState;
+    this.currentScreen = payload.currentScreen;
+    this.checkpointStepSequence = payload.stepSequence;
+    this.pendingPostActionEdges = [];
+    this.anomalies.push(...payload.anomalies);
+    this.anomalyClassKeys.clear();
+    for (const key of payload.anomalyClassKeys) this.anomalyClassKeys.add(key);
+    this.processedFindingClassKeys = new Set(payload.processedFindingClassKeys);
+    this.findingOutcomes = payload.findingOutcomes.map((outcome) => ({
+      anomalyKey: outcome.anomalyKey,
+      classKey: outcome.classKey,
+      outcome: outcome.outcome as FindingOutcomeKind,
+      ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+      ...(outcome.findingId !== undefined ? { findingId: outcome.findingId } : {}),
+    }));
+    for (const key of payload.toxicActionKeys) this.toxicActionKeys.add(key);
+    for (const key of payload.rejectedActionKeys) this.rejectedActionKeys.add(key);
+    this.reconcileCommittedState();
+  }
+
+  /**
+   * Reconcile the authoritative action log after a checkpoint lag. The
+   * explorer never resubmits these actions: a missing post-action observation
+   * produces an honest null-target edge.
+   */
+  private reconcileCommittedState(): void {
+    if (!this.store || !this.campaignEnabled) return;
+    const unresolved = this.store.getInFlightActions(this.run.runId);
+    for (const action of unresolved) {
+      const metadata = parseStoredActionMetadata(action.metadata_json);
+      const key = metadata?.actionKey ?? null;
+      if (key) this.toxicActionKeys.add(key);
+      if (metadata?.rngAfter) this.rng = restoreRng(metadata.rngAfter);
+      this.warnings.push(
+        `unresolved action ${action.id} (${action.status}) retained as non-retryable`,
+      );
+    }
+    this.resets = Math.max(
+      this.resets,
+      this.store.countExplorationEvents(this.run.runId, "reset"),
+    );
+    const durableActionCount = this.store.countRunActions(this.run.runId);
+    const actions = this.store.listCommittedActionsAfterStep(
+      this.run.runId,
+      this.checkpointStepSequence,
+    );
+    const steps = this.store.getRunSteps(this.run.runId);
+    const actionIndexBase = this.actionsExecuted;
+    for (let i = 0; i < actions.length; i++) {
+      const committed = actions[i]!;
+      const metadata = parseStoredActionMetadata(committed.action.metadata_json);
+      const storedMetadata = metadata ?? {};
+      const actionKey = storedMetadata.actionKey;
+      if (actionKey === undefined) {
+        this.warnings.push(
+          `committed action ${committed.action.id} has no exploration key; edge target retained as unknown`,
+        );
+        continue;
+      }
+      if (storedMetadata.rngAfter) this.rng = restoreRng(storedMetadata.rngAfter);
+      const stateBefore = storedMetadata.stateBefore ?? this.currentState;
+      if (stateBefore.length === 0) continue;
+      this.recentActionKeys.push(actionKey);
+      if (this.recentActionKeys.length > this.plateauWindow) this.recentActionKeys.shift();
+      const afterStep = steps.find(
+        (step) =>
+          step.step.sequence === committed.stepSequence + 1 &&
+          step.action === null &&
+          step.observations.length > 0,
+      );
+      let toState: string | null = null;
+      let newState = false;
+      if (afterStep) {
+        try {
+          const summary = JSON.parse(afterStep.observations[0]!.summary_json) as Record<string, unknown>;
+          const after = { summary } as Observation;
+          toState = stateFingerprint(after);
+          const screen = screenFingerprint(after);
+          newState = this.graph.visitState(toState, screen, actionIndexBase + i + 1);
+          this.currentState = toState;
+          this.currentScreen = screen;
+        } catch {
+          this.warnings.push(
+            `post-action observation for ${committed.action.id} was malformed; edge target remains unknown`,
+          );
+        }
+      }
+      this.graph.recordEdge(stateBefore, actionKey, toState, actionIndexBase + i + 1);
+      this.actionsSinceNewState = newState ? 0 : this.actionsSinceNewState + 1;
+      if (toState === null) {
+        this.pendingPostActionEdges.push({ fromState: stateBefore, actionKey });
+      }
+      this.actionKindSequence.push(committed.action.kind);
+      const reconstructed = actionFromStoredRecord(committed.action, storedMetadata);
+      if (reconstructed) this.actionPath.push(reconstructed);
+    }
+    this.actionsExecuted = Math.max(this.actionsExecuted, durableActionCount);
+    this.checkpointStepSequence = Math.max(
+      this.checkpointStepSequence,
+      this.store.maxRunStepSequence(this.run.runId),
+    );
+  }
+
+  private checkpoint(): void {
+    if (!this.store || !this.campaignEnabled) return;
+    this.actionsExecuted = Math.max(
+      this.actionsExecuted,
+      this.store.countRunActions(this.run.runId),
+    );
+    const payload: ExplorationCheckpointPayload = {
+      schema: "inspector-exploration-checkpoint/1",
+      version: 1,
+      runId: this.run.runId,
+      explorerKind: "web",
+      explorerVersion: EXPLORER_VERSION,
+      adapter: this.caps.adapter,
+      seed: this.config.seed >>> 0,
+      configFingerprint: configFingerprint(this.config),
+      rng: this.rng.snapshot(),
+      stepSequence: this.store.maxRunStepSequence(this.run.runId),
+      campaignStartedAt: this.campaignStartedAt,
+      actionsExecuted: this.actionsExecuted,
+      resets: this.resets,
+      actionsSinceNewState: this.actionsSinceNewState,
+      recentActionKeys: this.recentActionKeys.slice(),
+      toxicActionKeys: [...this.toxicActionKeys].sort(),
+      rejectedActionKeys: [...this.rejectedActionKeys].sort(),
+      currentState: this.currentState,
+      currentScreen: this.currentScreen,
+      graph: this.graph.snapshot(),
+      actionKindSequence: this.actionKindSequence.slice(),
+      actionPath: this.actionPath.slice(),
+      anomalies: this.anomalies.slice(),
+      anomalyClassKeys: [...this.anomalyClassKeys].sort(),
+      processedFindingClassKeys: [...this.processedFindingClassKeys].sort(),
+      findingOutcomes: this.findingOutcomes.map((outcome) => ({
+        anomalyKey: outcome.anomalyKey,
+        classKey: outcome.classKey,
+        outcome: outcome.outcome,
+        ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+        ...(outcome.findingId !== undefined ? { findingId: outcome.findingId } : {}),
+      } satisfies FindingOutcomeSnapshot)),
+      budget: this.budgetFor(this.config),
+    };
+    writeCheckpoint(this.store, payload);
+    this.checkpointStepSequence = payload.stepSequence;
   }
 
   private makeAction(c: CandidateAction): Action {
@@ -196,17 +412,23 @@ export class ExploreController {
         actionKey: c.actionKey,
         sourceElementId: c.sourceElementId ?? null,
         isBoundary: !!c.isBoundary,
+        exploration: {
+          actionKey: c.actionKey,
+          stateBefore: this.currentState,
+          rngAfter: this.rng.snapshot(),
+        },
       },
     };
   }
 
   async run_(): Promise<ExploreResult> {
-    this.startMs = Date.now();
+    this.startMs = Date.parse(this.campaignStartedAt);
+    if (!Number.isFinite(this.startMs)) this.startMs = Date.now();
     return this.loop();
   }
 
   private async loop(): Promise<ExploreResult> {
-    const actionKindSequence: string[] = [];
+    const actionKindSequence = this.actionKindSequence;
     // The initial observe is guarded: a broken observer must stop the run
     // with an explicit reason, not crash it.
     const first = await this.observeSafe();
@@ -216,7 +438,27 @@ export class ExploreController {
     this.lastObs = first;
     this.currentState = stateFingerprint(first);
     this.currentScreen = screenFingerprint(first);
-    this.graph.visitState(this.currentState, this.currentScreen, 0);
+    const hadPendingPostActionEdge = this.pendingPostActionEdges.length > 0;
+    const pendingEdge = this.pendingPostActionEdges.pop();
+    if (pendingEdge) {
+      // A process can die after the adapter has acted but before the explorer
+      // records the following observation. Resolve only the latest lagging
+      // committed edge; any older missing targets remain honestly unknown.
+      this.graph.resolveEdgeTarget(
+        pendingEdge.fromState,
+        pendingEdge.actionKey,
+        this.currentState,
+      );
+      this.pendingPostActionEdges = [];
+    }
+    if (!this.resumed || !this.graph.nodes.has(this.currentState) || hadPendingPostActionEdge) {
+      this.graph.visitState(
+        this.currentState,
+        this.currentScreen,
+        this.actionsExecuted,
+      );
+    }
+    this.checkpoint();
 
     let obs = this.lastObs!;
     while (this.actionsExecuted < this.config.maxActions) {
@@ -252,6 +494,10 @@ export class ExploreController {
       this.actionsExecuted += executed.count;
       for (const k of executed.kinds) actionKindSequence.push(k);
       obs = this.lastObs!;
+      // Persist after every action group before any stop/reset branch can
+      // return. A hard kill before this point is reconciled from committed
+      // action metadata on resume.
+      this.checkpoint();
 
       if (executed.stopReason === "adapter-error") {
         // One lost environment must not end the campaign: restore the baseline
@@ -297,6 +543,7 @@ export class ExploreController {
         obs = this.lastObs!;
         this.actionsSinceNewState = 0;
       }
+      this.checkpoint();
     }
 
     return this.finish(actionKindSequence, "action-budget");
@@ -509,9 +756,21 @@ export class ExploreController {
 
   private async doReset(): Promise<boolean> {
     this.resets += 1;
+    const resetEvent = this.store && this.campaignEnabled
+      ? this.store.appendExplorationEvent({
+          id: newId("checkpoint"),
+          runId: this.run.runId,
+          kind: "reset",
+          status: "pending",
+          stepSequence: this.store.maxRunStepSequence(this.run.runId),
+          payload: { stateBefore: this.currentState, actionCount: this.actionsExecuted },
+        })
+      : null;
     try {
       await this.run.reset();
+      if (resetEvent && this.store) this.store.resolveExplorationEvent(resetEvent.id, "committed");
     } catch (e) {
+      if (resetEvent && this.store) this.store.resolveExplorationEvent(resetEvent.id, "unknown");
       // The environment is too broken to restore; the caller must stop. The
       // error is recorded verbatim instead of being swallowed.
       this.warnings.push(`reset failed: ${errorMessage(e)}`);
@@ -533,6 +792,7 @@ export class ExploreController {
     );
     this.recentActionKeys = [];
     this.actionsSinceNewState = 0;
+    this.checkpoint();
     return true;
   }
 
@@ -570,11 +830,27 @@ export class ExploreController {
       findings: [],
       evidenceBundles: [],
       regressionScenarios: [],
-      findingOutcomes: [],
+      findingOutcomes: this.findingOutcomes.slice(),
       warnings: [],
       actionKindSequence,
       stoppedReason,
     };
+    if (this.store && typeof this.store.getFindingByClassKey === "function" && this.findingEngine) {
+      const restoredFindingIds = new Set<string>();
+      for (const anomaly of this.anomalies) {
+        if (!this.processedFindingClassKeys.has(anomaly.classKey)) continue;
+        const record = this.store.getFindingByClassKey(this.run.runId, anomaly.classKey);
+        if (!record || !["CONFIRMED", "RESOLVED", "REGRESSED"].includes(record.status)) continue;
+        const finding = this.findingEngine.rehydrate(record);
+        if (restoredFindingIds.has(finding.id)) continue;
+        restoredFindingIds.add(finding.id);
+        base.findings.push(finding);
+      }
+    }
+    // Make the terminal exploration state durable before reproduction. A
+    // restart during reproduction can then resume from the same anomaly set
+    // without forgetting the graph or treating the run as fresh.
+    this.checkpoint();
 
     if (
       this.config.skipReproduction ||
@@ -588,6 +864,7 @@ export class ExploreController {
     const cap = this.config.maxFindings;
 
     for (const a of this.anomalies) {
+      if (this.processedFindingClassKeys.has(a.classKey)) continue;
       // Defensive cap: exploration normally stops at the cap already, but
       // finish() must never emit more confirmed findings than allowed.
       if (cap !== undefined && base.findings.length >= cap) {
@@ -600,6 +877,9 @@ export class ExploreController {
       }
       try {
         await this.processAnomaly(a, base);
+        this.processedFindingClassKeys.add(a.classKey);
+        this.findingOutcomes = base.findingOutcomes.slice();
+        this.checkpoint();
       } catch (e) {
         // One broken reproduction (driver factory, replay, persist) must not
         // destroy the remaining anomalies: record and continue.
@@ -611,6 +891,9 @@ export class ExploreController {
           outcome: "error",
           detail,
         });
+        this.processedFindingClassKeys.add(a.classKey);
+        this.findingOutcomes = base.findingOutcomes.slice();
+        this.checkpoint();
       }
     }
 
@@ -653,11 +936,50 @@ export class ExploreController {
       kind: a.kind as OracleSignalKind,
       detail: a.message,
     };
-    const finding = engine.ingest(signal, {
-      runId: this.run.runId,
-      title: a.message,
-      adapter: this.caps.adapter,
-    });
+    const record = (outcome: FindingOutcomeKind, detail?: string, findingId?: string) => {
+      const entry: FindingOutcome = {
+        anomalyKey: a.key,
+        classKey: a.classKey,
+        outcome,
+        ...(findingId !== undefined ? { findingId } : {}),
+      };
+      if (detail !== undefined) entry.detail = detail;
+      base.findingOutcomes.push(entry);
+    };
+    const durable = this.store && typeof this.store.getFindingByClassKey === "function"
+      ? this.store.getFindingByClassKey(this.run.runId, a.classKey)
+      : undefined;
+    let finding = durable
+      ? engine.rehydrate(durable)
+      : engine.ingest(signal, {
+          runId: this.run.runId,
+          title: a.message,
+          adapter: this.caps.adapter,
+          classKey: a.classKey,
+        });
+    if (durable) {
+      if (finding.status === "REPRODUCING") {
+        finding = engine.transition(finding, "CANDIDATE", {
+          reason: "controller restarted during reproduction",
+          actor: "exploration-resume",
+        });
+      } else if (finding.status === "MINIMIZED" && finding.minimization?.verifiedReproduction === true) {
+        finding = engine.transition(finding, "CONFIRMED", {
+          reason: "resume completed persisted minimization",
+          actor: "exploration-resume",
+        });
+        base.findings.push(finding);
+        record("confirmed", "finding lifecycle completed before controller restart", finding.id);
+        return;
+      } else if (["CONFIRMED", "RESOLVED", "REGRESSED"].includes(finding.status)) {
+        base.findings.push(finding);
+        record("confirmed", "finding already persisted before controller restart", finding.id);
+        return;
+      } else if (finding.status === "REJECTED" || finding.status === "FLAKY") {
+        record(finding.status === "REJECTED" ? "rejected" : "flaky", "finding lifecycle already persisted before controller restart", finding.id);
+        return;
+      }
+    }
     this.persistFinding(finding);
 
     const rep = await engine.reproduce(finding, a.actionPath, driver, {
@@ -670,22 +992,12 @@ export class ExploreController {
     // (deduplicated), and the artifact refs captured by the discovering step.
     const signals = mergeSignals(rep.lastSignals, [signal]);
     const artifactRefs = a.outcome?.artifactRefs ?? [];
-    const record = (outcome: FindingOutcomeKind, detail?: string) => {
-      const entry: FindingOutcome = {
-        anomalyKey: a.key,
-        classKey: a.classKey,
-        outcome,
-        findingId: finding.id,
-      };
-      if (detail !== undefined) entry.detail = detail;
-      base.findingOutcomes.push(entry);
-    };
-
     if (rep.finding.status === "REJECTED") {
       record(
         "rejected",
         rep.stats.lastError ??
           `reproduction policy not satisfied (${rep.stats.successes}/${rep.stats.attempts} attempts reproduced)`,
+        finding.id,
       );
       return;
     }
@@ -693,6 +1005,7 @@ export class ExploreController {
       record(
         "flaky",
         `reproduction flaky (${rep.stats.successes}/${rep.stats.attempts} attempts reproduced)`,
+        finding.id,
       );
       return;
     }
@@ -710,14 +1023,14 @@ export class ExploreController {
           reason: "minimization verified reproduction",
         });
         this.persistFinding(confirmed);
-        record("confirmed");
+        record("confirmed", undefined, finding.id);
       } else {
         // A minimized-but-unverified finding must never be promoted.
         confirmed = engine.transition(rep.finding, "REJECTED", {
           reason: "minimization did not verify reproduction",
         });
         this.persistFinding(confirmed);
-        record("rejected", "minimization did not verify reproduction");
+        record("rejected", "minimization did not verify reproduction", finding.id);
         return;
       }
     } else {
@@ -726,6 +1039,7 @@ export class ExploreController {
       record(
         "confirmed-unverified-minimization",
         "minimize() baseline verification failed; confirmed by reproduction policy only",
+        finding.id,
       );
     }
 
@@ -766,6 +1080,7 @@ export class ExploreController {
         ? JSON.stringify(f.lastTransition)
         : null,
       adapter: f.adapter ?? null,
+      classKey: f.classKey ?? null,
     };
     try {
       this.store.putFinding(record);
@@ -779,6 +1094,66 @@ export class ExploreController {
 function baseActionKey(actionKey: string): string {
   const m = /^seq:(.*):\d+$/.exec(actionKey);
   return m ? m[1]! : actionKey;
+}
+
+interface StoredActionExplorationMetadata {
+  actionKey?: string;
+  stateBefore?: string;
+  rngAfter?: ReturnType<Rng["snapshot"]>;
+}
+
+function parseStoredActionMetadata(raw: string | null): StoredActionExplorationMetadata | null {
+  if (!raw) return null;
+  try {
+    const wrapper = JSON.parse(raw) as {
+      metadata?: { exploration?: StoredActionExplorationMetadata } | null;
+    };
+    const exploration = wrapper.metadata?.exploration;
+    if (!exploration || typeof exploration !== "object") return null;
+    return {
+      ...(typeof exploration.actionKey === "string"
+        ? { actionKey: exploration.actionKey }
+        : {}),
+      ...(typeof exploration.stateBefore === "string"
+        ? { stateBefore: exploration.stateBefore }
+        : {}),
+      ...(exploration.rngAfter !== undefined
+        ? { rngAfter: exploration.rngAfter as ReturnType<Rng["snapshot"]> }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function actionFromStoredRecord(
+  record: ActionRecord,
+  metadata: StoredActionExplorationMetadata,
+): Action | null {
+  if (!record.metadata_json) return null;
+  try {
+    const wrapper = JSON.parse(record.metadata_json) as {
+      input?: Record<string, unknown> | null;
+      metadata?: Record<string, unknown> | null;
+    };
+    return {
+      id: record.id,
+      runId: record.run_id,
+      environmentId: record.environment_id,
+      kind: record.kind,
+      risk: record.risk as Action["risk"],
+      deadlineMs: record.deadline_ms,
+      idempotency: record.idempotency as Action["idempotency"],
+      target: null,
+      input: wrapper.input ?? null,
+      metadata: {
+        ...(wrapper.metadata ?? {}),
+        exploration: metadata,
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 function errorMessage(e: unknown): string {

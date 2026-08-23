@@ -423,6 +423,86 @@ describe("cli", () => {
     expect(resumed.stdout).toContain("final status:");
   }, 90000);
 
+  it("continues the autonomous campaign with hunt --resume", async () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-cli-hunt-resume-"));
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        tsxImportUrl,
+        cliBin,
+        "hunt",
+        "--adapter",
+        "fake",
+        "--max-actions",
+        "200",
+        "--max-minutes",
+        "5",
+        "--json",
+        "--workspace",
+        dir,
+      ],
+      { cwd: process.cwd(), env: { ...process.env }, stdio: "ignore" },
+    );
+    const dbPath = join(dir, ".inspector", "runs.db");
+    let interruptedId: string | undefined;
+    let actionsBeforeKill = 0;
+    for (let i = 0; i < 60 && !interruptedId; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (!existsSync(dbPath)) continue;
+      let probe: Store | undefined;
+      try {
+        probe = Store.open(dbPath);
+        const active = probe.listRuns(5).find((r) => r.status === "running");
+        if (active && probe.countRunActions(active.id) >= 3) {
+          interruptedId = active.id;
+          actionsBeforeKill = probe.countRunActions(active.id);
+        }
+      } catch {
+        // The hunt may hold the short SQLite write lock; retry the probe.
+      } finally {
+        probe?.close();
+      }
+    }
+    expect(interruptedId).toBeTruthy();
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      child.kill("SIGKILL");
+    }
+    await new Promise((resolve) => child.once("close", resolve));
+
+    const resumed = await runCli(["hunt", "--resume", interruptedId!, "--json"], dir);
+    expect(
+      resumed.code,
+      `hunt continuation failed (stderr: ${resumed.stderr} stdout: ${resumed.stdout})`,
+    ).toBe(0);
+    const summary = JSON.parse(resumed.stdout) as {
+      runId: string;
+      actionsExecuted: number;
+      stoppedReason: string;
+      findings: Array<{ id: string }>;
+    };
+    expect(summary.runId).toBe(interruptedId);
+    expect(summary.actionsExecuted).toBeGreaterThanOrEqual(actionsBeforeKill);
+    expect(["action-budget", "no-candidates"]).toContain(summary.stoppedReason);
+
+    const finalStore = Store.open(dbPath);
+    try {
+      expect(finalStore.countRunActions(interruptedId!)).toBe(summary.actionsExecuted);
+      expect(finalStore.getRun(interruptedId!)?.status).toBe("closed");
+      const sequences = finalStore.getRunSteps(interruptedId!).map((s) => s.step.sequence);
+      expect(new Set(sequences).size).toBe(sequences.length);
+      const findingClassKeys = finalStore
+        .listFindings(1000)
+        .filter((f) => f.runId === interruptedId && f.classKey)
+        .map((f) => f.classKey);
+      expect(new Set(findingClassKeys).size).toBe(findingClassKeys.length);
+    } finally {
+      finalStore.close();
+    }
+  }, 90000);
+
   it("resolves $INSPECTOR_WORKSPACE when --workspace is absent", async () => {
     const envWs = mkdtempSync(join(tmpdir(), "inspector-cli-envws-"));
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-"));

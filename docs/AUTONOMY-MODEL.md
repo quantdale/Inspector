@@ -75,6 +75,23 @@ A run is resumable only if Inspector can distinguish:
 
 Retryable actions require idempotency semantics. Non-idempotent actions with unknown outcomes trigger re-observation or environment reset rather than blind replay.
 
+Autonomous hunts add a versioned exploration checkpoint beside the generic
+low-level run checkpoint. The durable action/step log is authoritative when a
+controller dies between a committed action and the explorer snapshot: the
+explorer restores the PRNG draw state, graph, recency/toxic/rejected keys,
+native tried edges, and finding classes, then reconciles committed metadata
+without resubmitting an unknown action. A lagging checkpoint may preserve an
+edge with an unknown target until the next authoritative observation; it never
+reuses a step sequence or silently starts a fresh campaign with the same run.
+
+Campaign wall-clock budget is measured from the durable campaign creation time,
+including controller downtime. This conservative semantic prevents repeated
+restart from granting free exploration time. Action, reset, and finding caps
+are derived from durable admissions/lifecycle records and the versioned
+campaign checkpoint. Checkpoint payloads are checksummed, validated against run,
+adapter, explorer, seed, and configuration identity, and retained in a bounded
+latest-checkpoint window.
+
 ## Repair loop
 
 Repair is a separate state machine:

@@ -150,6 +150,59 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE environments ADD COLUMN create_options TEXT;
   ALTER TABLE environments ADD COLUMN spawn_env TEXT;
   `,
+  // M10 resumable exploration: typed campaign identity, bounded full
+  // snapshots, durable reset-attempt events, and semantic action metadata
+  // needed to reconcile a committed step when the explorer snapshot lags it.
+  `
+  ALTER TABLE actions ADD COLUMN metadata_json TEXT;
+
+  CREATE TABLE IF NOT EXISTS exploration_campaigns (
+    run_id TEXT PRIMARY KEY REFERENCES runs(id),
+    schema_version INTEGER NOT NULL,
+    explorer_kind TEXT NOT NULL,
+    explorer_version TEXT NOT NULL,
+    adapter TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running'
+  );
+
+  CREATE TABLE IF NOT EXISTS exploration_checkpoints (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    schema_version INTEGER NOT NULL,
+    explorer_kind TEXT NOT NULL,
+    explorer_version TEXT NOT NULL,
+    step_sequence INTEGER NOT NULL,
+    action_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    payload_sha256 TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS exploration_events (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    step_sequence INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    resolved_at TEXT,
+    payload_json TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_exploration_checkpoints_run
+    ON exploration_checkpoints(run_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_exploration_events_run
+    ON exploration_events(run_id, created_at);
+  `,
+  // M10 finding continuity: bind a durable finding to the exploration defect
+  // class that created it so a controller death during reproduction cannot
+  // ingest a second finding for the same anomaly.
+  `
+  ALTER TABLE findings ADD COLUMN class_key TEXT;
+  CREATE INDEX IF NOT EXISTS idx_findings_run_class ON findings(run_id, class_key);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {

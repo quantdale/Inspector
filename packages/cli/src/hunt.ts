@@ -18,7 +18,23 @@ import {
   type OracleSignal,
   type OracleSignalKind,
 } from "@inspector/finding";
-import { ExploreController, WebReplayDriver, runNativeHunt, type NativeSessionDeps, mulberry32 } from "@inspector/explore";
+import {
+  ExploreController,
+  WebReplayDriver,
+  runNativeHunt,
+  type ExploreConfig,
+  type NativeExplorationConfig,
+  type NativeSessionDeps,
+  EXPLORER_VERSION,
+  configFingerprint,
+  loadLatestCheckpoint,
+  writeCheckpoint,
+  StateGraph,
+  mulberry32,
+  restoreRng,
+  type ExplorationCheckpointPayload,
+  type FindingOutcomeSnapshot,
+} from "@inspector/explore";
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
 import { adapterSpawn, isRepoRoot, openWorkspace, REPO_ROOT_WARNING, remapWorkspaceConflict } from "./workspace.js";
@@ -36,6 +52,7 @@ export interface HuntRequest {
   maxActions: number;
   maxMinutes: number;
   maxFindings: number;
+  resumeRunId?: string;
 }
 
 export interface HuntOutcomeEntry {
@@ -94,6 +111,13 @@ export function parseHuntRequest(parsed: ParsedInvocation): HuntRequest {
   if (targetRaw !== undefined && adapter === "web") {
     throw new CliError("invalid-value", "--target is not valid with --adapter web (use --url)");
   }
+  const resumeRaw = parsed.flags["--resume"];
+  if (resumeRaw !== undefined && typeof resumeRaw !== "string") {
+    throw new CliError("invalid-value", "--resume requires a run id");
+  }
+  if (resumeRaw !== undefined && parsed.positionals.length > 0) {
+    throw new CliError("invalid-value", "hunt --resume takes the run id as the --resume value, not a positional argument");
+  }
   return {
     adapter,
     targetUrl:
@@ -105,7 +129,147 @@ export function parseHuntRequest(parsed: ParsedInvocation): HuntRequest {
     maxActions: intFlag(parsed.flags, "--max-actions", 200),
     maxMinutes: intFlag(parsed.flags, "--max-minutes", 10),
     maxFindings: intFlag(parsed.flags, "--max-findings", 4),
+    ...(typeof resumeRaw === "string" ? { resumeRunId: resumeRaw } : {}),
   };
+}
+
+export function webExploreConfig(req: HuntRequest): ExploreConfig {
+  return {
+    seed: req.seed,
+    maxActions: req.maxActions,
+    maxWallMs: req.maxMinutes * 60_000,
+    maxFindings: req.maxFindings,
+    maxResets: 40,
+    noveltyPlateauLimit: 50,
+    reproducibleAttempts: 2,
+    reproducibleMinSuccesses: 1,
+    enableFaultInjection: false,
+    observeFields: ["url", "title", "uiTree", "storage", "pageErrors", "screenshot"],
+    targetUrl: req.targetUrl,
+  };
+}
+
+export function nativeExploreConfig(req: HuntRequest): NativeExplorationConfig {
+  return {
+    seed: req.seed,
+    maxActions: req.maxActions,
+    maxWallMs: req.maxMinutes * 60_000,
+    maxFindings: req.maxFindings,
+    noveltyPlateauLimit: 40,
+  };
+}
+
+export function fakeExploreConfig(req: HuntRequest): Omit<HuntRequest, "resumeRunId"> {
+  const { resumeRunId: _resumeRunId, ...config } = req;
+  return config;
+}
+
+interface DurableHuntMeta {
+  schema: "inspector-hunt/1";
+  version: 1;
+  request: Omit<HuntRequest, "resumeRunId">;
+  explorerKind: "web" | "native" | "fake";
+  explorerVersion: string;
+}
+
+function durableHuntMeta(req: HuntRequest): DurableHuntMeta {
+  const { resumeRunId: _resumeRunId, ...request } = req;
+  return {
+    schema: "inspector-hunt/1",
+    version: 1,
+    request,
+    explorerKind: req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native",
+    explorerVersion: EXPLORER_VERSION,
+  };
+}
+
+function storedAdapterSpawn(adapter: string | null): ReturnType<typeof adapterSpawn> | null {
+  if (adapter === "adapter-fake") return adapterSpawn("fake");
+  if (adapter === "web-playwright") return adapterSpawn("web");
+  if (adapter === "cli-pty") return adapterSpawn("cli");
+  if (adapter === "windows-uia") return adapterSpawn("windows");
+  if (adapter === "android-uiautomator") return adapterSpawn("android");
+  return null;
+}
+
+function parseDurableHuntMeta(raw: string | null, runId: string): DurableHuntMeta {
+  if (!raw) throw new CliError("not-resumable", `run ${runId} has no durable autonomous hunt configuration`);
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new CliError("not-resumable", `run ${runId} has malformed autonomous hunt configuration; refusing to guess`);
+  }
+  if (!isRecord(value) || value.schema !== "inspector-hunt/1" || value.version !== 1 || !isRecord(value.request) || value.explorerVersion !== EXPLORER_VERSION) {
+    throw new CliError("not-resumable", `run ${runId} has an incompatible autonomous hunt configuration; refusing to guess`);
+  }
+  const request = value.request;
+  const adapters = new Set(["web", "fake", "cli", "windows", "android"]);
+  if (
+    typeof request.adapter !== "string" ||
+    !adapters.has(request.adapter) ||
+    !Number.isSafeInteger(request.seed) ||
+    !Number.isSafeInteger(request.maxActions) ||
+    !Number.isSafeInteger(request.maxMinutes) ||
+    !Number.isSafeInteger(request.maxFindings) ||
+    (request.seed as number) < 0 || (request.maxActions as number) < 0 || (request.maxMinutes as number) < 0 || (request.maxFindings as number) < 0 ||
+    (request.targetUrl !== undefined && typeof request.targetUrl !== "string") ||
+    (request.target !== undefined && typeof request.target !== "string")
+  ) {
+    throw new CliError("not-resumable", `run ${runId} has an invalid autonomous hunt configuration; refusing to guess`);
+  }
+  if (typeof request.targetUrl === "string") {
+    try {
+      validateTargetUrl(request.targetUrl);
+    } catch {
+      throw new CliError("not-resumable", `run ${runId} has an invalid persisted target URL; refusing to resume`);
+    }
+  }
+  const explorerKind = value.explorerKind;
+  const expectedKind = request.adapter === "web" ? "web" : request.adapter === "fake" ? "fake" : "native";
+  if (explorerKind !== expectedKind) {
+    throw new CliError("incompatible-run", `run ${runId} records explorer '${String(explorerKind)}' for adapter '${request.adapter}'`);
+  }
+  return {
+    schema: "inspector-hunt/1",
+    version: 1,
+    request: request as DurableHuntMeta["request"],
+    explorerKind: explorerKind as DurableHuntMeta["explorerKind"],
+    explorerVersion: value.explorerVersion,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeResumeRequest(
+  parsed: ParsedInvocation,
+  requested: HuntRequest,
+  meta: DurableHuntMeta,
+): HuntRequest {
+  const original = meta.request;
+  const checks: Array<[string, string]> = [
+    ["--adapter", "adapter"],
+    ["--url", "targetUrl"],
+    ["--target", "target"],
+    ["--seed", "seed"],
+    ["--max-actions", "maxActions"],
+    ["--max-minutes", "maxMinutes"],
+    ["--max-findings", "maxFindings"],
+  ];
+  for (const [flag, key] of checks) {
+    if (parsed.flags[flag] === undefined) continue;
+    const requestedValue = requested[key as keyof HuntRequest];
+    const originalValue = original[key as keyof typeof original];
+    if (requestedValue !== originalValue) {
+      throw new CliError(
+        "incompatible-override",
+        `${flag}=${String(requestedValue)} does not match the original run value ${String(originalValue)}; resume refuses incompatible overrides`,
+      );
+    }
+  }
+  return { ...original, resumeRunId: requested.resumeRunId };
 }
 
 /** Mirror the adapter's RC1 policy: http(s) on localhost/127.0.0.1 only. */
@@ -202,6 +366,7 @@ async function runWebHunt(
   req: HuntRequest,
   base: string,
   progress: ProgressFn,
+  resume = false,
 ): Promise<HuntRunResult> {
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
 
@@ -228,24 +393,8 @@ async function runWebHunt(
     run,
     store,
     findingEngine,
-    config: {
-      seed: req.seed,
-      maxActions: req.maxActions,
-      maxWallMs: req.maxMinutes * 60_000,
-      maxFindings: req.maxFindings,
-      // Proven campaign defaults: without reset budget a single lost
-      // environment would end an otherwise healthy hunt.
-      maxResets: 40,
-      noveltyPlateauLimit: 50,
-      reproducibleAttempts: 2,
-      reproducibleMinSuccesses: 1,
-      enableFaultInjection: false,
-      observeFields: ["url", "title", "uiTree", "storage", "pageErrors", "screenshot"],
-      // Reproduction must hit the same external app the anomaly came from;
-      // otherwise real-target findings replay against the seeded app and
-      // honestly come out REJECTED/FLAKY.
-      targetUrl: req.targetUrl,
-    },
+    config: webExploreConfig(req),
+    resume,
     replayDriverFactory: () =>
       new WebReplayDriver({ artifactBaseDir: join(base, "replay"), targetUrl: req.targetUrl }),
   });
@@ -283,6 +432,7 @@ async function runNativeHuntCommand(
   req: HuntRequest,
   base: string,
   progress: ProgressFn,
+  resume = false,
 ): Promise<HuntRunResult> {
   void base;
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
@@ -309,14 +459,8 @@ async function runNativeHuntCommand(
   }
 
   const result = await runNativeHunt(
-    { run, findingEngine, ...(replayDriverFactory ? { replayDriverFactory } : {}) },
-    {
-      seed: req.seed,
-      maxActions: req.maxActions,
-      maxWallMs: req.maxMinutes * 60_000,
-      maxFindings: req.maxFindings,
-      noveltyPlateauLimit: 40,
-    },
+    { run, findingEngine, store, resume, ...(replayDriverFactory ? { replayDriverFactory } : {}) },
+    nativeExploreConfig(req),
   );
   progress(`native hunt stopped: ${result.stoppedReason}`);
   return {
@@ -404,6 +548,7 @@ async function runFakeHunt(
   store: Store,
   req: HuntRequest,
   progress: ProgressFn,
+  resume = false,
 ): Promise<HuntRunResult> {
   const engine = new FindingEngine(OracleEngine.defaults(), store);
   const sinks: FakeFindingSinks = {
@@ -413,16 +558,150 @@ async function runFakeHunt(
     seenClassKeys: new Set<string>(),
     warnings: [],
   };
-  const rng = mulberry32(req.seed >>> 0);
-  const statesSeen = new Set<string>(["home"]);
-  const segment: Action[] = [];
-
-  let state = "home";
-  let pendingFillIsBoundary = false;
-  let actionsExecuted = 0;
+  const campaign = store.getExplorationCampaign(run.runId);
+  const config = fakeExploreConfig(req);
+  const budget = {
+    maxActions: req.maxActions,
+    maxResets: 0,
+    maxFindings: req.maxFindings,
+    maxWallMs: req.maxMinutes * 60_000,
+  };
+  const restored = resume
+    ? (() => {
+        if (!campaign) throw new CliError("not-resumable", `run ${run.runId} has no durable fake exploration campaign`);
+        return loadLatestCheckpoint(store, {
+          runId: run.runId,
+          explorerKind: "fake",
+          explorerVersion: EXPLORER_VERSION,
+          adapter: campaign.adapter,
+          seed: req.seed >>> 0,
+          configFingerprint: configFingerprint(config),
+        }, budget);
+      })()
+    : null;
+  if (resume && !restored) throw new CliError("not-resumable", `run ${run.runId} has no fake exploration checkpoint`);
+  if (restored) {
+    for (const key of restored.anomalyClassKeys) sinks.seenClassKeys.add(key);
+    sinks.outcomes.push(...restored.findingOutcomes.map((outcome) => ({
+      classKey: outcome.classKey,
+      outcome: outcome.outcome,
+      ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+      ...(outcome.findingId !== undefined ? { findingId: outcome.findingId } : {}),
+    })));
+  }
+  let rng = restored ? restoreRng(restored.rng) : mulberry32(req.seed >>> 0);
+  const statesSeen = new Set<string>(restored?.fake?.statesSeen ?? ["home"]);
+  const segment: Action[] = restored?.fake?.segment?.slice() ?? [];
+  const blocked = new Set<string>(restored?.toxicActionKeys ?? []);
+  const rejected = new Set<string>(restored?.rejectedActionKeys ?? []);
+  const processed = new Set<string>(restored?.processedFindingClassKeys ?? []);
+  if (resume) {
+    for (const record of store.listFindings(1000)) {
+      if (record.runId !== run.runId || !record.classKey) continue;
+      const terminal = ["CONFIRMED", "RESOLVED", "REGRESSED", "REJECTED", "FLAKY"].includes(record.status);
+      if (!terminal) continue;
+      sinks.seenClassKeys.add(record.classKey);
+      processed.add(record.classKey);
+      if (sinks.outcomes.some((outcome) => outcome.classKey === record.classKey)) continue;
+      if (["CONFIRMED", "RESOLVED", "REGRESSED"].includes(record.status)) {
+        const finding = engine.rehydrate(record);
+        if (!sinks.findings.some((existing) => existing.id === finding.id)) sinks.findings.push(finding);
+        sinks.outcomes.push({ classKey: record.classKey, outcome: "confirmed", findingId: finding.id });
+      } else {
+        sinks.outcomes.push({ classKey: record.classKey, outcome: record.status.toLowerCase(), findingId: record.id });
+      }
+    }
+  }
+  let state = restored?.fake?.state ?? "home";
+  let pendingFillIsBoundary = restored?.fake?.pendingFillIsBoundary ?? false;
+  let actionsExecuted = restored?.actionsExecuted ?? 0;
   let consecutiveRejections = 0;
   let stoppedReason = "action-budget";
-  const startMs = Date.now();
+  const campaignStartMs = Date.parse(campaign?.createdAt ?? restored?.campaignStartedAt ?? new Date().toISOString());
+  const startMs = Number.isFinite(campaignStartMs) ? campaignStartMs : Date.now();
+  const graph = restored ? StateGraph.fromSnapshot(restored.graph) : new StateGraph();
+  if (!restored) graph.visitState("home", "fake:home", 0);
+  let checkpointStepSequence = restored?.stepSequence ?? 0;
+
+  const reconcile = (): void => {
+    for (const unresolved of store.getInFlightActions(run.runId)) {
+      const metadata = parseFakeMetadata(unresolved.metadata_json);
+      if (metadata?.actionKey) blocked.add(metadata.actionKey);
+      if (metadata?.rngAfter) rng = restoreRng(metadata.rngAfter);
+    }
+    const durable = store.countRunActions(run.runId);
+    for (const committed of store.listCommittedActionsAfterStep(run.runId, checkpointStepSequence)) {
+      const metadata = parseFakeMetadata(committed.action.metadata_json);
+      if (!metadata?.actionKey) continue;
+      if (metadata.rngAfter) rng = restoreRng(metadata.rngAfter);
+      const before = metadata.stateBefore ?? state;
+      const after = committed.action.state_after;
+      if (after) {
+        state = after;
+        statesSeen.add(after);
+        graph.visitState(after, `fake:${after}`, durable);
+      }
+      graph.recordEdge(before, metadata.actionKey, after, durable);
+      const reconstructed = fakeActionFromRecord(committed.action, metadata);
+      if (reconstructed) {
+        segment.push(reconstructed);
+        if (reconstructed.kind === "fillField") {
+          pendingFillIsBoundary = reconstructed.input?.value === "BAD";
+        } else if (reconstructed.kind === "submit" || reconstructed.kind === "goHome") {
+          pendingFillIsBoundary = false;
+        }
+      }
+      if (state === "home") segment.length = 0;
+    }
+    actionsExecuted = Math.max(actionsExecuted, durable);
+    checkpointStepSequence = Math.max(checkpointStepSequence, store.maxRunStepSequence(run.runId));
+  };
+
+  const checkpoint = (): void => {
+    if (!campaign) return;
+    actionsExecuted = Math.max(actionsExecuted, store.countRunActions(run.runId));
+    const payload: ExplorationCheckpointPayload = {
+      schema: "inspector-exploration-checkpoint/1",
+      version: 1,
+      runId: run.runId,
+      explorerKind: "fake",
+      explorerVersion: EXPLORER_VERSION,
+      adapter: campaign.adapter,
+      seed: req.seed >>> 0,
+      configFingerprint: configFingerprint(config),
+      rng: rng.snapshot(),
+      stepSequence: store.maxRunStepSequence(run.runId),
+      campaignStartedAt: campaign.createdAt,
+      actionsExecuted,
+      resets: 0,
+      actionsSinceNewState: 0,
+      recentActionKeys: [],
+      toxicActionKeys: [...blocked].sort(),
+      rejectedActionKeys: [...rejected].sort(),
+      currentState: state,
+      currentScreen: `fake:${state}`,
+      graph: graph.snapshot(),
+      actionKindSequence: [],
+      actionPath: segment.slice(),
+      anomalies: [],
+      anomalyClassKeys: [...sinks.seenClassKeys].sort(),
+      processedFindingClassKeys: [...processed].sort(),
+      findingOutcomes: sinks.outcomes.map((outcome) => ({
+        anomalyKey: outcome.classKey,
+        classKey: outcome.classKey,
+        outcome: outcome.outcome,
+        ...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+        ...(outcome.findingId !== undefined ? { findingId: outcome.findingId } : {}),
+      } satisfies FindingOutcomeSnapshot)),
+      budget,
+      fake: { state, pendingFillIsBoundary, statesSeen: [...statesSeen].sort(), segment: segment.slice() },
+    };
+    writeCheckpoint(store, payload);
+    checkpointStepSequence = payload.stepSequence;
+  };
+
+  reconcile();
+  checkpoint();
   const maxWallMs = req.maxMinutes * 60_000;
 
   while (true) {
@@ -434,17 +713,34 @@ async function runFakeHunt(
       stoppedReason = "wall-budget";
       break;
     }
-    if (req.maxFindings > 0 && sinks.findings.length >= req.maxFindings) {
+    if (req.maxFindings > 0 && sinks.outcomes.filter((o) => o.outcome.startsWith("confirmed")).length >= req.maxFindings) {
       stoppedReason = "finding-cap";
       break;
     }
 
-    const choice = nextFakeAction(rng, state, pendingFillIsBoundary);
+    let choice: { kind: string; input?: Record<string, unknown> } | null = null;
+    let actionKey = "";
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = nextFakeAction(rng, state, pendingFillIsBoundary);
+      const candidateKey = fakeChoiceKey(candidate);
+      if (blocked.has(candidateKey) || rejected.has(candidateKey)) continue;
+      choice = candidate;
+      actionKey = candidateKey;
+      break;
+    }
+    if (!choice) {
+      stoppedReason = "no-candidates";
+      break;
+    }
+    const stateBeforeAction = state;
     const action = fakeAction(run, choice.kind, choice.input);
+    action.metadata = { exploration: { actionKey, stateBefore: state, rngAfter: rng.snapshot() } };
     const submit = await run.submitAction(action);
     if (submit.kind === "adapter-error") {
       sinks.warnings.push(`adapter error during ${choice.kind}: ${submit.error}`);
       stoppedReason = "adapter-error";
+      blocked.add(actionKey);
+      checkpoint();
       break;
     }
     if (submit.kind === "rejected") {
@@ -452,6 +748,9 @@ async function runFakeHunt(
         `policy rejected ${choice.kind}: ${submit.decision.reason ?? "unknown reason"}`,
       );
       consecutiveRejections += 1;
+      rejected.add(actionKey);
+      blocked.add(actionKey);
+      checkpoint();
       if (consecutiveRejections >= 10) {
         stoppedReason = "no-candidates";
         break;
@@ -460,6 +759,8 @@ async function runFakeHunt(
     }
     if (submit.kind === "duplicate") {
       sinks.warnings.push(`duplicate submission for ${action.id}; outcome unresolved, skipping`);
+      blocked.add(actionKey);
+      checkpoint();
       continue;
     }
     consecutiveRejections = 0;
@@ -481,7 +782,17 @@ async function runFakeHunt(
       state = typeof outcome.stateAfter === "string" ? outcome.stateAfter : state;
       statesSeen.add(state);
       try {
-        await processFakeFailure(engine, run, outcome, segment.slice(), req, sinks, progress);
+        await processFakeFailure(
+          engine,
+          run,
+          outcome,
+          segment.slice(),
+          req,
+          sinks,
+          progress,
+          processed,
+          store,
+        );
       } catch (e) {
         // One broken reproduction must not destroy the hunt: record and move on.
         const detail = e instanceof Error ? e.message : String(e);
@@ -492,6 +803,7 @@ async function runFakeHunt(
           detail,
         });
       }
+      processed.add(`TARGET_FAILURE|${outcome.error?.message ?? ""}`);
     } else {
       state = typeof outcome.stateAfter === "string" ? outcome.stateAfter : state;
       statesSeen.add(state);
@@ -499,7 +811,17 @@ async function runFakeHunt(
     // Back at baseline: truncate the cumulative path so each reproducer is a
     // clean segment starting from the home state.
     if (state === "home") segment.length = 0;
+    graph.visitState(state, `fake:${state}`, actionsExecuted);
+    graph.recordEdge(
+      stateBeforeAction,
+      actionKey,
+      state,
+      actionsExecuted,
+    );
+    checkpoint();
   }
+
+  checkpoint();
 
   return {
     runId: run.runId,
@@ -516,6 +838,52 @@ async function runFakeHunt(
   };
 }
 
+function fakeChoiceKey(choice: { kind: string; input?: Record<string, unknown> }): string {
+  return `fake:${choice.kind}:${JSON.stringify(choice.input ?? null)}`;
+}
+
+interface FakeStoredMetadata {
+  actionKey?: string;
+  stateBefore?: string;
+  rngAfter?: import("@inspector/explore").RngSnapshot;
+  input?: Record<string, unknown> | null;
+}
+
+function parseFakeMetadata(raw: string | null): FakeStoredMetadata | null {
+  if (!raw) return null;
+  try {
+    const wrapper = JSON.parse(raw) as {
+      input?: Record<string, unknown> | null;
+      metadata?: { exploration?: FakeStoredMetadata } | null;
+    };
+    const exploration = wrapper.metadata?.exploration;
+    if (!exploration || typeof exploration !== "object") return null;
+    return {
+      ...(typeof exploration.actionKey === "string" ? { actionKey: exploration.actionKey } : {}),
+      ...(typeof exploration.stateBefore === "string" ? { stateBefore: exploration.stateBefore } : {}),
+      ...(exploration.rngAfter !== undefined ? { rngAfter: exploration.rngAfter } : {}),
+      ...(wrapper.input !== undefined ? { input: wrapper.input } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function fakeActionFromRecord(record: import("@inspector/store-sqlite").ActionRecord, metadata: FakeStoredMetadata): Action | null {
+  return {
+    id: record.id,
+    runId: record.run_id,
+    environmentId: record.environment_id,
+    kind: record.kind,
+    risk: record.risk as Action["risk"],
+    deadlineMs: record.deadline_ms,
+    idempotency: record.idempotency as Action["idempotency"],
+    target: null,
+    input: metadata.input ?? null,
+    metadata: { exploration: metadata },
+  };
+}
+
 /** Ingest -> reproduce -> minimize -> confirm -> bundle for one fake failure. */
 async function processFakeFailure(
   engine: FindingEngine,
@@ -525,10 +893,12 @@ async function processFakeFailure(
   req: HuntRequest,
   sinks: FakeFindingSinks,
   progress: ProgressFn,
+  processedFindingClassKeys: Set<string>,
+  store: Store,
 ): Promise<void> {
   const message = outcome.error?.message ?? "deterministic oracle failure";
   const classKey = `TARGET_FAILURE|${message}`;
-  if (sinks.seenClassKeys.has(classKey)) return;
+  if (processedFindingClassKeys.has(classKey)) return;
   sinks.seenClassKeys.add(classKey);
 
   if (req.maxFindings > 0 && sinks.findings.length >= req.maxFindings) {
@@ -542,14 +912,39 @@ async function processFakeFailure(
   const signal: OracleSignal = { kind: signalKind, detail: outcome.error?.detail ?? message };
   progress(`candidate defect detected (${signalKind})`);
 
-  const finding = engine.ingest(signal, {
-    runId: run.runId,
-    title:
-      message === signalKind
-        ? `${signalKind} from deterministic oracle`
-        : `${signalKind}: ${message}`,
-    adapter: run.caps.adapter,
-  });
+  const durable = store.getFindingByClassKey(run.runId, classKey);
+  let finding = durable
+    ? engine.rehydrate(durable)
+    : engine.ingest(signal, {
+        runId: run.runId,
+        title:
+          message === signalKind
+            ? `${signalKind} from deterministic oracle`
+            : `${signalKind}: ${message}`,
+        adapter: run.caps.adapter,
+        classKey,
+      });
+  if (finding.status === "REPRODUCING") {
+    finding = engine.transition(finding, "CANDIDATE", {
+      reason: "controller restarted during reproduction",
+      actor: "exploration-resume",
+    });
+  }
+  if (finding.status === "MINIMIZED" && finding.minimization?.verifiedReproduction === true) {
+    finding = engine.transition(finding, "CONFIRMED", {
+      reason: "resume completed persisted minimization",
+      actor: "exploration-resume",
+    });
+  }
+  if (finding.status === "CONFIRMED" || finding.status === "RESOLVED" || finding.status === "REGRESSED") {
+    sinks.findings.push(finding);
+    sinks.outcomes.push({ classKey, outcome: "confirmed", findingId: finding.id });
+    return;
+  }
+  if (finding.status === "REJECTED" || finding.status === "FLAKY") {
+    sinks.outcomes.push({ classKey, outcome: finding.status.toLowerCase(), findingId: finding.id });
+    return;
+  }
   const makeDriver = () => new FakeStateMachineDriver();
 
   const rep = await engine.reproduce(finding, path, makeDriver(), {
@@ -646,7 +1041,7 @@ export async function huntCommand(
   parsed: ParsedInvocation,
   ctx: CommandContext,
 ): Promise<{ code: number; data?: unknown }> {
-  const req = parseHuntRequest(parsed);
+  let req = parseHuntRequest(parsed);
   const dir = workDirOf(ctx, parsed);
   const warning = warnRepoRootWorkspace(ctx, dir);
   let workspace: ReturnType<typeof openWorkspace>;
@@ -657,7 +1052,85 @@ export async function huntCommand(
   }
   const { store, artifacts, base } = workspace;
   let run: RunController | null = null;
+  let resuming = false;
   try {
+    let storedRun: ReturnType<Store["getRun"]> = undefined;
+    let storedCampaign: ReturnType<Store["getExplorationCampaign"]> = undefined;
+    let storedSpawn: ReturnType<typeof storedAdapterSpawn> = null;
+    if (req.resumeRunId) {
+      resuming = true;
+      const resumeRunId = req.resumeRunId;
+      storedRun = store.getRun(resumeRunId);
+      if (!storedRun) throw new CliError("not-found", `run not found: ${resumeRunId}`);
+      if (["closed", "failed", "crashed", "complete", "resolved"].includes(storedRun.status)) {
+        throw new CliError("terminal-run", `run ${resumeRunId} is already ${storedRun.status}; a terminal autonomous hunt cannot resume`);
+      }
+      const meta = parseDurableHuntMeta(storedRun.meta_json, resumeRunId);
+      req = mergeResumeRequest(parsed, req, meta);
+      if (meta.request.adapter !== req.adapter) {
+        throw new CliError("incompatible-run", `run ${req.resumeRunId} records adapter '${meta.request.adapter}', not '${req.adapter}'`);
+      }
+      storedCampaign = store.getExplorationCampaign(resumeRunId);
+      if (!storedCampaign) {
+        throw new CliError("not-resumable", `run ${resumeRunId} has no durable exploration campaign; use 'runs resume' for environment-only reattachment`);
+      }
+      storedSpawn = storedAdapterSpawn(storedRun.adapter);
+      if (!storedSpawn) {
+        throw new CliError(
+          "unknown-adapter",
+          `cannot determine the original adapter for run ${resumeRunId} (recorded '${storedRun.adapter ?? "unknown"}'); refusing to guess`,
+        );
+      }
+      const explorerKind = req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native";
+      if (storedCampaign.explorerKind !== explorerKind || storedCampaign.adapter !== storedRun.adapter) {
+        throw new CliError("incompatible-run", `run ${resumeRunId} explorer/adapter provenance is inconsistent; refusing to resume`);
+      }
+      if (explorerKind === "web") {
+        loadLatestCheckpoint(store, {
+          runId: resumeRunId,
+          explorerKind: "web",
+          explorerVersion: EXPLORER_VERSION,
+          adapter: storedCampaign.adapter,
+          seed: req.seed >>> 0,
+          configFingerprint: configFingerprint(webExploreConfig(req)),
+        }, webExploreConfig(req) && {
+          maxActions: webExploreConfig(req).maxActions,
+          maxResets: webExploreConfig(req).maxResets ?? 0,
+          maxFindings: webExploreConfig(req).maxFindings ?? 0,
+          maxWallMs: webExploreConfig(req).maxWallMs ?? 0,
+        });
+      } else if (explorerKind === "native") {
+        const native = nativeExploreConfig(req);
+        loadLatestCheckpoint(store, {
+          runId: resumeRunId,
+          explorerKind: "native",
+          explorerVersion: EXPLORER_VERSION,
+          adapter: storedCampaign.adapter,
+          seed: req.seed >>> 0,
+          configFingerprint: configFingerprint(native),
+        }, {
+          maxActions: native.maxActions,
+          maxResets: 0,
+          maxFindings: native.maxFindings,
+          maxWallMs: native.maxWallMs,
+        });
+      } else {
+        const fake = fakeExploreConfig(req);
+        loadLatestCheckpoint(store, {
+          runId: resumeRunId,
+          explorerKind: "fake",
+          explorerVersion: EXPLORER_VERSION,
+          adapter: storedCampaign.adapter,
+          seed: req.seed >>> 0,
+          configFingerprint: configFingerprint(fake),
+        }, {
+          maxActions: fake.maxActions,
+          maxResets: 0,
+          maxFindings: fake.maxFindings,
+          maxWallMs: fake.maxMinutes * 60_000,
+        });
+      }
+    }
     const mgr = new RunManager(store, artifacts, new PolicyEngine(huntPolicy(req)));
     // RC1 external targets flow through WEB_TARGET_URL: RunManager issues the
     // lifecycle create itself, and the web adapter bin reads this env var as
@@ -665,9 +1138,11 @@ export async function huntCommand(
     const webTarget = req.adapter === "web" && req.targetUrl !== undefined;
     const isNative =
       req.adapter === "cli" || req.adapter === "windows" || req.adapter === "android";
-    const spawnSpec = webTarget
-      ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
-      : adapterSpawn(req.adapter);
+    const spawnSpec = resuming
+      ? storedSpawn!
+      : webTarget
+        ? adapterSpawn("web", { WEB_TARGET_URL: req.targetUrl })
+        : adapterSpawn(req.adapter);
     let createOptions: Record<string, unknown> | undefined;
     let spawnEnvDelta: NodeJS.ProcessEnv | undefined;
     if (isNative) {
@@ -688,25 +1163,46 @@ export async function huntCommand(
       }
     }
     try {
-      run = await mgr.startRun({
-        ...spawnSpec,
-        // Persisted so runs resume re-creates the SAME target, never the default.
-        ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
-        ...(createOptions ? { createOptions } : {}),
-        ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
-        // Real-device adapters need headroom on observe (uiautomator dumps).
-        ...(isNative ? { observeTimeoutMs: 30000 } : {}),
-      });
+      if (resuming) {
+        run = await mgr.resumeRun(req.resumeRunId!, {
+          ...spawnSpec,
+          ...(isNative ? { observeTimeoutMs: 30000 } : {}),
+        });
+      } else {
+        const explorerKind = req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native";
+        const explorerConfig =
+          explorerKind === "web"
+            ? webExploreConfig(req)
+            : explorerKind === "native"
+              ? nativeExploreConfig(req)
+              : fakeExploreConfig(req);
+        run = await mgr.startRun({
+          ...spawnSpec,
+          runMeta: durableHuntMeta(req),
+          exploration: {
+            schemaVersion: 1,
+            explorerKind,
+            explorerVersion: EXPLORER_VERSION,
+            config: explorerConfig,
+          },
+          // Persisted so runs resume re-creates the SAME target, never the default.
+          ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
+          ...(createOptions ? { createOptions } : {}),
+          ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
+          // Real-device adapters need headroom on observe (uiautomator dumps).
+          ...(isNative ? { observeTimeoutMs: 30000 } : {}),
+        });
+      }
     } catch (e) {
       throw remapWorkspaceConflict(e);
     }
 
     const result =
       req.adapter === "web"
-        ? await runWebHunt(run, store, req, base, ctx.progress)
+        ? await runWebHunt(run, store, req, base, ctx.progress, resuming)
         : isNative
-          ? await runNativeHuntCommand(run, store, req, base, ctx.progress)
-          : await runFakeHunt(run, store, req, ctx.progress);
+          ? await runNativeHuntCommand(run, store, req, base, ctx.progress, resuming)
+           : await runFakeHunt(run, store, req, ctx.progress, resuming);
 
     const bundlePaths = writeEvidenceBundles(base, result.runId, result.evidenceBundles);
     const errorOutcomes = result.findingOutcomes.filter((o) => o.outcome === "error");

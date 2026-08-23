@@ -11,3 +11,4 @@ export * from "./web-replay.js";
 export * from "./autonomy.js";
 export * from "./native-inventory.js";
 export * from "./native-session.js";
+export * from "./checkpoint.js";

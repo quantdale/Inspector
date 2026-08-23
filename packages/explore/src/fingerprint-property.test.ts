@@ -25,6 +25,7 @@ function makeRng(seed: number): PropRng {
     int: (m) => base.int(m),
     pick: (items) => base.pick(items),
     fork: (salt) => base.fork(salt),
+    snapshot: () => base.snapshot(),
     bool: (p = 0.5) => base.next() < p,
   };
 }

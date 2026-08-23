@@ -131,7 +131,7 @@ export class FindingEngine {
 
   ingest(
     signal: OracleSignal,
-    opts: { runId?: string; title?: string; revision?: string; adapter?: string } = {},
+    opts: { runId?: string; title?: string; revision?: string; adapter?: string; classKey?: string } = {},
   ): Finding {
     const now = new Date().toISOString();
     const finding: Finding = {
@@ -153,9 +153,39 @@ export class FindingEngine {
       minimization: null,
       lastTransition: null,
       adapter: opts.adapter ?? null,
+      classKey: opts.classKey ?? null,
     };
     this.persist(finding);
     return finding;
+  }
+
+  /** Rehydrate a finding admitted before a controller interruption. The
+   * durable row remains the lifecycle authority; this method only reconstructs
+   * the typed object needed to continue an allowed reproduction transition. */
+  rehydrate(record: FindingRecord): Finding {
+    const severity = record.severity;
+    const allowedSeverity = new Set(["low", "medium", "high", "critical", "unknown"]);
+    return {
+      id: record.id,
+      runId: record.runId,
+      status: record.status,
+      title: record.title,
+      confidence: record.confidence,
+      severity: allowedSeverity.has(severity ?? "")
+        ? (severity as Finding["severity"])
+        : "unknown",
+      revision: record.revision,
+      oracleIds: parseStringArray(record.oracleIds),
+      reproduction: parseJson(record.reproductionJson),
+      artifactRefs: parseStringArray(record.artifactRefs),
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      signature: record.signature,
+      minimization: parseJson(record.minimizationJson),
+      lastTransition: parseJson(record.lastTransitionJson),
+      adapter: record.adapter,
+      classKey: record.classKey ?? null,
+    };
   }
 
   transition(
@@ -537,7 +567,29 @@ export class FindingEngine {
       minimizationJson: finding.minimization ? JSON.stringify(finding.minimization) : null,
       lastTransitionJson: finding.lastTransition ? JSON.stringify(finding.lastTransition) : null,
       adapter: finding.adapter ?? null,
+      classKey: finding.classKey ?? null,
     };
     this.store.putFinding(record);
+  }
+}
+
+function parseStringArray(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) && value.every((item) => typeof item === "string")
+      ? value
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJson<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
   }
 }

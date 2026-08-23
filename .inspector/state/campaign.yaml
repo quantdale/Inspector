@@ -28,12 +28,12 @@ active:
   milestone_name: Resumable exploration campaigns
   spec: specs/010-resumable-exploration/SPEC.md
   tasks: specs/010-resumable-exploration/TASKS.md
-  task_group: R0
-  waypoint: M10.R0.checkpoint-contract
+  task_group: R9
+  waypoint: M10.R9.final-gate
   waypoint_status: IN_PROGRESS
   next_action: >-
-    Define and implement the versioned exploration campaign/checkpoint contract
-    and migration, then continue through R1-R9 without stopping at the spec.
+    Synchronize M10 documentation and durable state, then run the frozen
+    install, lint, typecheck, unit, integration, resume, and soak gates.
 
 progress:
   completed_milestones:
@@ -72,6 +72,15 @@ progress:
     - R4
     - R5
     - R6
+    - M10.R0
+    - M10.R1
+    - M10.R2
+    - M10.R3
+    - M10.R4
+    - M10.R5
+    - M10.R6
+    - M10.R7
+    - M10.R8
     - E0
     - E1
     - E2
@@ -172,6 +181,15 @@ progress:
     - M9.W6.replay-faithful-reproduction
     - M9.W7.android-depth
     - M9.W8.finding-proofs-exit-gate
+    - M10.R0.checkpoint-contract
+    - M10.R1.rng-and-graph
+    - M10.R2.web-resume
+    - M10.R3.native-resume
+    - M10.R4.crash-reconciliation
+    - M10.R5.continuation-cli
+    - M10.R6.finding-continuity
+    - M10.R7.restart-matrix-soak
+    - M10.R8.field-proofs
   deferred_milestones:
     - M8
 

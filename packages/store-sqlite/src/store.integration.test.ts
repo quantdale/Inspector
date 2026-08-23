@@ -347,6 +347,7 @@ describe("hardening wave 2: sqlite store", () => {
         actor: "test",
       }),
       adapter: "adapter-fake",
+      classKey: "PAGE_ERROR|x",
     };
     {
       const store = Store.open(path);
@@ -368,6 +369,7 @@ describe("hardening wave 2: sqlite store", () => {
       to: "CONFIRMED",
     });
     expect(got!.adapter).toBe("adapter-fake");
+    expect(got!.classKey).toBe("PAGE_ERROR|x");
     // Updates persist the extended fields too.
     reopened.putFinding({
       ...record,

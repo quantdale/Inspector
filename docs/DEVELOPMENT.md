@@ -82,6 +82,27 @@ pnpm cli findings list
 pnpm cli findings show <findingId>
 ```
 
+### Continue an autonomous hunt
+
+`hunt --resume` continues the durable exploration campaign itself. It is
+different from `runs resume`, which is a diagnostic environment reattachment
+and re-observation command:
+
+```bash
+# The run id is printed by the original hunt or `runs list`.
+pnpm cli hunt --resume <runId> --json
+
+# Optional overrides must exactly match the original durable hunt contract.
+pnpm cli hunt --resume <runId> --max-actions <original-value>
+```
+
+Continuation validates the stored adapter identity, target/create provenance,
+explorer configuration, checkpoint schema/checksum, unknown-action state, and
+remaining action/reset/finding/wall budgets. It refuses terminal runs,
+unknown adapters, corrupt checkpoints, and incompatible overrides. Use
+`pnpm cli runs resume <runId>` only when you want environment reattachment and
+a fresh diagnostic observation without autonomous decision-making.
+
 `pnpm cli` is a shorthand for `tsx packages/cli/src/bin.ts`.
 
 ## Workspace isolation

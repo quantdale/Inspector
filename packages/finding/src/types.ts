@@ -134,6 +134,8 @@ export interface Finding {
   lastTransition?: TransitionMeta | null;
   /** Adapter identity when known at ingest time. */
   adapter?: string | null;
+  /** Autonomous exploration defect class, when the finding came from a hunt. */
+  classKey?: string | null;
 }
 
 export interface EvidenceBundle {
