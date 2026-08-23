@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NodePtyBackend } from "./node-pty-backend.js";
+import { DEFAULT_TERMINAL_ROWS, NodePtyBackend } from "./node-pty-backend.js";
 
 // Probe the native binding without failing on machines where @lydell/node-pty
 // cannot load; those machines skip gracefully and stay green.
@@ -54,8 +54,13 @@ describe.skipIf(!ptyAvailable)("NodePtyBackend (real PTY)", () => {
     );
     expect(screen.some((l) => l.includes("echo:hello-pty"))).toBe(true);
 
-    // Fixed-height padded screen buffer.
-    expect(screen).toHaveLength(11);
+    // The semantic screen is a fixed-height VT viewport. Raw scrollback is
+    // exposed separately through readTerminal and is not the state model.
+    expect(screen).toHaveLength(DEFAULT_TERMINAL_ROWS);
+    const terminal = await backend.readTerminal(id);
+    expect(terminal.viewport).toEqual(screen);
+    expect(terminal.rows).toBe(DEFAULT_TERMINAL_ROWS);
+    expect(terminal.cols).toBeGreaterThan(0);
 
     // Graceful exit via input is observed by isAlive.
     await backend.write(id, "quit\n");
