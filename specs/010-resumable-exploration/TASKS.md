@@ -9,4 +9,4 @@
 - [x] R6 — finding/reproduction continuity and deduplication
 - [x] R7 — deterministic interruption matrix and bounded restart soak
 - [x] R8 — real web/native interrupt-resume field proofs
-- [ ] R9 — documentation/state synchronization and final exit gate
+- [x] R9 — documentation/state synchronization and final exit gate

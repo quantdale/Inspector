@@ -3,7 +3,7 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **IN PROGRESS — M10 R9 final gate**
+- Status: **COMPLETE — M10 exit gate passed**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: NOT ACTIVE
@@ -11,13 +11,14 @@
 ## Last trusted implementation state
 
 M9 native exploration is complete at `6ebc414`. M10 implementation waypoints
-R0-R8 are complete in the current worktree: a dedicated, checksummed
-exploration campaign/checkpoint stream and durable reset events retain the
-generic `checkpoints` table for low-level `RunController` step-sequence
-recovery; web/native explorers, CLI continuation, deterministic restart tests,
-and real web/Android interruption proofs are in place. The next gate is R9:
-frozen install, full repository gates, final state synchronization, and the
-M10 exit decision.
+R0-R9 are complete at `c0835d7` (with this state synchronization committed
+immediately afterward): a dedicated, checksummed exploration
+campaign/checkpoint stream and durable reset events retain the generic
+`checkpoints` table for low-level `RunController` step-sequence recovery;
+web/native explorers, CLI continuation, deterministic restart tests, and real
+web/Android interruption proofs are in place. Frozen install, lint, typecheck,
+unit, integration, targeted resume, and bounded soak gates all passed. M8
+remains deferred to a macOS/Xcode environment; no release/tag action was taken.
 
 M7 scale/integrations is COMPLETE. `@inspector/scale` provides durable exclusive leases with TTL reclaim, a deterministic priority scheduler over bounded workers, per-item isolated environments, a resource ledger with deterministic global/per-worker budgets, a provider-neutral model router with fallback/escalation, finding clustering with provenance preservation, an MCP-compatible read-only facade with cooperative stop, and adapter registration/discovery with protocol compatibility matrix. The S8 proving campaign runs two isolated workers over four bounded items, injects controller restart, verifies no duplicate execution or cross-worker contamination, and produces a consolidated report.
 

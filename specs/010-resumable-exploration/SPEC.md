@@ -1,6 +1,6 @@
 # SPEC-010 — Resumable Exploration Campaigns
 
-Status: IN PROGRESS (2026-08-23)
+Status: COMPLETE (2026-08-23)
 Milestone: M10
 Depends on: SPEC-003 E7, SPEC-009
 

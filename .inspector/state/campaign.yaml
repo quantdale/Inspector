@@ -26,14 +26,15 @@ autonomy:
 active:
   milestone_id: M10
   milestone_name: Resumable exploration campaigns
+  status: COMPLETE
   spec: specs/010-resumable-exploration/SPEC.md
   tasks: specs/010-resumable-exploration/TASKS.md
   task_group: R9
   waypoint: M10.R9.final-gate
-  waypoint_status: IN_PROGRESS
+  waypoint_status: COMPLETE
   next_action: >-
-    Synchronize M10 documentation and durable state, then run the frozen
-    install, lint, typecheck, unit, integration, resume, and soak gates.
+    M10 exit gate passed. Continue only with the next separately authorized
+    roadmap milestone; M8 remains deferred to a macOS/Xcode environment.
 
 progress:
   completed_milestones:
@@ -46,6 +47,7 @@ progress:
     - M6
     - M7
     - M9
+    - M10
   completed_task_groups:
     - F0
     - F1
@@ -81,6 +83,7 @@ progress:
     - M10.R6
     - M10.R7
     - M10.R8
+    - M10.R9
     - E0
     - E1
     - E2
@@ -190,12 +193,13 @@ progress:
     - M10.R6.finding-continuity
     - M10.R7.restart-matrix-soak
     - M10.R8.field-proofs
+    - M10.R9.final-gate
   deferred_milestones:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M9 exit gate)
-  last_gate: "M9: unit 515/3skip; integration 137 passed (29 files) after bounded retry of the documented concurrent-startup flake class; lint 0 errors; typecheck exit 0"
+  last_verified_commit: c0835d7
+  last_gate: "M10: frozen install PASS; lint 0 errors/4 pre-existing warnings; typecheck PASS; unit 518 passed/3 skipped; integration 144/144 across 31 files; deterministic resume matrix, bounded restart soak, and real web/Android field proofs PASS"
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
 

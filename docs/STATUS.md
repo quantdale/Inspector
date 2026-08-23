@@ -1,12 +1,12 @@
 # Project Status
 
-Last updated: M10 IN PROGRESS (2026-08-23)
+Last updated: M10 COMPLETE (2026-08-23)
 
 ## Campaign
 
-- Mode: **M10 — Resumable exploration campaigns: IN PROGRESS**. M9 native
-  autonomous exploration is complete; M10 is the active campaign in
-  `.inspector/state/campaign.yaml`.
+- Mode: **M10 — Resumable exploration campaigns: COMPLETE**. M9 native
+  autonomous exploration and M10 resumability are complete; the milestone
+  state is recorded in `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
@@ -27,7 +27,7 @@ proofs on the final tree: Calculator 56 actions/50 states; vim 100 actions/
 baseline). Full exit gate PASS (unit 515/3skip; integration 137/137 after a
 bounded retry of the documented concurrent-startup flake class).
 
-## M10 progress
+## M10 outcome
 
 The active implementation has a versioned, checksummed exploration checkpoint
 stream (`inspector-exploration-checkpoint/1`) alongside low-level run steps.
@@ -43,8 +43,15 @@ interrupted at run `run_7eb518e2e11849a3bcd97a66f73abd0b` and resumed to its
 original 8-action cap (3 states, 16 monotonic steps, 8 retained checkpoints).
 The available machine has no `vim` executable, and the Calculator UIA create
 probe exceeded its 30-second lifecycle deadline; those backends remain
-environmental non-proofs, not substituted mock passes. The final repository
-gate and durable-state synchronization remain open.
+environmental non-proofs, not substituted mock passes. The real web and
+Android proofs satisfy the M10 native/backend exit requirement.
+
+The deterministic matrix covers committed-step/checkpoint lag, pending and
+unknown actions, seeded multi-restart boundaries, bounded checkpoint history,
+corrupt/incompatible checkpoints, native edge/RNG restoration, and CLI
+process-kill continuation. The seeded restart soak uses boundaries 1, 2, 4,
+and 6 and ends with unique monotonic steps, exactly the configured action
+budget, and no checkpoint growth beyond retention 8.
 
 ## Candidate staleness (GA decision)
 
@@ -76,13 +83,15 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 
 | Gate | Result |
 | --- | --- |
-| lint | PASS |
+| frozen install | PASS |
+| lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
-| test (unit) | PASS |
-| test:integration | PASS |
+| test (unit) | PASS (518 passed / 3 skipped) |
+| test:integration | PASS (144/144 across 31 files) |
 
-Final-gate numbers are refreshed at the end of the field-validation campaign
-(see `.inspector/state/GA-READINESS.yaml` `final_gate`).
+M10 final-gate evidence is the `c0835d7` implementation commit plus the
+following state-synchronization commit; historical RC1 reports remain
+unchanged.
 
 ## Known blockers
 
@@ -101,5 +110,7 @@ None blocking continued validation.
 | M6 Cross-platform adapters | COMPLETE |
 | M7 Scale/integrations | COMPLETE |
 | M8 iOS | DEFERRED_ENVIRONMENT |
+| M9 Platform-neutral exploration | COMPLETE |
+| M10 Resumable exploration | COMPLETE |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

@@ -64,9 +64,9 @@ zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferr
 for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M10 — resumable exploration campaigns in progress**. RC1
-field validation is complete with a documented GO decision; the RC1 tag and
-release state remain unchanged and no rc.2 release has been published.
+Current status: **M10 — resumable exploration campaigns complete**. RC1 field
+validation is complete with a documented GO decision; the RC1 tag and release
+state remain unchanged and no rc.2 release has been published.
 
 ## Quickstart
 

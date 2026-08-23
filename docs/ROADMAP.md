@@ -234,7 +234,11 @@ is either wired or findings honestly remain CANDIDATE.
 
 Spec: `specs/010-resumable-exploration/SPEC.md`
 
-**Status: IN PROGRESS (2026-08-23).**
+**Status: COMPLETE (2026-08-23).** Exit gate PASS on `c0835d7`: frozen
+install, lint, typecheck, unit 518/3 skipped, and integration 144/144 across
+31 files. Deterministic interruption/soak tests plus real Playwright web and
+Android Settings interrupt/resume proofs passed; final state synchronization
+is recorded in the follow-up checkpoint commit.
 
 Goal: close the remaining SPEC-003 E7 gap so a controller or host process
 restart does not make an autonomous web or native hunt forget its exploration
