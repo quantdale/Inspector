@@ -33,9 +33,10 @@ active:
   waypoint: M11.P7.ci-distribution-acceptance
   waypoint_status: COMPLETE
   next_action: >-
-    M11 exit gate complete. Preserve the installed-artifact and acceptance
-    evidence, keep M8 and Electron field proofs environment-deferred until
-    their required hosts are available, and do not publish a release.
+    M11 exit gate complete. The production Electron field proof has since been
+    executed for real on a Windows host (Electron 43.4.1) and the layered CI
+    gained an Xvfb electron-real lane. Keep only M8 (iOS) environment-deferred,
+    run the hosted CI lanes on first push, and do not publish a release.
 
 progress:
   completed_milestones:
@@ -210,8 +211,17 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: 36ed89889be9a66cb5336c6603ba22f46fb76fc5
-  last_gate: "M11 exit gate: lint 0 errors/4 pre-existing warnings; typecheck PASS; unit 533 passed/3 skipped; integration 155 passed/1 skipped after bounded retries for concurrent subprocess startup; M11 acceptance PASS; installed release smoke PASS; layered Linux/Windows CI configured; Electron real field proof honestly deferred because the executable is unavailable; no release publication"
+  last_verified_commit: 91411faaffb763109bea90792da0c92128c9c44b
+  last_gate: >-
+    M11 re-verification with real Electron runtime: lint 0 errors/4
+    pre-existing warnings; typecheck PASS; unit 533 passed/3 skipped;
+    integration 155 passed/1 skipped across 37 files on the first run;
+    M11 acceptance matrix PASS; installed release smoke PASS from clean
+    source 91411fa (candidate SHA-256 de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126,
+    source.dirty false); production Electron field proof EXECUTED against a
+    real Electron 43.4.1 process on this Windows host; layered CI now includes
+    an Xvfb Electron proof lane and per-job timeouts; hosted CI not invoked
+    (no push authority); no release publication
   last_gate_result: PASS
   last_gate_at: "2026-08-23"
 
@@ -281,7 +291,11 @@ debt_audit:
     - web_exploration_replay_cost
   environment_deferred:
     - ios_macos_xcode_runtime
-    - electron_runtime_field_proof_until_host_supports_it
+  hosted_ci_pending:
+    - >-
+      first hosted execution of the layered CI lanes (Linux quality, Windows,
+      Xvfb electron-real, release smoke) awaits push authority; the equivalent
+      Electron proof already executed locally on Windows
   product_decision_required: []
 
 hardening:
@@ -483,6 +497,10 @@ m11:
     P5: COMPLETE
     P6: COMPLETE
     P7: COMPLETE
+  followup_verification: >-
+    2026-08-23 at 91411fa: real Electron 43.4.1 field proof executed on this
+    host; full integration sweep green first-run (155/1); Xvfb CI lane and
+    per-job timeouts added; clean candidate de577d58…d7126 from 91411fa.
   blockers: []
 
 ga_readiness:

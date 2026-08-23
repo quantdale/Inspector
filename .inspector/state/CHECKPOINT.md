@@ -10,6 +10,28 @@
 
 ## Last trusted implementation state
 
+M11 P0-P7 are complete and were re-verified end to end on 2026-08-23 at
+`91411fa` after the Electron runtime became executable on this host: the
+production Electron field proof ran against a real Electron 43.4.1 process
+(lifecycle, renderer inventory/actions, storage/screenshot/trace evidence,
+target-failure classification, reset, close — previously
+`ENVIRONMENT_DEFERRED`), two hardening tests that implicitly relied on the
+injectable backend were pinned explicitly (they would otherwise launch real
+Electron inside unit tests), the production launch test gained an honest
+display gate for headless hosts, CI gained per-job timeouts, an explicit
+`ELECTRON_SKIP_BINARY_DOWNLOAD` fast gate, and a dedicated Xvfb-backed
+`electron-real` job plus a Windows Electron step. Full gates on that tree:
+lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit **533 passed /
+3 skipped**; integration **155 passed / 1 skipped across 37 files on the
+first run** (no retries needed); `release:smoke` PASS from a clean prefix.
+Fresh clean-tree candidate `inspector-cli-0.1.0-m11.0.tgz` SHA-256 is
+`de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126`, built from
+`91411faaffb763109bea90792da0c92128c9c44b` with `source.dirty: false`.
+Hosted CI has still not executed (no push authority; GitHub unreachable from
+this host), so the Linux/Windows/Xvfb lanes remain CONFIGURED-not-yet-run.
+M8 remains deferred to a macOS/Xcode environment; no release/tag action was
+taken.
+
 M9 native exploration is complete at `6ebc414`. M10 implementation waypoints
 R0-R9 are complete at `c0835d7` (with the state synchronization committed
 immediately afterward): a dedicated, checksummed exploration

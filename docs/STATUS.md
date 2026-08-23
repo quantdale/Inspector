@@ -68,8 +68,10 @@ containment, freeform redaction, restart-durable budget/accounting, atomic
 artifact cleanup, and timestamped web attribution debt. P6 added a production
 Playwright Electron binding and deterministic fixture with explicit real vs
 injectable selection, plus a real PTY VT viewport/cursor/resize model. The
-current host has no downloaded Electron executable: the production field proof
-is `ENVIRONMENT_DEFERRED`, not substituted with a mock result.
+production Electron field proof has since been **executed for real** on this
+Windows host (Electron 43.4.1): lifecycle, renderer actions, evidence,
+target-failure classification, reset, and close all pass; headless hosts
+defer honestly via an explicit display gate instead of failing or faking.
 
 P7 completed layered Linux/Windows CI configuration, the clean installed
 npm-tarball smoke, the end-to-end acceptance matrix, stable CLI error output,
@@ -110,21 +112,21 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 | lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
 | test (unit) | PASS (533 passed / 3 skipped) |
-| test:integration | PASS after bounded retries (155 passed / 1 skipped across 37 files) |
+| test:integration | PASS — 155 passed / 1 skipped across 37 files on the first run of the latest full sweep (`91411fa`); the prior P7 sweep passed after bounded retries |
 | M11 acceptance matrix | PASS |
 | installed release smoke | PASS (fresh npm prefix) |
 
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration
-passes, Electron injectable conformance is 2/2, and the real Electron test is
-honestly skipped because the executable is unavailable. P7's installed-artifact
-smoke passes from a fresh npm prefix (`inspector-cli-0.1.0-m11.0.tgz`). The
-full parallel integration sweep exposed only the documented concurrent
-subprocess-startup class; bounded isolated retries passed without weakening
-assertions. The clean candidate SHA-256 is
-`a626595041a3b1a9aab87145fca8fd36708c84e9bc015253041d4e54039001f3`, with
-manifest source commit `e6f4c78471e030a39fcf9e232cb12e2b781bc8e3` and
-`source.dirty: false`.
+passes, Electron injectable conformance is 2/2, and the real Electron
+production proof now executes against an actual Electron 43.4.1 process on
+this host (the only skip left is the executable-absent refusal case). P7's
+installed-artifact smoke passes from a fresh npm prefix
+(`inspector-cli-0.1.0-m11.0.tgz`). The latest clean candidate SHA-256 is
+`de577d58592b0ce5c3f6391a83e64bdf2dfd788d9c815de61ac5fe7d9ccd7126`, with
+manifest source commit `91411faaffb763109bea90792da0c92128c9c44b` and
+`source.dirty: false`; the earlier P7 candidate
+(`a6265950…39001f3`, `e6f4c78…bc8e3`) remains historical record.
 
 M10 final-gate evidence is the `c0835d7` implementation commit plus the
 following state-synchronization commit; historical RC1 reports remain

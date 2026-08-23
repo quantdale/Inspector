@@ -24,6 +24,11 @@ Optional, per backend:
   real UIA bridge
 - Electron 43 executable — optional for the production Electron backend;
   `INSPECTOR_ELECTRON_BACKEND=real` fails closed when it is not installed.
+  The npm package alone is not enough: fetch the pinned binary with
+  `node packages/electron-adapter/node_modules/electron/install.js`
+  (set `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`
+  if GitHub releases are unreachable from your network). `doctor` reports
+  the executable's presence either way.
 
 The CLI's `doctor` command probes all of these and reports which capabilities
 are present:

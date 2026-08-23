@@ -271,7 +271,11 @@ Spec: `specs/011-operator-product-workflows/SPEC.md`
 **Status: COMPLETE — P0-P7 (2026-08-23).** M11 converted the mature internal engines into
 the workflows promised by `docs/PRODUCT.md` and validates them from the
 installed CLI. M10 remains historically COMPLETE; M8 remains
-`DEFERRED_ENVIRONMENT`.
+`DEFERRED_ENVIRONMENT`. Follow-up verification (2026-08-23, `91411fa`) executed
+the production Electron field proof for real on a Windows host (Electron
+43.4.1), re-ran the full integration sweep green in one pass, added a
+display-gated Xvfb Electron CI lane with per-job timeouts, and refreshed the
+clean candidate artifact provenance.
 
 Goal: make an operator able to discover, verify, regress, explore, repair, and
 operate bounded campaigns without reaching into package internals, while
