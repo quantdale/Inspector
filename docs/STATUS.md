@@ -121,7 +121,10 @@ honestly skipped because the executable is unavailable. P7's installed-artifact
 smoke passes from a fresh npm prefix (`inspector-cli-0.1.0-m11.0.tgz`). The
 full parallel integration sweep exposed only the documented concurrent
 subprocess-startup class; bounded isolated retries passed without weakening
-assertions.
+assertions. The clean candidate SHA-256 is
+`a626595041a3b1a9aab87145fca8fd36708c84e9bc015253041d4e54039001f3`, with
+manifest source commit `e6f4c78471e030a39fcf9e232cb12e2b781bc8e3` and
+`source.dirty: false`.
 
 M10 final-gate evidence is the `c0835d7` implementation commit plus the
 following state-synchronization commit; historical RC1 reports remain

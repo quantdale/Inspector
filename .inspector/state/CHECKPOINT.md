@@ -144,6 +144,9 @@ no push was performed.
   payloads.
 - Clean-prefix installed-artifact smoke passed for `--version`, `doctor
   --json`, fake `hunt`, `findings list`, `runs list`, and `campaign list`.
+  Candidate `inspector-cli-0.1.0-m11.0.tgz` SHA-256 is
+  `a626595041a3b1a9aab87145fca8fd36708c84e9bc015253041d4e54039001f3`, built
+  from `e6f4c78471e030a39fcf9e232cb12e2b781bc8e3` with `source.dirty: false`.
 - The deterministic product chain passed: hunt → confirmed finding → verify
   → regression → isolated repair → exact replay/regression pass → masking and
   benign checks → accepted reviewable patch, with the primary checkout

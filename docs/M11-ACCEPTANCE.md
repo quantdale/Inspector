@@ -26,4 +26,7 @@ publishing remain unauthorized and are not part of this matrix.
 
 Local gate evidence: lint 0 errors/4 pre-existing warnings, typecheck PASS,
 unit 533 passed/3 skipped, integration 155 passed/1 skipped after bounded
-subprocess-startup retries, and installed-artifact smoke PASS.
+subprocess-startup retries, and installed-artifact smoke PASS. The local
+candidate tarball SHA-256 is
+`a626595041a3b1a9aab87145fca8fd36708c84e9bc015253041d4e54039001f3`, built
+from clean source commit `e6f4c78471e030a39fcf9e232cb12e2b781bc8e3`.
