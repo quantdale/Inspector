@@ -8,4 +8,6 @@ export * from "./router.js";
 export * from "./cluster.js";
 export * from "./discovery.js";
 export * from "./facade.js";
+export * from "./executor.js";
+export * from "./fake-executor.js";
 export * from "./campaign.js";

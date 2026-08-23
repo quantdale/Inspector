@@ -9,7 +9,10 @@ import { AdapterRegistry } from "./discovery.js";
 import {
   UnattendedCampaign,
   InspectorFacade,
+  FakeItemExecutor,
   type WorkItem,
+  type WorkItemExecutor,
+  type WorkItemResult,
   type UsageEntry,
 } from "./index.js";
 import type { Finding } from "@inspector/finding";
@@ -56,34 +59,43 @@ function makeLeases(
 const BACKENDS = ["json", "sqlite"] as const;
 
 type ExecuteItemImpl = (this: unknown, item: WorkItem, workerId: string, generation?: number) => Promise<boolean>;
+type LegacyPatchRef = ExecuteItemImpl | undefined;
+void (0 as unknown as LegacyPatchRef);
 
-interface ExecuteItemPatch {
+/** One execution-level injection hook around the real fake executor body. */
+type ExecuteHook = (
+  item: WorkItem,
+  runReal: () => Promise<WorkItemResult>,
+) => Promise<WorkItemResult | void>;
+
+/**
+ * M12: item execution is delegated to a pluggable WorkItemExecutor, so the
+ * historical prototype-level seam is replaced by executor injection with the
+ * same hook semantics (throw to fail, runReal to proceed).
+ */
+function wrappedExecutor(usage = USAGE): {
+  executor: WorkItemExecutor;
+  addHook(hook: ExecuteHook): void;
   count(): number;
-  /** Replace executeItem; `runReal` invokes the true implementation with all original arguments. */
-  wrap(impl: (this: unknown, item: WorkItem, workerId: string, generation: number | undefined, runReal: () => Promise<boolean>) => Promise<boolean>): void;
-  restore(): void;
-}
-function patchExecuteItem(): ExecuteItemPatch {
-  const proto = UnattendedCampaign.prototype as unknown as { executeItem: ExecuteItemImpl };
-  const original = proto.executeItem;
+} {
+  const inner = new FakeItemExecutor({ usagePerStep: usage });
   let calls = 0;
-  return {
-    count: () => calls,
-    wrap(impl) {
-      proto.executeItem = function (...args: unknown[]) {
-        calls += 1;
-        const item = args[0] as WorkItem;
-        const workerId = args[1] as string;
-        const generation = args[2] as number | undefined;
-        return impl.call(this, item, workerId, generation, () =>
-          original.apply(this, args as Parameters<ExecuteItemImpl>),
-        );
-      };
-    },
-    restore: () => {
-      proto.executeItem = original;
+  const hooks: ExecuteHook[] = [];
+  const executor: WorkItemExecutor = {
+    id: "test-wrapped",
+    capabilities: () => inner.capabilities(),
+    async execute(item, ctx) {
+      calls += 1;
+      const workItem = item as WorkItem;
+      const runReal = () => inner.execute(workItem, ctx);
+      for (const hook of hooks) {
+        const out = await hook(workItem, runReal);
+        if (out !== undefined) return out;
+      }
+      return runReal();
     },
   };
+  return { executor, addHook: (h) => hooks.push(h), count: () => calls };
 }
 
 function readCampaignJson(stateDir: string): {
@@ -189,20 +201,20 @@ describe("D1: cross-instance state must be serialized through a durable lock", (
 
   it("a second campaign instance over one stateDir never re-executes completed items", async () => {
     const stateDir = join(fresh("d1-campaign"), "state");
-    const patch = patchExecuteItem();
+    const wrapped = wrappedExecutor();
     try {
-      const a = new UnattendedCampaign({ stateDir, workerCount: 1, items: items(), usagePerStep: USAGE });
-      const b = new UnattendedCampaign({ stateDir, workerCount: 1, items: items(), usagePerStep: USAGE });
+      const a = new UnattendedCampaign({ stateDir, workerCount: 1, items: items(), usagePerStep: USAGE, executor: wrapped.executor });
+      const b = new UnattendedCampaign({ stateDir, workerCount: 1, items: items(), usagePerStep: USAGE, executor: wrapped.executor });
       await a.run();
-      const afterA = patch.count();
+      const afterA = wrapped.count();
       await b.run();
-      expect(patch.count()).toBe(afterA); // b executed nothing
+      expect(wrapped.count()).toBe(afterA); // b executed nothing
       const disk = readCampaignJson(stateDir);
       expect(disk.executions.map((e) => e.itemId).sort()).toEqual([
         "item-1", "item-2", "item-3", "item-4",
       ]);
     } finally {
-      patch.restore();
+      /* executor seam needs no restore */
     }
   });
 });
@@ -288,63 +300,64 @@ describe("D4: stop stays durable but resume unbricks the campaign", () => {
 describe("D5: per-item failure containment and cleanup", () => {
   it("an adapter throw is contained: durable failure record, lease released, run continues", async () => {
     const stateDir = join(fresh("d5-containment"), "state");
-    const patch = patchExecuteItem();
-    try {
-      patch.wrap(async (item, _workerId, _generation, runReal) => {
-        if (item.id === "item-1") throw new Error("adapter exploded");
-        return runReal();
-      });
-      const campaign = new UnattendedCampaign({
-        stateDir,
-        workerCount: 1,
-        items: items(),
-        usagePerStep: USAGE,
-      });
-      const report = await campaign.run(); // pre-fix: rejects, aborting the whole run
-      expect(report.failed).toContain("item-1");
-      expect(report.completed.sort()).toEqual(["item-2", "item-3", "item-4"]);
-      const disk = readCampaignJson(stateDir);
-      expect(disk.failed).toContain("item-1"); // durably recorded
-      expect(new LeaseManager(stateDir).inFlight()).toHaveLength(0); // lease released
-    } finally {
-      patch.restore();
-    }
+    const wrapped = wrappedExecutor();
+    wrapped.addHook(async (item, runReal) => {
+      if (item.id === "item-1") throw new Error("adapter exploded");
+      return runReal();
+    });
+    const campaign = new UnattendedCampaign({
+      stateDir,
+      workerCount: 1,
+      items: items(),
+      usagePerStep: USAGE,
+      executor: wrapped.executor,
+    });
+    const report = await campaign.run(); // pre-fix: rejects, aborting the whole run
+    expect(report.failed).toContain("item-1");
+    expect(report.completed.sort()).toEqual(["item-2", "item-3", "item-4"]);
+    expect(report.failureDetails?.["item-1"]?.class).toBe("execution-failure");
+    const disk = readCampaignJson(stateDir);
+    expect(disk.failed).toContain("item-1"); // durably recorded
+    expect(new LeaseManager(stateDir).inFlight()).toHaveLength(0); // lease released
   });
 
   it("work done before a crash stays durable: findings persist even when the item fails", async () => {
     const stateDir = join(fresh("d5-findings"), "state");
-    const patch = patchExecuteItem();
-    try {
-      patch.wrap(async (_item, _workerId, _generation, runReal) => {
-        const ok = await runReal(); // real execution ingests a finding
-        void ok;
-        throw new Error("crash after ingest"); // simulate controller death right after work
-      });
-      const campaign = new UnattendedCampaign({
-        stateDir,
-        workerCount: 1,
-        items: items(),
-        usagePerStep: USAGE,
-      });
-      const report = await campaign.run(); // pre-fix: rejects on the first item
-      expect(report.failed).toHaveLength(4);
-      const disk = readCampaignJson(stateDir);
-      expect(disk.findings).toHaveLength(4); // findings durable despite item failure
-      expect(disk.executions).toHaveLength(0); // no false positives recorded
-    } finally {
-      patch.restore();
-    }
+    const wrapped = wrappedExecutor();
+    wrapped.addHook(async (_item, runReal) => {
+      await runReal(); // real execution ingests a finding
+      throw new Error("crash after ingest"); // simulate controller death right after work
+    });
+    const campaign = new UnattendedCampaign({
+      stateDir,
+      workerCount: 1,
+      items: items(),
+      usagePerStep: USAGE,
+      executor: wrapped.executor,
+    });
+    const report = await campaign.run(); // pre-fix: rejects on the first item
+    expect(report.failed).toHaveLength(4);
+    const disk = readCampaignJson(stateDir);
+    expect(disk.findings).toHaveLength(4); // findings durable despite item failure
+    expect(disk.executions).toHaveLength(0); // no false positives recorded
   });
 
-  it("per-item temp dirs are cleaned up on both success and failure paths", async () => {
+  it("per-item workspaces are cleaned up on both success and failure paths", async () => {
     const base = fresh("d5-temp-cleanup");
     const stateDir = join(base, "state");
-    const scan = (): string[] =>
+    const artifactsDir = join(base, "artifacts");
+    const scanTmpLitter = (): string[] =>
       readdirSync(tmpdir()).filter((f) => f.startsWith("inspector-worker-0-leakprobe-a-"));
-    const patch = patchExecuteItem();
-    try {
-      patch.wrap(async (item) => !item.id.endsWith("b")); // second item hits the failure path
-      const campaign = new UnattendedCampaign({
+    const wrapped = wrappedExecutor();
+    wrapped.addHook(async (item, runReal) => {
+      const result = await runReal();
+      if (item.id.endsWith("b")) {
+        return { ...result, ok: false, failureClass: "execution-failure", failureDetail: "injected" };
+      }
+      return result;
+    });
+    const campaign = new UnattendedCampaign(
+      {
         stateDir,
         workerCount: 1,
         items: [
@@ -352,12 +365,19 @@ describe("D5: per-item failure containment and cleanup", () => {
           { id: "leakprobe-ab", priority: 2, mode: "hunt", target: "fake", seed: 2, steps: 1 },
         ],
         usagePerStep: USAGE,
-      });
+        executor: wrapped.executor,
+      },
+      artifactsDir,
+    );
+    try {
       const report = await campaign.run();
       expect(report.completed).toEqual(["leakprobe-a"]);
-      expect(scan()).toEqual([]); // pre-fix: leaked mkdtemp dirs remain
+      expect(scanTmpLitter()).toEqual([]); // no mkdtemp litter outside the artifacts root
+      const itemsRoot = join(artifactsDir, "items");
+      expect(existsSync(itemsRoot)).toBe(true);
+      expect(readdirSync(itemsRoot)).toEqual([]); // per-item workspaces removed on both paths
     } finally {
-      patch.restore();
+      campaign.dispose();
     }
   });
 

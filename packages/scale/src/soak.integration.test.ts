@@ -16,10 +16,12 @@ import {
   StateCorruptionError,
   StateFile,
   UnattendedCampaign,
+  FakeItemExecutor,
   type CampaignReport,
   type ModelProvider,
   type UsageEntry,
   type WorkItem,
+  type WorkItemExecutor,
 } from "./index.js";
 
 // SOAK phase J (hardening campaign #1): bounded-but-substantial deterministic
@@ -94,30 +96,54 @@ type ExecuteItemImpl = (
   workerId: string,
   generation?: number,
 ) => Promise<boolean>;
+void (0 as unknown as ExecuteItemImpl | undefined);
 
-/** Prototype-level seam (same discipline as scale.hardening.test.ts). */
-function patchExecuteItem(
-  impl: (
-    this: unknown,
-    item: WorkItem,
-    workerId: string,
-    generation: number | undefined,
-    runReal: () => Promise<boolean>,
-  ) => Promise<boolean>,
-): () => void {
-  const proto = UnattendedCampaign.prototype as unknown as { executeItem: ExecuteItemImpl };
-  const original = proto.executeItem;
-  proto.executeItem = function (...args: unknown[]) {
-    const item = args[0] as WorkItem;
-    const workerId = args[1] as string;
-    const generation = args[2] as number | undefined;
-    return impl.call(this, item, workerId, generation, () =>
-      original.apply(this, args as Parameters<ExecuteItemImpl>),
-    );
+/**
+ * M12 seam: injections run inside a wrapping WorkItemExecutor. The current
+ * campaign instance is supplied by the test via a mutable holder so stop()
+ * and leasesRef behave exactly like the historical prototype patch.
+ */
+interface SoakExecutor {
+  executor: WorkItemExecutor;
+  setCampaign(c: UnattendedCampaign): void;
+}
+function soakExecutor(usage: typeof USAGE, ctx: ChurnCtx, ttlMs: number, inner: FakeItemExecutor): SoakExecutor {
+  let camp: UnattendedCampaign | null = null;
+  const executor: WorkItemExecutor = {
+    id: "soak-wrapped",
+    capabilities: () => inner.capabilities(),
+    async execute(rawItem, ectx) {
+      const item = rawItem as WorkItem;
+      const campaign = camp;
+      if (!campaign) throw new Error("soak executor used without a campaign");
+      ctx.attempts += 1;
+      // Injected worker failure (once per item): contained crash before any work.
+      if (ctx.attempts % 11 === 3 && !ctx.failedOnce.has(item.id)) {
+        ctx.failedOnce.add(item.id);
+        ctx.workerFailures += 1;
+        throw new Error(`injected worker crash for ${item.id}`);
+      }
+      // Injected lease-TTL expiry + ghost-controller reclaim mid-run: the
+      // current holder's completion must be fenced out as stale.
+      if (ctx.attempts % 7 === 5) {
+        ctx.t += ctx.ttlMs + 1; // expire the lease the campaign just acquired
+        const ghost = campaign.leasesRef.acquire(item.id, "worker-ghost");
+        if (ghost.ok) {
+          ctx.staleInjections += 1;
+          const duplicate = campaign.leasesRef.acquire(item.id, "worker-ghost-2");
+          if (!duplicate.ok) ctx.duplicateClaimsRejected += 1; // held: double claim rejected
+        }
+      }
+      ctx.realBodyRuns += 1;
+      const result = await inner.execute(item, ectx);
+      if (result.ok) {
+        ctx.completionsThisCycle += 1;
+        if (ctx.completionsThisCycle >= ctx.chunkSize) campaign.stop(); // restart between items
+      }
+      return result;
+    },
   };
-  return () => {
-    proto.executeItem = original;
-  };
+  return { executor, setCampaign: (c) => (camp = c) };
 }
 
 interface ChurnCtx {
@@ -177,34 +203,8 @@ describe("SOAK-J: unattended-campaign long-run churn", () => {
       const MAX_CYCLES = 90;
       const t0 = Date.now();
 
-      const restore = patchExecuteItem(async function (item, _workerId, _generation, runReal) {
-        const camp = this as UnattendedCampaign;
-        ctx.attempts += 1;
-        // Injected worker failure (once per item): contained crash before any work.
-        if (ctx.attempts % 11 === 3 && !ctx.failedOnce.has(item.id)) {
-          ctx.failedOnce.add(item.id);
-          ctx.workerFailures += 1;
-          throw new Error(`injected worker crash for ${item.id}`);
-        }
-        // Injected lease-TTL expiry + ghost-controller reclaim mid-run: the
-        // current holder's completion must be fenced out as stale.
-        if (ctx.attempts % 7 === 5) {
-          ctx.t += ctx.ttlMs + 1; // expire the lease the campaign just acquired
-          const ghost = camp.leasesRef.acquire(item.id, "worker-ghost");
-          if (ghost.ok) {
-            ctx.staleInjections += 1;
-            const duplicate = camp.leasesRef.acquire(item.id, "worker-ghost-2");
-            if (!duplicate.ok) ctx.duplicateClaimsRejected += 1; // held: double claim rejected
-          }
-        }
-        ctx.realBodyRuns += 1;
-        const ok = await runReal();
-        if (ok) {
-          ctx.completionsThisCycle += 1;
-          if (ctx.completionsThisCycle >= ctx.chunkSize) camp.stop(); // restart between items
-        }
-        return ok;
-      });
+      const innerFake = new FakeItemExecutor({ usagePerStep: USAGE, leaseTtlMs: ttlMs });
+      const soak = soakExecutor(USAGE, ctx, ttlMs, innerFake);
 
       try {
         while (cycles < MAX_CYCLES && allCompleted.size < items.length) {
@@ -221,14 +221,16 @@ describe("SOAK-J: unattended-campaign long-run churn", () => {
               usagePerStep: USAGE,
               now: (): number => ctx.t,
               leaseTtlMs: ttlMs,
+              executor: soak.executor,
             },
             artifactsDir,
           );
+          soak.setCampaign(campaign);
           // Tap every admitted charge so durable totals can be cross-checked.
           const led = campaign.ledgerRef;
           const origCharge = led.charge.bind(led);
-          led.charge = (entry: UsageEntry): boolean => {
-            const ok = origCharge(entry);
+          led.charge = (entry: UsageEntry, options?: { allowWhenStopped?: boolean }): boolean => {
+            const ok = origCharge(entry, options);
             if (ok) {
               ctx.admittedCharges += 1;
               ctx.admittedActions += entry.actions ?? 0;
@@ -274,7 +276,7 @@ describe("SOAK-J: unattended-campaign long-run churn", () => {
           }
         }
       } finally {
-        restore();
+        /* executor seam needs no restore */
       }
 
       const wallMs = Date.now() - t0;

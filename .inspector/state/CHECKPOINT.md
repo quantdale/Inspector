@@ -32,6 +32,40 @@ the M12 milestone; campaign.yaml `active` now points at SPEC-012 with an
 F0 gate: durable state references SPEC-012; no historical evidence rewritten;
 M8 stays DEFERRED_ENVIRONMENT.
 
+### M12 F1 — execution abstraction checkpoint (2026-08-24)
+
+- `packages/scale/src/executor.ts`: WorkItemExecutor/ExecutionContext/
+  WorkItemResult contract with the M12 failure taxonomy
+  (capability-unavailable, target-incompatible, environment-unavailable,
+  target-config-invalid, execution-failure, policy-refusal,
+  budget-exhausted) and ItemCancelledError for cooperative cancel.
+- `packages/scale/src/fake-executor.ts`: historical inline fake execution
+  extracted verbatim as FakeItemExecutor — one implementation behind the
+  contract; campaign.ts imports NO adapter handler (exit criterion met).
+- UnattendedCampaign re-architected: event-driven concurrent workers
+  (deterministic priority claiming, one claim per idle worker per pass),
+  capability-aware routing via executor.capabilities(), unroutable work
+  durably refused up front, per-item workspaces under the artifacts root
+  (keepItemWorkspaces option), persisted assignments/refusals/worker
+  snapshots/failureDetails/stopReason in campaign state, cooperative stop
+  via AbortSignal, WorkItem type extended with v2 fields (adapterFamily,
+  targetUri, targetConfig, revision, budgets, requiresCapabilities,
+  exclusive, repairAuthorized; mode widened to include explore/verify).
+- Two concurrency defects found by SOAK-J1 and fixed:
+  1) scheduleAll could return while claims were in flight (queue-drain race)
+     — loop now always drains in-flight runs before reporting;
+  2) a chunk-stop racing an item made ResourceLedger.charge refuse post-stop
+     charges, so executors misreported budget-exhausted and fenced-stale
+     accounting was lost. Charges taken while stopping are now recorded
+     (charge(entry,{allowWhenStopped:true})); settleResult reconciles lease
+     truth before classifying failures; finding persistence is idempotent
+     per finding id (persistPartial + final result cannot duplicate).
+- Hardening/soak tests moved from the executeItem prototype seam to executor
+  injection with identical assertions.
+- F1 gate: lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit 533
+  passed / 3 skipped; integration 155 passed / 1 skipped across 37 files on
+  the first run (SOAK-J1 stale==injections exact).
+
 ## Last trusted implementation state
 
 M11 P0-P7 are complete and were re-verified end to end on 2026-08-23 at

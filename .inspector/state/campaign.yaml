@@ -513,8 +513,8 @@ m12:
   tasks: specs/012-real-target-fleet-campaigns/TASKS.md
   task_groups:
     F0: COMPLETE
-    F1: ACTIVE
-    F2: PENDING
+    F1: COMPLETE
+    F2: ACTIVE
     F3: PENDING
     F4: PENDING
     F5: PENDING
@@ -524,7 +524,7 @@ m12:
     F9: PENDING
     F10: PENDING
     F11: PENDING
-  waypoint: M12.F1.executor-contract
+  waypoint: M12.F2.manifest-schema
   waypoint_status: ACTIVE
   blockers: []
 

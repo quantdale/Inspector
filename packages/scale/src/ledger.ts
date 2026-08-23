@@ -38,11 +38,16 @@ export class ResourceLedger {
     this.file.load();
   }
 
-  /** Attempt to charge usage; returns false when a budget would be exceeded. */
-  charge(entry: UsageEntry): boolean {
+  /**
+   * Attempt to charge usage; returns false when a budget would be exceeded.
+   * Pass `allowWhenStopped` for work that already consumed resources while a
+   * stop was racing it — the usage is real and must be accounted, and the
+   * caller distinguishes stop-from-budget through other means.
+   */
+  charge(entry: UsageEntry, options: { allowWhenStopped?: boolean } = {}): boolean {
     assertValidUsage(entry);
     return this.file.update((state) => {
-      if (state.stopped) return false;
+      if (state.stopped && !options.allowWhenStopped) return false;
       const nextGlobal = this.project(
         this.add(this.sumOf(state.entries), entry),
         this.globalBudget,

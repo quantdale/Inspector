@@ -12,18 +12,26 @@ before the next activates.
 
 ## F1 — Execution abstraction in @inspector/scale
 
-- [ ] F1.1 `executor.ts`: WorkItemExecutor, ExecutionContext, WorkItemResult,
+- [x] F1.1 `executor.ts`: WorkItemExecutor, ExecutionContext, WorkItemResult,
       failure taxonomy (capability-unavailable / target-incompatible /
       environment-unavailable / target-config-invalid / execution-failure /
       policy-refusal / budget-exhausted).
-- [ ] F1.2 Extract inline execution into deterministic fake executor behind the
+- [x] F1.2 Extract inline execution into deterministic fake executor behind the
       contract; scheduler takes an executor option and imports no production
       adapter handler in campaign.ts.
-- [ ] F1.3 Concurrent worker loops under leases with preserved queue priority;
+- [x] F1.3 Concurrent worker loops under leases with preserved queue priority;
       capability snapshot hook on the executor contract.
-- [ ] F1.4 Persist assignment decisions + refusals in durable campaign state.
-- Gate: scale unit/integration tests green; existing campaign tests unchanged
-  in behavior; grep proves campaign.ts no longer constructs FakeAdapterHandler.
+- [x] F1.4 Persist assignment decisions + refusals in durable campaign state.
+- Gate: PASSED 2026-08-24 — lint 0 errors/4 pre-existing warnings; typecheck
+  PASS; unit 533 passed/3 skipped; integration 155 passed/1 skipped (37
+  files) first-run; SOAK-J1 fencing accounting exact (stale==injections);
+  campaign.ts imports no adapter handler. Two concurrency defects found and
+  fixed with regression coverage via the executor seam: (a) scheduleAll could
+  return while claims were in flight; (b) a stop racing an item misclassified
+  post-stop charges as budget-exhausted and lost fenced-stale accounting —
+  charges taken while stopping are now recorded (`allowWhenStopped`) and
+  lease-truth reconciliation takes precedence over failure classification;
+  finding persistence is idempotent per finding id.
 
 ## F2 — Versioned work-item schema and manifest
 
