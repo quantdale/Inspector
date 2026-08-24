@@ -22,6 +22,7 @@ const EXTERNALS = [
   "@lydell/node-pty",
   "ajv",
   "ajv-formats",
+  "yaml",
 ];
 
 const CLI_ENTRY = { in: "packages/cli/src/bin.ts", out: "inspector-cli" };
@@ -127,6 +128,7 @@ const meta = {
     "ajv-formats": "^3.0.1",
     "better-sqlite3": "^11.7.0",
     playwright: "^1.62.1",
+    yaml: "^2.9.0",
   },
   optionalDependencies: {
     // Electron is optional because its native executable is large and some

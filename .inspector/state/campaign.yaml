@@ -522,10 +522,10 @@ m12:
     F7: COMPLETE
     F8: COMPLETE
     F9: COMPLETE
-    F10: ACTIVE
+    F10: COMPLETE
+    F11: ACTIVE
     F11: PENDING
-    F11: PENDING
-  waypoint: M12.F10.installed-artifact
+  waypoint: M12.F11.final-gate
   waypoint_status: ACTIVE
   blockers: []
 

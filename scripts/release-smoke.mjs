@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -79,13 +79,52 @@ try {
   JSON.parse(runInspector(["findings", "list", "--json"]).stdout);
   JSON.parse(runInspector(["runs", "list", "--json"]).stdout);
   JSON.parse(runInspector(["campaign", "list", "--json"]).stdout);
+
+  // M12 F10: installed-artifact campaign operation.
+  const manifestPath = join(prefix, "m12-campaign.yaml");
+  writeFileSync(
+    manifestPath,
+    [
+      "schema: inspector-campaign-manifest/1",
+      "id: smoke-fleet",
+      "workers: 2",
+      "items:",
+      "  - id: one",
+      "    workflow: hunt",
+      "    adapterFamily: fake",
+      "    seed: 11",
+      "    steps: 2",
+      "  - id: two",
+      "    workflow: explore",
+      "    adapterFamily: fake",
+      "    seed: 22",
+      "    steps: 2",
+      "    priority: 2",
+    ].join("\n"),
+    "utf8",
+  );
+  const validated = JSON.parse(runInspector(["campaign", "validate", "--manifest", manifestPath, "--json"]).stdout);
+  if (validated.schema !== "inspector-cli/campaign-validate/1" || validated.ok !== true || validated.result.items.length !== 2) {
+    throw new Error("release smoke: campaign manifest validation mismatch");
+  }
+  const campaignRun = JSON.parse(runInspector(["campaign", "run", "--manifest", manifestPath, "--json"]).stdout);
+  if (campaignRun.campaign.status !== "complete" || [...campaignRun.campaign.completed].sort().join() !== "one,two") {
+    throw new Error("release smoke: installed campaign run mismatch");
+  }
+  if (new Set(campaignRun.campaign.executions.map((e) => e.workerId)).size !== 2) {
+    throw new Error("release smoke: installed campaign did not use two workers");
+  }
+  const shown = JSON.parse(runInspector(["campaign", "show", "smoke-fleet", "--json"]).stdout);
+  if (shown.campaign.status !== "complete" || typeof shown.campaign.elapsedMs !== "number") {
+    throw new Error("release smoke: installed campaign show mismatch");
+  }
   process.stdout.write(JSON.stringify({
     ok: true,
     schema: "inspector-release-smoke/1",
     version,
     tarball,
     workspace: prefix,
-    commands: ["--version", "doctor --json", "hunt --adapter fake", "explore --adapter fake", "findings list", "runs list", "campaign list"],
+    commands: ["--version", "doctor --json", "hunt --adapter fake", "explore --adapter fake", "findings list", "runs list", "campaign list", "campaign validate --manifest", "campaign run --manifest", "campaign show"],
   }, null, 2) + "\n");
 } finally {
   rmSync(prefix, { recursive: true, force: true });

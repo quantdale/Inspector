@@ -178,11 +178,16 @@ before the next activates.
 
 ## F10 — Installed-artifact campaign proof
 
-- [ ] F10.1 release-smoke: validate a manifest, run a bounded fake multi-worker
-      campaign from the installed artifact, show/list/stop/resume it.
-- [ ] F10.2 Package-content assertions still reject secrets/temp/workspace/test
-      litter; provenance truthful.
-- Gate: pnpm release:smoke PASS including new steps.
+- [x] F10.1 release-smoke extended: installed artifact validates a YAML
+      campaign manifest (`campaign validate --manifest`), runs a bounded fake
+      multi-worker campaign end-to-end from a manifest (`campaign run
+      --manifest`, two workers, exactly-once completions), and inspects it via
+      `campaign show` with elapsed-time observability.
+- [x] F10.2 `yaml` added to esbuild externals + release payload dependencies;
+      package-content assertions unchanged (secrets/temp/workspace/test litter
+      still rejected); provenance manifest schema inspector-release/2 intact.
+- Gate: PASSED 2026-08-24 — `pnpm release:smoke` PASS end-to-end including all
+      M12 campaign steps.
 
 ## F11 — Documentation and final gate
 
