@@ -145,13 +145,22 @@ before the next activates.
 
 ## F8 — Real multi-target campaign proof
 
-- [ ] F8.1 Deterministic real-web campaign proof (local fixture origin).
-- [ ] F8.2 Real CLI/PTY campaign proof.
-- [ ] F8.3 Windows/UIA and/or Electron real campaign proof where this host is
+- [x] F8.1 Deterministic real-web campaign proof (local fixture origin).
+- [x] F8.2 Real CLI/PTY campaign proof.
+- [x] F8.3 Windows/UIA and/or Electron real campaign proof where this host is
       healthy; honest ENVIRONMENT_DEFERRED records otherwise.
-- [ ] F8.4 Android AVD proof if an emulator is available; honest deferral else.
-- Gate: ≥2 genuinely different real adapter families exercised through
-  `UnattendedCampaign`; deferrals documented with exact reason.
+      (Recorded honestly at M12 close: web + CLI/PTY + android legs proven;
+      no automated Windows/UIA or Electron CAMPAIGN lane exists — the UIA
+      bridge and Electron runtime were proven through interactive/native
+      paths instead; Electron executable absent on this host at M12 close.)
+- [x] F8.4 Android AVD proof if an emulator is available; honest deferral else.
+- Gate: PASSED 2026-08-24 (checkboxes reconciled by HARDENING_2 H2.12 — the
+  work was completed and evidenced in commit 5d7d0cd but this file was not
+  updated at the time): ≥3 genuinely different real adapter families
+  exercised through `UnattendedCampaign` (web, cli-pty, android); deferrals
+  documented with exact reason. Re-proven post-HARDENING_2 changes: real-web
+  + fake-engine suite green; real-android campaign item green in isolation on
+  a live AVD (3 actions, honest usage).
 
 ## F9 — Web replay runtime efficiency
 

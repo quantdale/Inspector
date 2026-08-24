@@ -3,10 +3,10 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **ACTIVE — M12 Real-Target Fleet Campaigns, Capability-Aware Scheduling, Unattended Runtime Efficiency**
+- Status: **COMPLETE — M12 Real-Target Fleet Campaigns closed 2026-08-24; HARDENING_2 (separately invoked) also COMPLETE — see `.inspector/state/HARDENING-CHECKPOINT.md`**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: NOT ACTIVE
+- Hardening: HARDENING_2 ACTIVE at M12 open; see the hardening ledger for its final state.
 
 ### M12 activation (2026-08-23)
 
@@ -63,6 +63,9 @@ installed-campaign steps). Highlights:
   "triggered" to "green".
 - Durable state updated accordingly (hosted_ci_pending note + verification
   block unchanged: gates were run locally on the exact final tree).
+
+- Historical pre-M12 baseline facts (superseded by the COMPLETE record above;
+  retained verbatim so no historical evidence is rewritten):
 
 - `@inspector/scale` `UnattendedCampaign` (packages/scale/src/campaign.ts)
   constructs `FakeAdapterHandler` inline in `executeItem`; this is the product

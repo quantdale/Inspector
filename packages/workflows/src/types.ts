@@ -1,6 +1,13 @@
 /** Progress sink; stderr so stdout stays parseable. */
 export type ProgressFn = (line: string) => void;
 
+/**
+ * Campaign execution control threaded into the exploration loops
+ * (HARDENING_2 D1/D3). Structurally `@inspector/explore`'s hook so CLI and
+ * fleet callers share one shape.
+ */
+export type ExplorationControl = import("@inspector/explore").ExplorationControl;
+
 /** Adapter families an exploration workflow can drive. */
 export type ExplorationAdapter = "web" | "fake" | "cli" | "windows" | "android";
 

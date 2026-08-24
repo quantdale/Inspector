@@ -27,7 +27,7 @@ const CAMPAIGN_VALIDATE_SCHEMA = "inspector-cli/campaign-validate/1";
 const MAX_WORKERS = 32;
 const MAX_STEPS = 10_000;
 
-type CampaignStatus = "configured" | "running" | "stopped" | "complete" | "failed";
+type CampaignStatus = "configured" | "running" | "stopped" | "complete" | "failed" | "refused" | "blocked";
 
 interface CampaignManifest {
   schema: "inspector-campaign/1";
@@ -90,6 +90,12 @@ interface CampaignSnapshot {
   stopReason: string | null;
   workers: Array<{ workerId: string; executorId: string | null; families: string[]; capabilities: string[] }>;
   elapsedMs: number;
+  /** HARDENING_2 D6: durable wall truth in every machine view. */
+  wall: { maxWallMs: number; elapsedMs: number; remainingMs: number; exhausted: boolean };
+  /** HARDENING_2 D9: items refused without any execution. */
+  refusedCount: number;
+  /** HARDENING_2 D7: present when scheduling stopped on externally-held work. */
+  blocked?: { reason: string; heldItems: number; earliestReclaimAtMs: number; waitMs: number };
   findingSummary?: {
     total: number;
     candidates: number;
@@ -317,12 +323,32 @@ async function operateCampaign(
       return { code: 0, data: output };
     }
     if (req.operation === "resume") campaign.resume();
+
+    // HARDENING_2 D6: the wall allowance is a CAMPAIGN bound derived from the
+    // durable start time — a restarted process never receives a fresh one.
+    const wall = remainingWallMs(manifest);
+    if (wall.remainingMs <= 0) {
+      // Truthful immediate stop: the campaign allowance was spent by earlier
+      // lives; this process grants no fresh window.
+      campaign.stop("max-wall");
+      const stoppedReport: CampaignReport = {
+        ...emptyBlockedReport(manifest),
+        stopReason: "max-wall",
+        elapsedMs: wall.elapsedMs,
+      };
+      manifest = updateManifest(manifest, { status: "stopped", lastReport: stoppedReport });
+      writeManifest(manifestPath, manifest);
+      const output = campaignOutput("run", manifest, campaign, warning);
+      emit(ctx, output, `campaign ${id}: wall budget exhausted before any work could run (max-wall)`);
+      return { code: exitCodeFor("stopped"), data: output };
+    }
+
     manifest = updateManifest(manifest, { status: "running", lastError: undefined });
     writeManifest(manifestPath, manifest);
     const removeSignals = installSignalShutdown(campaign);
     let report: CampaignReport;
     try {
-      report = await runBounded(campaign, manifest.maxWallMs);
+      report = await runBounded(campaign, wall.remainingMs);
     } catch (err) {
       manifest = updateManifest(manifest, { status: "failed", lastError: errorMessage(err) });
       writeManifest(manifestPath, manifest);
@@ -334,11 +360,62 @@ async function operateCampaign(
     manifest = updateManifest(manifest, { status, lastReport: report });
     writeManifest(manifestPath, manifest);
     const output = campaignOutput(req.operation, manifest, campaign, warning);
+    const exitCode = exitCodeFor(status);
     emit(ctx, output, `campaign ${id}: ${status}`);
-    return { code: report.failed.length > 0 ? 2 : 0, data: output };
+    return { code: exitCode, data: output };
   } finally {
     campaign.close();
   }
+}
+
+/** Exit codes are truthful: 0 done, 2 failed/refused, 3 blocked on others. */
+function exitCodeFor(status: CampaignStatus): number {
+  if (status === "complete" || status === "stopped") return 0;
+  if (status === "blocked") return 3;
+  if (status === "failed" || status === "refused") return 2;
+  return 0;
+}
+
+interface WallAllowance {
+  elapsedMs: number;
+  remainingMs: number;
+}
+
+/**
+ * Durable wall computation (D6): elapsed time comes from the campaign's
+ * PERSISTED start timestamp in the scale state directory, so controller
+ * deaths cannot reset the allowance. Pauses count toward the wall — this is
+ * deliberate and documented: an operator who stops a campaign for a day
+ * must not silently receive a fresh full window on resume.
+ */
+function remainingWallMs(manifest: CampaignManifest): WallAllowance {
+  const state = readJson<{ startedAtMs?: number | null }>(join(manifest.stateDir, "campaign.json"), {});
+  const startedAtMs = typeof state.startedAtMs === "number" ? state.startedAtMs : Date.now();
+  const elapsedMs = Math.max(0, Date.now() - startedAtMs);
+  return { elapsedMs, remainingMs: Math.max(0, manifest.maxWallMs - elapsedMs) };
+}
+
+function emptyBlockedReport(manifest: CampaignManifest): CampaignReport {
+  return {
+    completed: [],
+    failed: [],
+    executions: [],
+    findings: [],
+    clusters: 0,
+    usage: { modelRequests: 0, tokens: 0, costUsd: 0, actions: 0, resets: 0, artifactBytes: 0 },
+    restartsInjected: 0,
+    staleCompletions: 0,
+    refusals: [],
+    assignments: [],
+    failureDetails: {},
+    stopReason: null,
+    elapsedMs: Math.max(0, Date.now() - wallStartMs(manifest)),
+  };
+}
+
+function wallStartMs(manifest: CampaignManifest): number {
+  const state = readJson<{ startedAtMs?: number | null }>(join(manifest.stateDir, "campaign.json"), {});
+  return typeof state.startedAtMs === "number" ? state.startedAtMs : Date.now();
 }
 
 /** Load the request's manifest file; map config failures to stable CLI errors. */
@@ -443,9 +520,14 @@ function campaignOutput(
   campaign: UnattendedCampaign,
   warning: string | null,
 ): Record<string, unknown> {
+  const ok =
+    manifest.status === "complete" ||
+    manifest.status === "stopped" ||
+    manifest.status === "configured" ||
+    manifest.status === "running";
   return {
     schema: CAMPAIGN_SCHEMA,
-    ok: manifest.status === "complete" || manifest.status === "stopped" || manifest.status === "configured",
+    ok,
     command: "campaign",
     operation,
     campaign: inspectManifest(manifest, campaign),
@@ -458,18 +540,21 @@ function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampai
   try {
     const raw = readJson<Partial<{ queue: string[]; executions: Array<{ itemId: string; workerId: string }>; failed: string[]; restarts: number; staleCompletions: number; refusals: Array<{ itemId: string; class: string; detail: string; at: string }>; failureDetails: Record<string, { class: string; detail: string }>; stopReason: string | null; workerCaps: Record<string, { executorId?: string; families?: string[]; capabilities?: string[] }> }>>(join(manifest.stateDir, "campaign.json"), {});
     const report = manifest.lastReport;
-    const stopped = campaign.ledgerRef.isStopped;
-    const status: CampaignStatus = stopped
-      ? "stopped"
-      : raw.queue?.length === 0 && (raw.failed?.length ?? 0) === 0 && report
-        ? "complete"
-        : raw.queue?.length === 0 && (raw.failed?.length ?? 0) > 0
-          ? "failed"
-          : manifest.status === "configured" && !report
-            ? "configured"
-            : manifest.status === "running"
-              ? "running"
-              : manifest.status;
+    const stopReason = report?.stopReason ?? raw.stopReason ?? null;
+    // One classifier everywhere (HARDENING_2 D9/D12): show/list and the run
+    // exit path can never disagree about lifecycle truth.
+    const configured = manifest.status === "configured" && !report;
+    const status: CampaignStatus = configured
+      ? "configured"
+      : classifyCampaignStatus({
+          ledgerStopped: campaign.ledgerRef.isStopped,
+          queuedCount: raw.queue?.length ?? 0,
+          failedCount: raw.failed?.length ?? 0,
+          refusalCount: (report?.refusals ?? raw.refusals ?? []).length,
+          executedCount:
+            report?.completed.length ?? (raw.executions ?? []).length,
+          lastStopReason: stopReason,
+        });
     return {
       id: manifest.id,
       status,
@@ -489,7 +574,7 @@ function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampai
       // M12 additive observability: routing and lifecycle detail.
       refusals: report?.refusals ?? raw.refusals ?? [],
       failureDetails: report?.failureDetails ?? raw.failureDetails ?? {},
-      stopReason: report?.stopReason ?? raw.stopReason ?? null,
+      stopReason,
       workers: Object.entries(raw.workerCaps ?? {}).map(([workerId, caps]) => ({
         workerId,
         executorId: caps.executorId ?? null,
@@ -497,6 +582,14 @@ function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampai
         capabilities: caps.capabilities ?? [],
       })),
       elapsedMs: report?.elapsedMs ?? 0,
+      // HARDENING_2 D6/D12: wall truth + blocked outcome are first-class in
+      // every machine view.
+      wall: (() => {
+        const w = remainingWallMs(manifest);
+        return { maxWallMs: manifest.maxWallMs, elapsedMs: w.elapsedMs, remainingMs: w.remainingMs, exhausted: w.remainingMs <= 0 };
+      })(),
+      refusedCount: (report?.refusals ?? raw.refusals ?? []).length,
+      ...(report?.blocked ? { blocked: report.blocked } : {}),
       ...(report?.findingSummary ? { findingSummary: report.findingSummary } : {}),
       ...(manifest.sourceManifest ? { sourceManifest: manifest.sourceManifest } : {}),
       ...(manifest.lastError ? { lastError: manifest.lastError } : {}),
@@ -650,10 +743,51 @@ function numberFlag(flags: Record<string, string | true>, name: string, fallback
 }
 
 function deriveStatus(manifest: CampaignManifest, campaign: UnattendedCampaign): CampaignStatus {
-  if (campaign.ledgerRef.isStopped) return "stopped";
-  const state = readJson<{ queue?: string[]; failed?: string[] }>(join(manifest.stateDir, "campaign.json"), {});
-  if ((state.queue?.length ?? 0) === 0) return (state.failed?.length ?? 0) > 0 ? "failed" : "complete";
-  return "running";
+  const state = readJson<{
+    queue?: string[];
+    failed?: string[];
+    refusals?: Array<{ itemId: string }>;
+    executions?: Array<{ itemId: string }>;
+  }>(join(manifest.stateDir, "campaign.json"), {});
+  return classifyCampaignStatus({
+    ledgerStopped: campaign.ledgerRef.isStopped,
+    queuedCount: state.queue?.length ?? 0,
+    failedCount: state.failed?.length ?? 0,
+    refusalCount: state.refusals?.length ?? 0,
+    executedCount:
+      manifest.lastReport?.completed.length ?? (state.executions ?? []).length,
+    lastStopReason: manifest.lastReport?.stopReason ?? null,
+  });
+}
+
+/**
+ * Pure campaign lifecycle classification (HARDENING_2 D9/D12).
+ * Exported for deterministic contract tests.
+ */
+export function classifyCampaignStatus(input: {
+  ledgerStopped: boolean;
+  queuedCount: number;
+  failedCount: number;
+  refusalCount: number;
+  executedCount: number;
+  lastStopReason: string | null;
+}): CampaignStatus {
+  if (input.ledgerStopped) return "stopped";
+  if (input.queuedCount > 0) {
+    // HARDENING_2 D7/D12: work remaining behind external leases with the
+    // controller intentionally exited is BLOCKED, never a false "running".
+    if (
+      input.lastStopReason === "blocked-external-holds"
+    ) {
+      return "blocked";
+    }
+    return "running";
+  }
+  if (input.failedCount > 0) return "failed";
+  // HARDENING_2 D9: a campaign that executed NOTHING because every item was
+  // refused is not indistinguishable from success.
+  if (input.refusalCount > 0 && input.executedCount === 0) return "refused";
+  return "complete";
 }
 
 function readJson<T>(path: string, fallback: T): T {

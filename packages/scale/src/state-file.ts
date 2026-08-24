@@ -34,33 +34,57 @@ export class StateCorruptionError extends Error {
  * fsync + rename; corrupt files are quarantined and reported with a typed
  * error instead of being silently reset; leftover .tmp files from crashed
  * saves are swept on load.
+ * HARDENING_2 (D8): an optional validate hook runs on every parsed load.
+ * Syntactically valid JSON that violates the semantic contract of the state
+ * (wrong types, impossible values) fails closed with StateCorruptionError
+ * instead of being silently normalized into empty/default state.
  */
 export class StateFile<T> {
   private readonly path: string;
   private readonly lock: FileLock;
+  private readonly validate?: (value: unknown) => T;
 
   constructor(
     stateDir: string,
     name: string,
     private initial: () => T,
+    validate?: (value: unknown) => T,
   ) {
     mkdirSync(stateDir, { recursive: true });
     this.path = join(stateDir, `${name}.json`);
     this.lock = new FileLock(`${this.path}.lock`);
+    this.validate = validate;
   }
 
   load(): T {
     this.sweepLeftoverTmp();
     if (!existsSync(this.path)) return this.initial();
+    let parsed: unknown;
     try {
-      return JSON.parse(readFileSync(this.path, "utf8")) as T;
+      parsed = JSON.parse(readFileSync(this.path, "utf8"));
     } catch (err) {
       // Fail loud: quarantine the corrupt bytes so post-mortem is possible,
       // then raise instead of silently resetting to initial state.
-      const quarantine = `${this.path}.corrupt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      renameSync(this.path, quarantine);
-      throw new StateCorruptionError(this.path, quarantine, err);
+      throw this.quarantine(err);
     }
+    if (this.validate) {
+      try {
+        return this.validate(parsed);
+      } catch (err) {
+        throw this.quarantine(err);
+      }
+    }
+    return parsed as T;
+  }
+
+  private quarantine(cause: unknown): StateCorruptionError {
+    const quarantinePath = `${this.path}.corrupt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      renameSync(this.path, quarantinePath);
+    } catch {
+      // A racing instance may have quarantined it already.
+    }
+    return new StateCorruptionError(this.path, quarantinePath, cause);
   }
 
   /**

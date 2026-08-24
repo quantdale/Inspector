@@ -2,7 +2,8 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import Database from "better-sqlite3";
 import type { LeaseRecord } from "./types.js";
-import { StateFile } from "./state-file.js";
+import { StateFile, StateCorruptionError } from "./state-file.js";
+import { validateLeasesState } from "./state-validation.js";
 
 /** Durable lease state, identical in shape across backends. */
 export interface LeasesState {
@@ -29,7 +30,9 @@ export class JsonLeaseStore implements LeaseStore {
   private readonly file: StateFile<LeasesState>;
 
   constructor(stateDir: string) {
-    this.file = new StateFile(stateDir, "leases", () => ({ leases: {}, done: [] }));
+    this.file = new StateFile(stateDir, "leases", () => ({ leases: {}, done: [] }), (raw) =>
+      validateLeasesState(raw),
+    );
   }
 
   load(): LeasesState {
@@ -117,7 +120,13 @@ export class SqliteLeaseStore implements LeaseStore {
     }>) {
       state.done.push(row.item_id);
     }
-    return state;
+    // HARDENING_2 D8: semantic validation applies to BOTH backends — an
+    // impossible durable lease state fails closed instead of misfencing.
+    try {
+      return validateLeasesState(state);
+    } catch (err) {
+      throw new StateCorruptionError(join("sqlite:", "leases"), "leases.db", err);
+    }
   }
 
   private writeState(state: LeasesState): void {

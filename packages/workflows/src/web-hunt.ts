@@ -9,7 +9,7 @@ import {
 import type { Store } from "@inspector/store-sqlite";
 import { webExploreConfig } from "./configs.js";
 import { mergeSignals, closeRunGuarded } from "./evidence.js";
-import type { HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
+import type { ExplorationControl, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 export { closeRunGuarded };
 
@@ -34,6 +34,7 @@ export async function runWebHunt(
   base: string,
   progress: ProgressFn,
   resume = false,
+  control?: ExplorationControl,
 ): Promise<HuntRunResult> {
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
 
@@ -62,6 +63,7 @@ export async function runWebHunt(
     findingEngine,
     config: webExploreConfig(req),
     resume,
+    ...(control ? { control } : {}),
     replayDriverFactory: () =>
       new WebReplayDriver({
         artifactBaseDir: join(base, "replay"),

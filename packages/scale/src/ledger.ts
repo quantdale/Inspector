@@ -1,5 +1,6 @@
 import type { Budget, UsageEntry } from "./types.js";
 import { StateFile } from "./state-file.js";
+import { validateLedgerState } from "./state-validation.js";
 
 interface LedgerState {
   entries: UsageEntry[];
@@ -33,7 +34,9 @@ export class ResourceLedger {
     private readonly globalBudget: Budget = {},
     private readonly workerBudgets: Record<string, Budget> = {},
   ) {
-    this.file = new StateFile(stateDir, "ledger", () => ({ entries: [], stopped: false }));
+    this.file = new StateFile(stateDir, "ledger", () => ({ entries: [], stopped: false }), (raw) =>
+      validateLedgerState(raw),
+    );
     // Fail loud at construction if durable state is corrupt.
     this.file.load();
   }
@@ -43,32 +46,72 @@ export class ResourceLedger {
    * Pass `allowWhenStopped` for work that already consumed resources while a
    * stop was racing it — the usage is real and must be accounted, and the
    * caller distinguishes stop-from-budget through other means.
+   *
+   * `itemBudget` (HARDENING_2 D14) enforces per-item ceilings atomically in
+   * the same serialized critical section, so concurrent workers cannot
+   * oversubscribe one item's declared budget.
    */
-  charge(entry: UsageEntry, options: { allowWhenStopped?: boolean } = {}): boolean {
+  charge(
+    entry: UsageEntry,
+    options: { allowWhenStopped?: boolean; itemBudget?: Budget & { maxResets?: number } } = {},
+  ): boolean {
     assertValidUsage(entry);
     return this.file.update((state) => {
       if (state.stopped && !options.allowWhenStopped) return false;
-      const nextGlobal = this.project(
-        this.add(this.sumOf(state.entries), entry),
-        this.globalBudget,
-      );
-      if (!nextGlobal.ok) return false;
+      if (!this.project(this.add(this.sumOf(state.entries), entry), this.globalBudget).ok) {
+        return false;
+      }
       const wb = entry.workerId ? this.workerBudgets[entry.workerId] : undefined;
-      if (wb) {
-        const workerTotals = this.sumOf(
-          state.entries.filter((e) => e.workerId === entry.workerId),
-        );
-        const nextWorker = this.project(this.add(workerTotals, entry), wb);
-        if (!nextWorker.ok) return false;
+      if (wb && !this.project(this.add(this.sumOf(state.entries.filter((e) => e.workerId === entry.workerId)), entry), wb).ok) {
+        return false;
+      }
+      if (options.itemBudget && !this.project(this.add(this.sumOf(state.entries.filter((e) => e.itemId === entry.itemId)), entry), options.itemBudget).ok) {
+        return false;
       }
       state.entries.push(entry);
       return true;
     });
   }
 
-  totals(filter?: { workerId?: string }): Required<Pick<UsageEntry, "modelRequests" | "tokens" | "costUsd" | "actions" | "resets" | "artifactBytes">> {
+  /**
+   * Permission check WITHOUT accounting (HARDENING_2 D1): would this usage be
+   * admitted right now against global/worker/item bounds? Used to obtain
+   * budget permission BEFORE budgeted resources are consumed;
+   * {@link charge} remains the authoritative recording step and re-enforces
+   * every bound inside the lock.
+   */
+  wouldAdmit(
+    entry: UsageEntry,
+    options: { itemBudget?: Budget & { maxResets?: number } } = {},
+  ): boolean {
+    assertValidUsage(entry);
+    return this.file.update((state) => {
+      if (state.stopped) return false;
+      if (!this.project(this.add(this.sumOf(state.entries), entry), this.globalBudget).ok) return false;
+      const wb = entry.workerId ? this.workerBudgets[entry.workerId] : undefined;
+      if (wb && !this.project(this.add(this.sumOf(state.entries.filter((e) => e.workerId === entry.workerId)), entry), wb).ok) {
+        return false;
+      }
+      if (options.itemBudget && !this.project(this.add(this.sumOf(state.entries.filter((e) => e.itemId === entry.itemId)), entry), options.itemBudget).ok) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  totals(filter?: { workerId?: string; itemId?: string }): Required<Pick<UsageEntry, "modelRequests" | "tokens" | "costUsd" | "actions" | "resets" | "artifactBytes">> {
     const entries = this.file.load().entries;
     return this.sumOf(this.filterEntries(entries, filter));
+  }
+
+  /**
+   * Projection-only budget check (HARDENING_2 D1): would this charge be
+   * admitted against the configured global/worker bounds WITHOUT recording
+   * it? Used to obtain permission BEFORE budgeted resources are consumed;
+   * {@link charge} remains the authoritative accounting step.
+   */
+  wouldAdmitGlobal(entry: UsageEntry): boolean {
+    return this.wouldAdmit(entry);
   }
 
   stop(): void {
@@ -88,9 +131,11 @@ export class ResourceLedger {
     return this.file.load().stopped;
   }
 
-  private filterEntries(entries: UsageEntry[], filter?: { workerId?: string }): UsageEntry[] {
-    if (!filter?.workerId) return entries;
-    return entries.filter((e) => e.workerId === filter.workerId);
+  private filterEntries(entries: UsageEntry[], filter?: { workerId?: string; itemId?: string }): UsageEntry[] {
+    let out = entries;
+    if (filter?.workerId) out = out.filter((e) => e.workerId === filter.workerId);
+    if (filter?.itemId) out = out.filter((e) => e.itemId === filter.itemId);
+    return out;
   }
 
   private sumOf(entries: UsageEntry[]) {
@@ -117,11 +162,12 @@ export class ResourceLedger {
     };
   }
 
-  private project(t: ReturnType<ResourceLedger["totals"]>, b: Budget): { ok: boolean } {
+  private project(t: ReturnType<ResourceLedger["totals"]>, b: Budget & { maxResets?: number }): { ok: boolean } {
     if (b.maxModelRequests !== undefined && t.modelRequests > b.maxModelRequests) return { ok: false };
     if (b.maxTokens !== undefined && t.tokens > b.maxTokens) return { ok: false };
     if (b.maxCostUsd !== undefined && t.costUsd > b.maxCostUsd + 1e-9) return { ok: false };
     if (b.maxActions !== undefined && t.actions > b.maxActions) return { ok: false };
+    if (b.maxResets !== undefined && t.resets > b.maxResets) return { ok: false };
     return { ok: true };
   }
 }

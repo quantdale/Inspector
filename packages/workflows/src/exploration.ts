@@ -20,7 +20,7 @@ import { closeRunGuarded, writeEvidenceBundles } from "./evidence.js";
 import { runFakeHunt } from "./fake-hunt.js";
 import { runNativeHuntCommand } from "./native-hunt.js";
 import { runWebHunt } from "./web-hunt.js";
-import type { ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
+import type { ExplorationControl, ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 export type { ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn };
 export { validateTargetUrl };
@@ -36,6 +36,13 @@ export interface ExplorationOptions {
   warning?: string | null;
   /** M12: campaign provenance threaded into durable run meta. */
   campaign?: CampaignProvenance;
+  /**
+   * HARDENING_2 D1/D3: cooperative cancellation + pre-consumption budget
+   * permission threaded into the REAL exploration loops. When present, the
+   * loops stop with `stoppedReason: 'cancelled' | 'budget-exhausted'` at
+   * safe boundaries; committed findings stay durable.
+   */
+  control?: ExplorationControl;
 }
 
 export interface ExplorationOutcome {
@@ -224,10 +231,10 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
 
     const result =
       req.adapter === "web"
-        ? await runWebHunt(run, store, req, base, progress, resuming)
+        ? await runWebHunt(run, store, req, base, progress, resuming, opts.control)
         : isNative
-          ? await runNativeHuntCommand(run, store, req, base, progress, resuming)
-           : await runFakeHunt(run, store, req, progress, resuming);
+          ? await runNativeHuntCommand(run, store, req, base, progress, resuming, opts.control)
+           : await runFakeHunt(run, store, req, progress, resuming, opts.control);
 
     const bundlePaths = writeEvidenceBundles(base, result.runId, result.evidenceBundles);
     const errorOutcomes = result.findingOutcomes.filter((o) => o.outcome === "error");

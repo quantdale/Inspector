@@ -12,3 +12,4 @@ export * from "./autonomy.js";
 export * from "./native-inventory.js";
 export * from "./native-session.js";
 export * from "./checkpoint.js";
+export * from "./control.js";

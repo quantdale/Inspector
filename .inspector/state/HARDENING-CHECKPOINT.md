@@ -1,7 +1,98 @@
+# HARDENING CAMPAIGN #2 — Fleet Runtime Integrity, Recovery, and State Truth
+
+- Campaign: HARDENING_2
+- Status: **ACTIVE**
+- Opened: 2026-08-24
+- Base commit: `702b33a4b5897cbcdec8b4b0170ca16e8043f79e` (M12 final, post-push)
+- Branch policy: main only; no force-push; no release/tag/publication.
+- Scope: M12 fleet/campaign runtime — budgets, cancellation, leases,
+  settlement durability, wall clocks, external holds, state truth, terminal
+  semantics, verify/regress provenance, torture coverage, real-runtime proof.
+- HARDENING_1's historical record follows below, untouched.
+
+## H2.0 Baseline (recorded 2026-08-24 at 702b33a)
+
+- Git: clean tree on `main`, synced with `origin/main` (push f7fba41..f5d27f1
+  recorded in durable state). Planned-from SHA equals current HEAD.
+- Gates: pnpm install --frozen-lockfile OK; lint PASS (0 errors / 4
+  pre-existing warnings); typecheck PASS; unit **549 passed / 3 skipped (50
+  files)** — matches the M12 final-gate record exactly.
+- Real backends available this host (per prior proofs): Playwright/Chromium,
+  ConPTY (@lydell/node-pty), Windows UIA bridge, ADB+AVD (health varies),
+  Electron 43.4.1 executable. Hosted CI was triggered by the authorized M12
+  push; results not inspectable from this host (gh unauthenticated) — owner
+  checks Actions tab; any red lane triaged per SPEC-012 §15.
+- Integration/release-smoke baselines: recorded below when runs complete.
+
+## Defect matrix (H2.0 truth table — evidence-first)
+
+Lifecycle: SUSPICION → EVIDENCE (repro/impossible-transition) → SEVERITY →
+REGRESSION TEST → FIX → CLOSED. IDs D1..D14; nothing is marked CLOSED without
+a deterministic reproducer demonstrating the defect or an impossible state
+transition read directly from code plus a failing-before/passing-after test.
+
+| ID | Sev | Invariant violated | Evidence (pre-fix behavior) | Correction | Status |
+| --- | --- | --- | --- | --- | --- |
+| D1 | CRIT | Charge before consuming budgeted resources | `runExplorationItem` ran the whole exploration first, then charged once and IGNORED the charge result; FakeItemExecutor acted before charging each step. | `ExecutionContext.admit` permission hook + `ExplorationControl` threaded into fake/web/native loops (explore/src/control.ts); fake executor admits before acting. Tests: h2-control.integration (deny-upfront: zero overspend), h2-fleet-hardening D14. | CLOSED |
+| D2 | HIGH | budget-exhausted structured/durable; consumption accounted | Rejected post-hoc charge lost usage entirely and still returned success. | Pre-consumption admission + incremental commits keep exact ledger totals; exhaustion maps to failedResult(budget-exhausted) preserving findings/evidence/runIds. Tests: h2-control "tiny budget" (bounded spend, durable failure class). | CLOSED |
+| D3 | HIGH | Cancellation reaches real work | Signal checked once before runExploration only. | stopRequested/admit at every safe loop boundary in all three engines incl. waits/reset paths; cancelled exits skip reproduction; committed evidence stays; owned claims requeue. Tests: h2-control cancel-mid (mid-loop exit ≤20 actions) + evidence-survival/resume. | CLOSED |
+| D4 | HIGH | Long executions keep leases or are fenced | Workflow executor never renewed; default TTL < real explorations → mid-run reclaim exposure. | Scheduler heartbeat (half-TTL, exact generation, epoch-guarded for crash simulation) aborts stale executions via signal; settle reconciles lease truth. Tests: h2-fleet-hardening heartbeat ≥2 renewals; fence-abort (stale aborted, 0 executions, staleCompletions=1). | CLOSED |
+| D5 | CRIT | Crash-safe settlement | `leases.complete()` then `recordExecution()` non-atomically; death between them requeued a done-lease item forever. | PendingSettlementJournal written BEFORE either store mutates; constructor replays entries idempotently under fencing; settlement faults fail LOUDLY as controller crashes instead of being swallowed as item failures. Tests: crash-after-complete → recovered exactly once (1 execution across lives); crash-before-complete → journalled replay without re-execution; repeated lives exactly-once. | CLOSED |
+| D6 | HIGH | Wall budget survives process lives | CLI granted a fresh setTimeout(maxWallMs) per process life. | Remaining wall derived from persisted startedAtMs; exhausted campaigns stop immediately/durably (`max-wall`, wall.exhausted in views). Test: CLI D6 restart-with-spent-allowance stops with zero additional spend. Pauses count toward the wall (documented). | CLOSED |
+| D7 | HIGH | Externally-held liveness | 200×10ms spin then silent exit; status stayed running, ok true, exit 0. | Bounded wait to earliest reclaim (+grace), then truthful blocked outcome (reason/heldItems/earliestReclaimAtMs/waitMs) and stopReason `blocked-external-holds`; claim-marker ordering fixed so local claims are never misread as external holds; progress resets the one-wait budget. Tests: expiry→reclaim completes once; live renewal→blocked truth with queue intact; two-live-controller no-duplicate. | CLOSED |
+| D8 | HIGH | Corrupt durable state fails closed | normalizeInPlace coerced wrong shapes silently; JSON lease store unvalidated. | StateFile validate hooks + state-validation.ts for campaign/ledger/lease JSON and SQLite lease reads: quarantine + StateCorruptionError on wrong types/impossible values/duplicate identities/invalid generations/negative counters; documented legacy-field migration only. Tests: corruption matrix + migration case. | CLOSED |
+| D9 | MED | Refused ≠ completed | All-refused campaigns reported complete/ok/exit 0. | `classifyCampaignStatus` (single classifier for run exit + show/list): refusal-only campaigns report `refused`, ok:false, exit 2; mixed completion stays complete with refusedCount surfaced. Tests: CLI e2e refused campaign + classifier contract cases. | CLOSED |
+| D10 | HIGH | verify/regress reach source findings | Attempt workspaces were fresh/empty; cross-item verification structurally impossible. | `targetConfig.sourceItemId` + optional findingId (auto-select single CONFIRMED): preflight validation (existence/producer/retention/cycles/self), dependency-gated claiming (source-durable before downstream; failed source ⇒ downstream target-incompatible refusal), contained resolution inside artifacts root, provenance notes. Tests: hunt→verify e2e reproduces source finding; preflight rejections; downstream-of-failed-source. ADR-0012. | CLOSED |
+| D11 | MED | Repair contract coherence | Preflight REQUIRED repairAuthorized then runtime always refused. | Reconciled operator-only: repair items rejected at preflight (`repair-unsupported`) regardless of authorization; runtime policy-refusal kept as defense in depth; docs/state aligned. Tests: work-item validation both branches; CLI manifest-invalid path. ADR-0012. | CLOSED |
+| D12 | MED | Truthful lifecycle after controller exit | deriveStatus returned running for any non-empty queue even after intentional exit. | Blocked classification from persisted blocked outcome; one classifier everywhere (run exit + inspectManifest); running appears only while work is queued without a terminal reason. Tests: classifier contract + scheduler blocked e2e. | CLOSED |
+| D13 | LOW | Workspace teardown scope | finally-block rmSync deleted items/<id> shared by ALL attempts/lives. | Per-execution attempt-dir removal + empty-root sweep only; concurrent lives' workspaces untouched (found and fixed an intermediate instance-scoped regression via EBUSY on Windows before it landed). Covered by all multi-worker/restart suites green on Windows. | CLOSED |
+| D14 | LOW | Per-item budgets honored | Only maxActions/maxWallMs consumed; maxResets/tokens/model/cost accepted but ignored. | Item ceilings enforced atomically inside ResourceLedger.charge/wouldAdmit via itemBudget projection (maxResets added to projection); wall stays engine-side. Tests: maxActions bounded exhaustion; maxResets rejection at ceiling; concurrent workers cannot oversubscribe one item's budget (exactly 10/40 admitted). | CLOSED |
+
+Accepted existing semantics (documented, NOT defects): failed items are
+requeued and retried by a fresh controller construction (SOAK-J1 depends on
+retry-to-success across lives; SOAK-J2 proves zero additional spend for
+budget-exhausted tails). This is the documented resume behavior.
+
+## Phases
+
+| Phase | Focus | State |
+| --- | --- | --- |
+| H2.0 | Baseline gates + defect matrix | DONE (baseline green at 702b33a: lint 0e/4w, typecheck PASS, unit 549/3skip, integration 165/1skip/40 files, release:smoke PASS) |
+| H2.1 | Budgets pre-consumption (D1/D2/D14) | DONE — admit/commit control hook in all three engines; per-item ceilings atomic in ledger; regression coverage h2-control + h2-fleet-hardening |
+| H2.2 | Cancellation reaches work (D3) | DONE — mid-loop cancel proven deterministically; evidence/resume preserved |
+| H2.3 | Lease liveness (D4) | DONE — scheduler heartbeat + fenced abort; low-TTL tests |
+| H2.4 | Settlement crash windows (D5) | DONE — journal + replay; both boundary crashes + repeated lives tested; settlement faults fail loud |
+| H2.5 | Durable wall budget (D6) | DONE — persisted-start derivation + exhausted-stop e2e |
+| H2.6 | External-hold semantics (D7) | DONE — bounded reclaim wait then truthful blocked; claim-window race fixed |
+| H2.7 | Semantic state validation (D8) | DONE — validators across campaign/ledger/lease (JSON+SQLite) with quarantine; legacy migration |
+| H2.8 | Truthful status contracts (D9/D12) | DONE — single classifier; refused/blocked statuses + exit codes |
+| H2.9 | Workflow claims audit (D10/D11) | DONE — source references implemented + repair contract reconciled (ADR-0012); F8/TASKS/SPEC drift corrected |
+| H2.10 | Stress/fault injection | DONE — 18-test hardening suite incl. two-live-controllers, fence abort, corruption matrix, concurrent budget race |
+| H2.11 | Real-runtime validation | DONE — fake ✓, real web ✓, real CLI/PTY ✓, real android campaign item ✓ (isolated, live AVD); Windows/UIA+Electron campaign lanes remain unwritten/deferred (honest) |
+| H2.12 | Repo truth reconciliation | DONE — AGENTS/README/STATUS/ROADMAP/SPEC-012/TASKS/CHECKPOINT/campaign.yaml synchronized |
+| EXIT | Final gate on exact final tree | see final gate record below |
+
+## HARDENING CAMPAIGN #2 RESULT
+
+- Defects: **14 confirmed and CLOSED (D1–D14): 2 CRITICAL, 8 HIGH, 4 MEDIUM/**
+  **LOW** — every fix carries deterministic regression coverage named above.
+- Contract changes recorded in ADR-0012 (operator-only campaign repair;
+  verify/regress source references) and additive ExecutionContext/
+  CampaignReport/CLI-JSON fields documented in docs/STATUS.md.
+- Environment deferrals: Electron executable absent (campaign lane deferred);
+  no automated Windows/UIA campaign lane exists (bridge itself healthy and
+  proven via native paths); hosted CI results not inspectable from this host.
+- Remaining debt (MEDIUM/LOW): web exploration replay cost (~4–6 min E2E,
+  product-acceptable); executor-hang force-kill is impossible by design for
+  in-process cooperative executors (documented; real engines honor stop);
+  paused wall time counts toward the allowance (documented choice).
+
+---
+
 # HARDENING CAMPAIGN #1 — Checkpoint
 
 - Campaign: HARDENING_1
-- Status: **ACTIVE**
+- Status: **COMPLETE** (historical; preserved verbatim below)
 - Opened: 2026-08-21
 - Base commit: `bff389034b0610f05237b0eff75f8fc2fc4fbf30` (M7 checkpoint, implementation campaign COMPLETE)
 - Branch policy: main only; no force-push.

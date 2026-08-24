@@ -327,6 +327,18 @@ Goal: remove the fake-target limitation from the campaign product surface so
 adapter-backed targets with the durability, isolation, evidence, policy,
 budget, restart, lease, and provenance guarantees already built in.
 
+**HARDENING_2 (2026-08-24, separately invoked) hardened exactly this runtime:**
+budget permission is now obtained BEFORE budgeted resources are consumed
+(structured `budget-exhausted`, exact accounting), cooperative cancellation
+reaches the real exploration loops, the scheduler manages lease liveness with
+fenced heartbeats, settlement is crash-safe via a pending-settlement journal,
+wall budgets survive process restarts, externally-held work reports truthful
+`blocked` state (never false `running`), semantically corrupt durable state
+fails closed, all-refused campaigns are distinguishable from success, and
+verify/regress items reach their producers' findings via validated
+`targetConfig.sourceItemId` references. See ADR-0012 and the HARDENING_2
+ledger in `.inspector/state/HARDENING-CHECKPOINT.md`.
+
 Deliverables:
 
 - pluggable execution contract (`WorkItemExecutor`) behind the scale scheduler;

@@ -20,6 +20,13 @@ export interface WorkItem {
   targetUri?: string;
   /** M12 F2: structured target configuration (create options / env deltas). */
   targetConfig?: Record<string, unknown>;
+  /**
+   * HARDENING_2 D10: narrow source reference. verify/regress items name a
+   * sibling hunt/explore item whose retained attempt workspace holds the
+   * durable finding/reproducer to operate on. Validated at preflight
+   * (existence, producer workflow, retention, acyclicity) and gated at claim
+   * time so downstream work never starts before its source is durable.
+   */
   /** M12 F2: exact source revision provenance when the item is revision-bound. */
   revision?: string | null;
   /** M12 F2: per-item budget ceilings charged through the shared ledger. */
@@ -29,9 +36,10 @@ export interface WorkItem {
   /** M12 F2: item refuses co-scheduling with other work (reserved; default false). */
   exclusive?: boolean;
   /**
-   * M12 F2: explicit repair authorization. Repair items are refused with
-   * `policy-refusal` unless this is exactly true — discovery never implies
-   * repair.
+   * M12 F2 legacy authorization flag, retained for schema compatibility.
+   * HARDENING_2 D11 reconciled the contract: campaign repair is UNSUPPORTED
+   * (operator-supervised `inspector repair` is THE repair path); manifests
+   * reject repair items at preflight regardless of this flag.
    */
   repairAuthorized?: boolean;
 }

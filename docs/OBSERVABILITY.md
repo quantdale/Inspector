@@ -63,7 +63,12 @@ send progress to stderr. Unexpected failures use
 malformed JSON is never used for an error path. Verification, regression,
 repair, and campaign records are persisted in SQLite alongside their evidence
 artifacts, so an interrupted operator process can resume or report an explicit
-environment/incompatible-target outcome.
+environment/incompatible-target outcome. Campaign machine views (HARDENING_2)
+carry first-class lifecycle truth: `status` distinguishes complete/refused/
+failed/blocked/stopped, `blocked` reports reason/heldItems/earliestReclaimAtMs,
+`wall` reports durable elapsed/remaining/exhausted, and `refusedCount` counts
+routing refusals — a refused or blocked campaign is never indistinguishable
+from success.
 
 Target freeform text is redacted before it enters persisted observations,
 evidence, or model context. Raw evidence remains available where it does not

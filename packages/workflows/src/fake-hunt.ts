@@ -22,7 +22,7 @@ import type { Store } from "@inspector/store-sqlite";
 import { fakeExploreConfig } from "./configs.js";
 import { mergeSignals } from "./evidence.js";
 import { WorkflowError } from "./errors.js";
-import type { HuntOutcomeEntry, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
+import type { ExplorationControl, HuntOutcomeEntry, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 const FAKE_FILL_VALUES = ["ok", "ok", "", "x".repeat(80), "<script>", "BAD"] as const;
 
@@ -90,6 +90,7 @@ export async function runFakeHunt(
   req: HuntRequest,
   progress: ProgressFn,
   resume = false,
+  control?: ExplorationControl,
 ): Promise<HuntRunResult> {
   const engine = new FindingEngine(OracleEngine.defaults(), store);
   const sinks: FakeFindingSinks = {
@@ -250,6 +251,16 @@ export async function runFakeHunt(
       stoppedReason = "action-budget";
       break;
     }
+    // HARDENING_2 D1/D3: cooperative stop + budget permission at the safe
+    // boundary BEFORE the next budgeted action starts.
+    if (control?.stopRequested()) {
+      stoppedReason = "cancelled";
+      break;
+    }
+    if (control && !control.admit("action")) {
+      stoppedReason = "budget-exhausted";
+      break;
+    }
     if (Date.now() - startMs > maxWallMs) {
       stoppedReason = "wall-budget";
       break;
@@ -307,6 +318,13 @@ export async function runFakeHunt(
     consecutiveRejections = 0;
     actionsExecuted += 1;
     segment.push(action);
+    if (control && !control.commit("action")) {
+      // The action executed and stays counted; the allowance was spent
+      // concurrently. Stop with a truthful structured reason.
+      stoppedReason = "budget-exhausted";
+      checkpoint();
+      break;
+    }
     if (actionsExecuted % 25 === 0) progress(`... ${actionsExecuted} actions executed`);
 
     // Track the field under test: a boundary fill must be submitted next.

@@ -64,10 +64,16 @@ zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferr
 for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M11 — operator-grade product workflows and distribution
-complete**. M10 resumable exploration and all M11 product, safety, CI, and
-distribution gates are complete. A local candidate artifact was installed and
-smoke-tested; no rc.2 package, release, or tag was published.
+Current status: **M12 — real-target fleet campaigns complete, HARDENING_2 fleet-
+runtime integrity campaign complete**. M10 resumable exploration, all M11
+product/safety/CI/distribution gates, and the full M12 real-workflow campaign
+surface are complete; the separately invoked HARDENING_2 campaign closed the
+fleet-runtime reliability gaps (budgets enforced before consumption,
+cancellation reaching real workflows, scheduler-managed lease liveness,
+crash-safe settlement with a durable journal, durable wall budgets, truthful
+blocked/refused lifecycle states, fail-closed semantic state validation, and
+verify/regress source references). A local candidate artifact was installed
+and smoke-tested; no rc.2 package, release, or tag was published.
 RC1 field validation is complete with a documented GO decision; the RC1 tag
 and release state remain unchanged and no rc.2 release has been published.
 

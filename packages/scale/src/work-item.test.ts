@@ -85,7 +85,7 @@ describe("M12 F2 work-item validation", () => {
     expect(issues.map((i) => i.code)).toContain("capability-unknown");
   });
 
-  it("never allows repair without explicit per-item authorization", () => {
+  it("rejects repair items at preflight — campaign repair is unsupported (HARDENING_2 D11)", () => {
     const issues = collect();
     const item = validateWorkItem(
       { id: "repair-1", workflow: "repair", adapterFamily: "fake", steps: 1 },
@@ -94,8 +94,10 @@ describe("M12 F2 work-item validation", () => {
       issues,
     );
     expect(item).toBeUndefined();
-    expect(issues.map((i) => i.code)).toContain("repair-not-authorized");
+    expect(issues.map((i) => i.code)).toContain("repair-unsupported");
 
+    // Even explicit per-item authorization does not admit campaign repair:
+    // operator-supervised `inspector repair` is THE repair path.
     const okIssues = collect();
     const authorized = validateWorkItem(
       { id: "repair-2", workflow: "repair", adapterFamily: "fake", steps: 1, repairAuthorized: true },
@@ -103,8 +105,29 @@ describe("M12 F2 work-item validation", () => {
       0,
       okIssues,
     );
-    expect(okIssues).toHaveLength(0);
-    expect(authorized?.repairAuthorized).toBe(true);
+    expect(authorized).toBeUndefined();
+    expect(okIssues.map((i) => i.code)).toContain("repair-unsupported");
+  });
+
+  it("validates source references for verify/regress (HARDENING_2 D10)", () => {
+    const issues = collect();
+    const item = validateWorkItem(
+      { id: "verify-1", workflow: "verify", adapterFamily: "fake", targetConfig: { findingId: "find_1", sourceItemId: "hunt-1" } },
+      "items[1]",
+      1,
+      issues,
+    );
+    expect(issues).toHaveLength(0);
+    expect(item?.targetConfig?.sourceItemId).toBe("hunt-1");
+
+    const badIssues = collect();
+    validateWorkItem(
+      { id: "verify-2", workflow: "verify", adapterFamily: "fake", targetConfig: { findingId: "find_1", sourceItemId: "NOT AN ID" } },
+      "items[0]",
+      0,
+      badIssues,
+    );
+    expect(badIssues.map((i) => i.code)).toContain("source-id-invalid");
   });
 });
 

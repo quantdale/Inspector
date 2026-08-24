@@ -1,13 +1,15 @@
 # Project Status
 
-Last updated: M12 COMPLETE (2026-08-24)
+Last updated: HARDENING_2 COMPLETE (2026-08-24)
 
 ## Campaign
 
-- Mode: **M12 — Real-target fleet campaigns, capability-aware scheduling,
-  and unattended runtime efficiency: COMPLETE**. M11 and all earlier
-  milestones remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`.
-  Canonical state is recorded in `.inspector/state/campaign.yaml`.
+- Mode: **M12 — real-target fleet campaigns: COMPLETE; HARDENING_2 — fleet
+  runtime integrity, recovery, and state truth (separately invoked): 
+  COMPLETE**. M11 and all earlier milestones remain COMPLETE; M8 stays
+  `DEFERRED_ENVIRONMENT`.
+  Canonical state is recorded in `.inspector/state/campaign.yaml`; the
+  HARDENING_2 ledger lives in `.inspector/state/HARDENING-CHECKPOINT.md`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
@@ -15,6 +17,46 @@ Last updated: M12 COMPLETE (2026-08-24)
   **COMPLETE**. DOGFOOD_RC1: **COMPLETE**.
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
+
+## HARDENING_2 outcome (fleet runtime integrity)
+
+The M12 fleet runtime became genuinely trustworthy under failure:
+
+- **Budgets before consumption**: the real hunt/explore loops obtain budget
+  permission BEFORE each budgeted action/reset (`ExecutionContext.admit`) and
+  account actual consumption incrementally; exhaustion is a structured,
+  durable `budget-exhausted` terminal result that preserves committed
+  evidence. Per-item manifest budgets are enforced atomically in the ledger
+  (no silently ignored configuration).
+- **Cancellation reaches real work**: cooperative stop/SIGINT/max-wall land
+  at safe boundaries INSIDE the fake/web/native exploration loops; committed
+  findings stay committed; owned claims requeue for resume.
+- **Scheduler-managed lease liveness**: heartbeats renew at half-TTL with the
+  exact fencing generation while any executor runs; a lost generation aborts
+  the stale execution immediately and fences its completion.
+- **Crash-safe settlement**: every completion/failure settlement is journalled
+  before either durable store is touched; a fresh controller deterministically
+  replays partial settlements (the crash between `leases.complete()` and
+  execution-recording can no longer strand an item behind a done lease).
+- **Durable wall budgets**: `--max-minutes` bounds the CAMPAIGN from its
+  persisted start time — process restarts grant no fresh allowance.
+- **Truthful lifecycle**: externally-held work yields `blocked` (with reason,
+  held count, earliest reclaim) instead of silent exits or false `running`;
+  all-refused campaigns report `refused` (exit 2), never success.
+- **Fail-closed state truth**: semantically corrupt JSON state (wrong types,
+  impossible values, duplicate identities, invalid generations) is quarantined
+  and raises `StateCorruptionError` across campaign/ledger/lease stores;
+  legitimate pre-M12 shapes migrate deliberately.
+- **verify/regress source references**: `targetConfig.sourceItemId` reaches a
+  producer's retained workspace through validated, contained, dependency-
+  gated provenance (ADR-0012); campaign repair is preflight-rejected as
+  unsupported (operator-supervised repair remains THE path).
+
+Real-runtime re-proofs after these changes: deterministic fake campaigns,
+REAL web campaign vs a live local app, REAL CLI/PTY campaign, and a REAL
+android campaign item on a live AVD all pass. Windows/UIA and Electron
+campaign lanes remain unwritten/deferred respectively (Electron executable
+absent on this host).
 
 ## M12 outcome
 

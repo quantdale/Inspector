@@ -25,6 +25,7 @@ import {
 import { mulberry32, restoreRng, type RngSnapshot } from "./rng.js";
 import { buildNativeInventory } from "./native-inventory.js";
 import type { CandidateAction } from "./inventory.js";
+import type { ExplorationControl } from "./control.js";
 import { StateGraph, screenFingerprint, stateFingerprint, uiTreeOf } from "./state.js";
 import {
   EXPLORER_VERSION,
@@ -54,7 +55,10 @@ export interface NativeHuntResult {
     | "no-candidates"
     | "coverage-exhausted"
     | "novelty-plateau"
-    | "adapter-error";
+    | "adapter-error"
+    /** HARDENING_2: cooperative campaign stop / pre-consumption budget stop. */
+    | "cancelled"
+    | "budget-exhausted";
   actionsExecuted: number;
   statesVisited: number;
   anomalies: number;
@@ -179,13 +183,15 @@ export interface NativeSessionDeps {
   replayDriverFactory?: () => ReplayDriver | Promise<ReplayDriver>;
   store?: Store;
   resume?: boolean;
+  /** Campaign execution control (HARDENING_2 D1/D3). */
+  control?: ExplorationControl;
 }
 
 export async function runNativeHunt(
   deps: NativeSessionDeps,
   config: NativeExplorationConfig,
 ): Promise<NativeHuntResult> {
-  const { run, findingEngine, replayDriverFactory } = deps;
+  const { run, findingEngine, replayDriverFactory, control } = deps;
   const caps = run.caps;
   const campaign = deps.store?.getExplorationCampaign(run.runId);
   const budget = {
@@ -365,6 +371,10 @@ export async function runNativeHunt(
       stoppedReason = "finding-cap";
       break;
     }
+    // HARDENING_2 D1/D3: cooperative stop and budget permission at the safe
+    // loop boundary, before any further adapter activity.
+    if (control?.stopRequested()) { stoppedReason = "cancelled"; break; }
+    if (control && !control.admit("action")) { stoppedReason = "budget-exhausted"; break; }
 
     // Observe through the standard pipeline (persists an observation).
     let obs;
@@ -504,6 +514,13 @@ export async function runNativeHunt(
     actionsExecuted++;
     segment.push(action);
     useCount.set(pick.actionKey, (useCount.get(pick.actionKey) ?? 0) + 1);
+    if (control && !control.commit("action")) {
+      // The action ran and stays counted; the allowance was spent
+      // concurrently. Stop with a truthful structured reason.
+      stoppedReason = "budget-exhausted";
+      checkpoint();
+      break;
+    }
 
     const outcome = submit.outcome;
     if (

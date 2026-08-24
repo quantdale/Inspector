@@ -44,6 +44,7 @@ import {
   type FindingOutcomeSnapshot,
 } from "./checkpoint.js";
 import { restoreRng } from "./rng.js";
+import type { ExplorationControl } from "./control.js";
 
 export interface ExploreConfig {
   seed: number;
@@ -117,6 +118,11 @@ export interface ExploreDeps {
   caps?: CapabilityDoc;
   /** Restore the durable exploration campaign instead of starting a new one. */
   resume?: boolean;
+  /**
+   * Campaign execution control (HARDENING_2): cooperative cancellation and
+   * pre-consumption budget permission at safe loop boundaries.
+   */
+  control?: ExplorationControl;
 }
 
 const DEFAULT_OBSERVE = ["url", "uiTree", "storage", "pageErrors", "title"];
@@ -165,6 +171,7 @@ export class ExploreController {
   private findingEngine?: FindingEngine;
   private replayDriverFactory?: () => ReplayDriver;
   private store?: Store;
+  private readonly control?: ExplorationControl;
 
   constructor(deps: ExploreDeps) {
     this.run = deps.run;
@@ -207,6 +214,7 @@ export class ExploreController {
     this.findingEngine = deps.findingEngine;
     this.replayDriverFactory = deps.replayDriverFactory;
     this.store = deps.store;
+    this.control = deps.control;
     this.campaignStartedAt = campaign?.createdAt ?? new Date().toISOString();
     if (restored) this.restore(restored);
   }
@@ -462,6 +470,11 @@ export class ExploreController {
 
     let obs = this.lastObs!;
     while (this.actionsExecuted < this.config.maxActions) {
+      // HARDENING_2 D3: cooperative cancellation is observed at every safe
+      // boundary, not only before the exploration starts.
+      if (this.control?.stopRequested()) {
+        return this.finish(actionKindSequence, "cancelled");
+      }
       if (
         this.config.maxWallMs &&
         Date.now() - this.startMs > this.config.maxWallMs
@@ -487,7 +500,7 @@ export class ExploreController {
           obs = this.lastObs!;
           continue;
         }
-        return this.finish(actionKindSequence, "no-candidates");
+        return this.finish(actionKindSequence, this.pendingControlStop ?? "no-candidates");
       }
 
       const executed = await this.step(chosen);
@@ -504,10 +517,16 @@ export class ExploreController {
         // and continue (the hazard that caused it is now blacklisted).
         if (this.canReset()) {
           if (!(await this.doReset())) {
-            return this.finish(actionKindSequence, "reset-failed");
+            return this.finish(actionKindSequence, this.pendingControlStop ?? "reset-failed");
           }
           continue;
         }
+        return this.finish(actionKindSequence, executed.stopReason);
+      }
+      if (this.pendingControlStop) {
+        return this.finish(actionKindSequence, this.pendingControlStop);
+      }
+      if (executed.stopReason === "cancelled" || executed.stopReason === "budget-exhausted") {
         return this.finish(actionKindSequence, executed.stopReason);
       }
       if (executed.stopReason) {
@@ -528,7 +547,7 @@ export class ExploreController {
       }
       if (executed.crashed && this.canReset()) {
         if (!(await this.doReset())) {
-          return this.finish(actionKindSequence, "reset-failed");
+          return this.finish(actionKindSequence, this.pendingControlStop ?? "reset-failed");
         }
         obs = this.lastObs!;
         continue;
@@ -538,7 +557,7 @@ export class ExploreController {
         this.canReset()
       ) {
         if (!(await this.doReset())) {
-          return this.finish(actionKindSequence, "reset-failed");
+          return this.finish(actionKindSequence, this.pendingControlStop ?? "reset-failed");
         }
         obs = this.lastObs!;
         this.actionsSinceNewState = 0;
@@ -648,6 +667,19 @@ export class ExploreController {
         stopReason = "wall-budget";
         break;
       }
+      // HARDENING_2 D1/D3: permission BEFORE the action starts, accounting
+      // only for actions that actually executed. Policy-rejected and failed
+      // submissions consumed nothing and are never committed.
+      if (this.control) {
+        if (this.control.stopRequested()) {
+          stopReason = "cancelled";
+          break;
+        }
+        if (!this.control.admit("action")) {
+          stopReason = "budget-exhausted";
+          break;
+        }
+      }
 
       const action = this.makeAction({ ...chosen, id: `c_${newId("act")}` });
       const before = this.lastObs!;
@@ -666,6 +698,18 @@ export class ExploreController {
         this.warnings.push(
           `duplicate submission for ${action.id}; outcome unresolved, skipping`,
         );
+        break;
+      }
+      if (this.control && !this.control.commit("action")) {
+        // The action DID run and stays counted; a concurrent worker spent the
+        // last allowance mid-flight. Stop immediately — the overshoot is
+        // bounded by the worker count.
+        kinds.push(chosen.kind);
+        this.recentActionKeys.push(chosen.actionKey);
+        if (this.recentActionKeys.length > this.plateauWindow)
+          this.recentActionKeys.shift();
+        this.actionPath.push(action);
+        stopReason = "budget-exhausted";
         break;
       }
 
@@ -751,10 +795,26 @@ export class ExploreController {
 
   private canReset(): boolean {
     if (!this.config.maxResets) return false;
+    if (this.control?.stopRequested()) return false;
     return this.resets < this.config.maxResets;
   }
 
+  /** Set when control refused a reset; the main loop finishes with it. */
+  private pendingControlStop: string | null = null;
+
   private async doReset(): Promise<boolean> {
+    // HARDENING_2 D1/D14: resets are budgeted resources — permission comes
+    // BEFORE the reset runs, and only successful resets are committed.
+    if (this.control) {
+      if (this.control.stopRequested()) {
+        this.pendingControlStop = "cancelled";
+        return false;
+      }
+      if (!this.control.admit("reset")) {
+        this.pendingControlStop = "budget-exhausted";
+        return false;
+      }
+    }
     this.resets += 1;
     const resetEvent = this.store && this.campaignEnabled
       ? this.store.appendExplorationEvent({
@@ -769,6 +829,7 @@ export class ExploreController {
     try {
       await this.run.reset();
       if (resetEvent && this.store) this.store.resolveExplorationEvent(resetEvent.id, "committed");
+      this.control?.commit("reset");
     } catch (e) {
       if (resetEvent && this.store) this.store.resolveExplorationEvent(resetEvent.id, "unknown");
       // The environment is too broken to restore; the caller must stop. The
@@ -852,7 +913,13 @@ export class ExploreController {
     // without forgetting the graph or treating the run as fresh.
     this.checkpoint();
 
+    // HARDENING_2: a cooperatively cancelled or budget-exhausted exploration
+    // must not keep burning wall time in the reproduction phase. Committed
+    // findings are restored from durable state below; pending anomalies stay
+    // checkpointed and resumable.
+    const controlStop = stoppedReason === "cancelled" || stoppedReason === "budget-exhausted";
     if (
+      controlStop ||
       this.config.skipReproduction ||
       !this.findingEngine ||
       !this.resolveReplayDriverFactory()

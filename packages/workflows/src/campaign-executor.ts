@@ -1,5 +1,5 @@
-import { statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import type { ReplayDriver } from "@inspector/finding";
 import { FindingEngine, OracleEngine } from "@inspector/finding";
 import { Store } from "@inspector/store-sqlite";
@@ -23,6 +23,7 @@ import {
   WorkflowProvenanceError,
 } from "./replay-subject.js";
 import { probeAdb, probeBrowser, probeElectron, probePty, probeUia, type BackendProbe } from "./capabilities.js";
+import type { ExplorationControl } from "./types.js";
 
 /** Capability tag each adapter family requires on a worker. */
 export const FAMILY_CAPABILITY: Record<Exclude<AdapterFamily, "fake">, string> = {
@@ -138,7 +139,11 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         case "regression":
           return await this.runRegressItem(item, ctx);
         case "repair":
-          // Graduated autonomy: discovery never implies repair.
+          // Graduated autonomy: discovery never implies repair. Campaign
+          // repair stays unsupported — operator-supervised
+          // `inspector repair <findingId>` with explicit provider
+          // configuration is THE repair path (HARDENING_2 D11; manifests
+          // reject repair items at preflight).
           return failedResult(
             "policy-refusal",
             "campaign items cannot run repair; use operator-supervised `inspector repair <findingId>` with explicit authorization",
@@ -156,6 +161,22 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         err instanceof Error ? err.message : String(err),
       );
     }
+  }
+
+  /**
+   * HARDENING_2 D1/D3: the scheduler-owned execution context becomes the
+   * exploration loops' control hook. Permission comes from ctx.admit BEFORE
+   * each budgeted unit; consumption is recorded through ctx.charge as it
+   * happens; cooperative stop rides the scheduler-managed abort signal.
+   */
+  private controlFrom(ctx: ExecutionContext): ExplorationControl {
+    return {
+      stopRequested: () => ctx.signal.aborted,
+      admit: (kind) =>
+        ctx.admit(kind === "reset" ? { resets: 1 } : { actions: 1 }),
+      commit: (kind) =>
+        ctx.charge(kind === "reset" ? { resets: 1 } : { actions: 1 }),
+    };
   }
 
   /* --------------------------------------------------------------- *
@@ -204,11 +225,14 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         itemId: item.id,
         workerId: ctx.workerId,
       },
+      control: this.controlFrom(ctx),
     });
 
     const r = outcome.result;
     const usage = { actions: r.actionsExecuted, resets: r.resets };
-    ctx.charge(usage);
+    // HARDENING_2 D1/D2: action/reset usage was already permitted and
+    // committed incrementally INSIDE the loops (pre-consumption). Only
+    // artifact bytes — outputs, not permissions — are charged post-hoc.
     const artifactBytes = outcome.bundlePaths.reduce((total, entry) => {
       try {
         return total + statSync(entry.path).size;
@@ -218,6 +242,25 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     }, 0);
     if (artifactBytes > 0) ctx.charge({ artifactBytes });
 
+    // Cooperative cancellation is never a failure: throw so the scheduler
+    // reconciles the claim against durable lease truth (requeue when owned).
+    if (r.stoppedReason === "cancelled" || ctx.signal.aborted) {
+      throw new ItemCancelledError(`item ${item.id} stopped cooperatively`);
+    }
+    // Budget exhaustion is a structured durable terminal result that still
+    // preserves everything the exploration actually committed.
+    if (r.stoppedReason === "budget-exhausted") {
+      return failedResult(
+        "budget-exhausted",
+        `exploration budget exhausted after ${r.actionsExecuted} action(s)/${r.resets} reset(s)`,
+        {
+          findings: r.findings,
+          evidencePaths: outcome.bundlePaths.map((b) => b.path),
+          runIds: [r.runId],
+          usage,
+        },
+      );
+    }
     if (outcome.badStop || outcome.errorOutcomes > 0) {
       return failedResult(
         outcome.badStop ? "environment-unavailable" : "execution-failure",
@@ -247,17 +290,35 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
    * --------------------------------------------------------------- */
 
   private async runVerifyItem(item: WorkItem, ctx: ExecutionContext): Promise<WorkItemResult> {
-    const findingId = typeof item.targetConfig?.findingId === "string" ? String(item.targetConfig.findingId) : undefined;
-    if (!findingId) {
+    let findingId = typeof item.targetConfig?.findingId === "string" ? String(item.targetConfig.findingId) : undefined;
+    const sourceRef = typeof item.targetConfig?.sourceItemId === "string" ? String(item.targetConfig.sourceItemId) : undefined;
+    if (!findingId && !sourceRef) {
       return failedResult(
         "target-config-invalid",
-        "verify items require targetConfig.findingId pointing at a durable CONFIRMED finding in the item workspace",
+        "verify items require targetConfig.findingId or targetConfig.sourceItemId pointing at a durable CONFIRMED finding",
       );
     }
     if (ctx.signal.aborted) throw new ItemCancelledError();
-    const store = openItemStore(ctx.workspaceDir);
+    const source = resolveSourceContext(item, ctx);
+    if (!source.ok) return source.result;
+    const store = Store.open(source.storePath);
     try {
-      const base = join(ctx.workspaceDir, ".inspector");
+      const base = source.base;
+      // HARDENING_2 D10: with a source reference and no explicit findingId,
+      // deterministically select THE single confirmed finding the producer
+      // committed; ambiguity is a configuration error, never a guess.
+      if (!findingId) {
+        const confirmed = store.listFindings(500).filter((f) => f.status === "CONFIRMED");
+        if (confirmed.length === 1) {
+          findingId = confirmed[0]!.id;
+          ctx.progress(`verify selected finding ${findingId} from source '${sourceRef}'`);
+        } else {
+          return failedResult(
+            "target-config-invalid",
+            `source item '${sourceRef}' has ${confirmed.length} CONFIRMED findings; specify targetConfig.findingId explicitly`,
+          );
+        }
+      }
       let subject;
       try {
         subject = loadReplaySubject(store, base, findingId);
@@ -321,6 +382,7 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
             errors,
             classification,
             bundlePath: subject.bundlePath,
+            ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
           },
         },
       });
@@ -335,17 +397,19 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
 
   private async runRegressItem(item: WorkItem, ctx: ExecutionContext): Promise<WorkItemResult> {
     if (ctx.signal.aborted) throw new ItemCancelledError();
-    const store = openItemStore(ctx.workspaceDir);
+    const source = resolveSourceContext(item, ctx);
+    if (!source.ok) return source.result;
+    const store = Store.open(source.storePath);
     try {
       const records = store.listFindings(500).filter((f) => f.status === "CONFIRMED" || f.status === "REGRESSED");
       if (records.length === 0) {
         return failedResult(
           "target-incompatible",
-          "no durable CONFIRMED findings to regress in this item's workspace; point regress items at workspaces produced by hunt/explore items (keepWorkspaces)",
+          "no durable CONFIRMED findings to regress in the resolved source workspace; point regress items at hunt/explore items via targetConfig.sourceItemId (keepWorkspaces)",
         );
       }
       const limit = clampInt(item.budgets?.maxActions ?? numOption(item.targetConfig?.limit), 4, 1, 50);
-      const base = join(ctx.workspaceDir, ".inspector");
+      const base = source.base;
       const results: Array<{ findingId: string; reproduced: boolean }> = [];
       for (const record of records.slice(0, limit)) {
         if (ctx.signal.aborted) throw new ItemCancelledError();
@@ -377,6 +441,7 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
             scenariosReplayed: results.length,
             reproduced,
             clean: results.length - reproduced,
+            ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
             detail: results.slice(0, 20),
           },
         },
@@ -398,8 +463,62 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
   }
 }
 
-function openItemStore(workspaceDir: string): Store {
-  return Store.open(join(workspaceDir, ".inspector", "runs.db"));
+/**
+ * HARDENING_2 D10: resolve the durable source workspace a verify/regress
+ * item operates on. Each campaign attempt gets a FRESH workspace, so without
+ * an explicit reference a verify/regress item can never see the finding its
+ * producer committed. `targetConfig.sourceItemId` names a sibling item whose
+ * retained attempt workspaces live under the campaign artifacts root — path
+ * containment is structural (sanitize + artifacts-root prefix check), and the
+ * newest attempt with a durable store wins deterministically.
+ */
+function resolveSourceContext(
+  item: WorkItem,
+  ctx: ExecutionContext,
+): { ok: true; base: string; storePath: string; sourceItemId?: string } | { ok: false; result: WorkItemResult } {
+  const raw = item.targetConfig?.sourceItemId;
+  if (typeof raw !== "string" || raw.length === 0) {
+    const base = join(ctx.workspaceDir, ".inspector");
+    return { ok: true, base, storePath: join(base, "runs.db") };
+  }
+  const sanitized = raw.replace(/[^A-Za-z0-9._-]+/g, "__");
+  const root = resolve(join(ctx.artifactsDir, "items", sanitized));
+  if (!root.startsWith(resolve(ctx.artifactsDir) + sep)) {
+    return {
+      ok: false,
+      result: failedResult(
+        "target-config-invalid",
+        `sourceItemId '${raw}' resolves outside the campaign artifacts root`,
+      ),
+    };
+  }
+  if (!existsSync(root)) {
+    return {
+      ok: false,
+      result: failedResult(
+        "target-incompatible",
+        `source item '${raw}' has no retained workspace; set manifest keepWorkspaces: true so downstream items can reference it`,
+      ),
+    };
+  }
+  const attempts = readdirSync(root)
+    .filter((entry) => /^\d+$/.test(entry))
+    .sort((a, b) => Number(b) - Number(a));
+  for (const attempt of attempts) {
+    const dir = join(root, attempt);
+    const storePath = join(dir, ".inspector", "runs.db");
+    if (existsSync(storePath)) {
+      ctx.progress(`source context resolved: item '${raw}' attempt ${attempt}`);
+      return { ok: true, base: join(dir, ".inspector"), storePath, sourceItemId: raw };
+    }
+  }
+  return {
+    ok: false,
+    result: failedResult(
+      "target-incompatible",
+      `source item '${raw}' has no attempt workspace containing a durable .inspector/runs.db`,
+    ),
+  };
 }
 
 function numOption(value: unknown): number | undefined {

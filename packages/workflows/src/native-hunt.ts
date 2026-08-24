@@ -3,7 +3,7 @@ import { FindingEngine, OracleEngine } from "@inspector/finding";
 import { runNativeHunt, type NativeSessionDeps } from "@inspector/explore";
 import type { Store } from "@inspector/store-sqlite";
 import { nativeExploreConfig } from "./configs.js";
-import type { HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
+import type { ExplorationControl, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 /**
  * SPEC-009 W4: native (non-web) hunts share the fake walker's proven loop
@@ -18,6 +18,7 @@ export async function runNativeHuntCommand(
   _base: string,
   progress: ProgressFn,
   resume = false,
+  control?: ExplorationControl,
 ): Promise<HuntRunResult> {
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
 
@@ -43,7 +44,7 @@ export async function runNativeHuntCommand(
   }
 
   const result = await runNativeHunt(
-    { run, findingEngine, store, resume, ...(replayDriverFactory ? { replayDriverFactory } : {}) },
+    { run, findingEngine, store, resume, ...(control ? { control } : {}), ...(replayDriverFactory ? { replayDriverFactory } : {}) },
     nativeExploreConfig(req),
   );
   progress(`native hunt stopped: ${result.stoppedReason}`);

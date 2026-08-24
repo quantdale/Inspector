@@ -67,11 +67,27 @@ export class FakeItemExecutor implements WorkItemExecutor {
       for (let i = 0; i < item.steps; i++) {
         if (ctx.signal.aborted) throw new ItemCancelledError();
         // Renewal at half-TTL keeps long items from expiring mid-run; the
-        // generation fence remains the backstop if renewal ever fails.
+        // scheduler also runs its own heartbeat, this is defense in depth.
         const t = ctx.now();
         if (t - lastRenewMs >= (this.opts.leaseTtlMs ?? 60_000) / 2) {
           ctx.renewLease();
           lastRenewMs = t;
+        }
+        // Contract: obtain budget permission BEFORE consuming budgeted
+        // resources (HARDENING_2 D1); record actual consumption after the
+        // action really executed.
+        if (
+          !ctx.admit({
+            actions: this.opts.usagePerStep.actions,
+            modelRequests: this.opts.usagePerStep.modelRequests,
+            tokens: this.opts.usagePerStep.tokens,
+            costUsd: this.opts.usagePerStep.costUsd,
+          })
+        ) {
+          return failedResult("budget-exhausted", `budget exhausted before action in item ${item.id}`, {
+            findings: [finding],
+            runIds,
+          });
         }
         const action = {
           id: newId("act"),

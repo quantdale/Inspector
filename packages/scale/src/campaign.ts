@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { Finding } from "@inspector/finding";
 import type { Budget, WorkItem as LegacyWorkItem } from "./types.js";
@@ -17,6 +17,8 @@ import {
   type WorkerCapabilitySnapshot,
 } from "./executor.js";
 import { FakeItemExecutor } from "./fake-executor.js";
+import { SettlementJournal, type PendingSettlement } from "./settlement.js";
+import { validateCampaignState } from "./state-validation.js";
 
 export interface CampaignOptions {
   /** Durable state directory shared by all campaign instances over one deployment. */
@@ -96,6 +98,16 @@ export interface CampaignReport {
   elapsedMs: number;
   /** M12 additive: finding aggregation over the standard lifecycle. */
   findingSummary?: FindingSummary;
+  /** HARDENING_2 D7: set when scheduling stopped on externally-held work. */
+  blocked?: CampaignBlocked;
+}
+
+/** Truthful "waiting on other controllers" outcome — never a silent exit. */
+export interface CampaignBlocked {
+  reason: string;
+  heldItems: number;
+  earliestReclaimAtMs: number;
+  waitMs: number;
 }
 
 interface CampaignState {
@@ -113,7 +125,35 @@ interface CampaignState {
   workerCaps: Record<string, WorkerCapabilitySnapshot>;
 }
 
-/** Coerce legacy/partial on-disk state so pre-M12 files load safely. */
+function initialState(): CampaignState {
+  return {
+    queue: [],
+    executions: [],
+    findings: [],
+    failed: [],
+    failureDetails: {},
+    refusals: [],
+    assignments: [],
+    restarts: 0,
+    staleCompletions: 0,
+    stopReason: null,
+    startedAtMs: null,
+    workerCaps: {},
+  };
+}
+
+/**
+ * Coerce legacy/partial on-disk state so pre-M12 files load safely.
+ *
+ * HARDENING_2: semantic validation happens at the load boundary
+ * (state-validation.ts) and fails closed on corruption; this function now
+ * only fills documented LEGACY-absent fields on already-valid objects.
+ */
+/**
+ * Fill documented LEGACY-absent fields on an already-validated state object.
+ * Corruption (present-but-invalid) never reaches this function: the load
+ * boundary validator fails closed first (HARDENING_2 D8).
+ */
 function normalizeInPlace(s: Partial<CampaignState>): asserts s is CampaignState {
   if (!Array.isArray(s.queue)) s.queue = [];
   if (!Array.isArray(s.executions)) s.executions = [];
@@ -135,6 +175,42 @@ function sanitize(name: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const SETTLEMENT_SCHEMA = "inspector-campaign-settlement/1" as const;
+
+/** Grace added to a lease expiry before a reclaim attempt (clock skew). */
+const RECLAIM_GRACE_MS = 50;
+
+function settlingEntry(
+  itemId: string,
+  workerId: string,
+  generation: number | undefined,
+  result: WorkItemResult,
+): PendingSettlement {
+  return {
+    schema: SETTLEMENT_SCHEMA,
+    itemId,
+    workerId,
+    ...(generation !== undefined ? { generation } : {}),
+    phase: "completing",
+    result,
+    at: new Date().toISOString(),
+  };
+}
+
+function EMPTY_RESULT(): WorkItemResult {
+  return { ok: true, findings: [], evidencePaths: [], runIds: [], usage: {} };
+}
+
+/** Best-effort removal of the item's workspace root once no attempts remain. */
+function tryRemoveItemWorkspaceRoot(artifactsPath: string, itemId: string): void {
+  try {
+    const root = join(artifactsPath, "items", sanitize(itemId));
+    if (readdirSync(root).length === 0) rmSync(root, { recursive: true, force: true });
+  } catch {
+    // Root absent or still holds another life's attempts: leave it.
+  }
 }
 
 /**
@@ -162,6 +238,7 @@ export class UnattendedCampaign {
   private readonly leases: LeaseManager;
   private readonly ledger: ResourceLedger;
   private readonly stateFile: StateFile<CampaignState>;
+  private readonly journal: SettlementJournal;
   private readonly executor: WorkItemExecutor;
   private readonly itemsById = new Map<string, LegacyWorkItem>();
   private readonly artifactsPath: string;
@@ -174,6 +251,11 @@ export class UnattendedCampaign {
   private abort = new AbortController();
   private activeClaims = new Set<string>();
   private capsCache: WorkerCapabilitySnapshot | null = null;
+  /** D7: durable blocked outcome when work is held by other controllers. */
+  private blockedOutcome: CampaignBlocked | null = null;
+  private blockWaitStartedAtMs: number | null = null;
+  /** Bumped by injectRestart: zombie heartbeats from "dead" lives stand down. */
+  private epoch = 0;
 
   constructor(
     private readonly opts: CampaignOptions,
@@ -196,21 +278,10 @@ export class UnattendedCampaign {
       backend: opts.leaseBackend,
     });
     this.ledger = new ResourceLedger(stateDir, opts.globalBudget ?? {}, opts.workerBudgets ?? {});
-    this.stateFile = new StateFile<CampaignState>(stateDir, "campaign", () => ({
-      queue: [],
-      executions: [],
-      findings: [],
-      failed: [],
-      failureDetails: {},
-      refusals: [],
-      assignments: [],
-      restarts: 0,
-      staleCompletions: 0,
-      stopReason: null,
-      startedAtMs: null,
-      workerCaps: {},
-    }));
+    this.stateFile = new StateFile<CampaignState>(stateDir, "campaign", initialState, (raw) => validateCampaignState(raw) as CampaignState);
+    this.journal = new SettlementJournal(stateDir);
     for (const item of opts.items) this.itemsById.set(item.id, item);
+    this.reconcilePendingSettlements();
     // Requeue on construction: pending + not-done items, deterministic order.
     this.stateFile.update((s) => {
       normalizeInPlace(s);
@@ -250,6 +321,7 @@ export class UnattendedCampaign {
    * memory and reclaimed by TTL expiry on the next run pass.
    */
   injectRestart(): void {
+    this.epoch += 1;
     this.abort = new AbortController();
     this.activeClaims.clear();
     this.capsCache = null;
@@ -327,6 +399,9 @@ export class UnattendedCampaign {
     }
     const inflight = new Map<string, Run>();
     let idleSpins = 0;
+    /** D7: one reclaim opportunity granted per externally-held wait. */
+    let waitedForReclaim = false;
+    let lastQueueSize = -1;
 
     for (;;) {
       if (this.stopped || this.ledger.isStopped) break;
@@ -343,19 +418,27 @@ export class UnattendedCampaign {
         const run: Run = { workerId, done: false, promise: Promise.resolve() };
         run.promise = (async () => {
           try {
-            const result = await this.executeWithExecutor(claim.item, workerId, claim.attempt, claim.generation);
-            this.settleResult(claim.item, workerId, claim.generation, result);
+            let result: WorkItemResult;
+            try {
+              result = await this.executeWithExecutor(claim.item, workerId, claim.attempt, claim.generation);
             } catch (err) {
               if (err instanceof ItemCancelledError || (err instanceof Error && err.name === "ItemCancelledError")) {
                 // Cooperative cancel: reconcile against durable lease truth.
                 this.reconcileCancellation(claim.item, workerId, claim.generation);
               } else {
-              console.warn(
-                `[scale] item ${claim.item.id} failed: ${err instanceof Error ? err.message : String(err)}`,
-              );
-              this.recordFailure(claim.item.id, "execution-failure", err instanceof Error ? err.message : String(err));
-              this.leases.release(claim.item.id, workerId);
+                console.warn(
+                  `[scale] item ${claim.item.id} failed: ${err instanceof Error ? err.message : String(err)}`,
+                );
+                this.recordFailureWithJournal(claim.item, workerId, claim.generation, "execution-failure", err instanceof Error ? err.message : String(err));
+              }
+              return;
             }
+            // HARDENING_2 D5: settlement runs OUTSIDE the executor-containment
+            // try. A fault inside settlement leaves multi-store state mid-
+            // transition; it must fail LOUDLY as a controller crash (the
+            // journal replays it deterministically on the next life), never
+            // be swallowed as a mere item failure.
+            this.settleResult(claim.item, workerId, claim.generation, result);
           } finally {
             this.activeClaims.delete(claim.item.id);
             run.done = true;
@@ -365,14 +448,40 @@ export class UnattendedCampaign {
       }
       if (inflight.size > 0) {
         idleSpins = 0;
+        waitedForReclaim = false;
         // Wait until at least one in-flight run settles, then reschedule.
         await Promise.race([...inflight.values()].map((r) => r.promise));
         continue;
       }
       const queue = this.stateFile.load().queue;
       if (queue.length === 0) break;
-      // Remaining items exist but none acquirable: externally held (fresh
-      // leases owned by other processes). Yield briefly, boundedly.
+      // Any observable queue change resets the one-reclaim-opportunity
+      // budget: only a STABLE unacquirable queue may end blocked.
+      if (queue.length !== lastQueueSize) {
+        lastQueueSize = queue.length;
+        waitedForReclaim = false;
+      }
+      // Remaining items exist but none acquirable. Classify WHY before
+      // waiting (HARDENING_2 D7): items held by OTHER processes get a bounded
+      // wait until their earliest lease expiry — never a busy-spin and never
+      // a silent exit that leaves a campaign falsely "running".
+      const holds = this.externalHolds(queue);
+      if (holds && !waitedForReclaim) {
+        waitedForReclaim = true;
+        const stoppedWhileWaiting = await this.waitUntil(holds.earliestReclaimMs + RECLAIM_GRACE_MS);
+        if (stoppedWhileWaiting) break;
+        continue; // one reclaim opportunity; re-run claims
+      }
+      if (holds) {
+        this.blockedOutcome = {
+          reason: "all remaining items are leased by other controllers",
+          heldItems: holds.itemIds.length,
+          earliestReclaimAtMs: holds.earliestReclaimMs,
+          waitMs: Math.max(0, this.nowMs() - (this.blockWaitStartedAtMs ?? this.nowMs())),
+        };
+        break;
+      }
+      // No external hold explains the stall: legacy bounded spin (defensive).
       idleSpins += 1;
       if (idleSpins > 200) break;
       await sleep(this.claimPollMs);
@@ -380,6 +489,38 @@ export class UnattendedCampaign {
     // Propagate cancellation into still-running executors on stop.
     if (this.stopped || this.ledger.isStopped) {
       await Promise.all([...inflight.values()].map((r) => r.promise));
+    }
+  }
+
+  /** Externally-held queued items with the earliest reclaim time, if any. */
+  private externalHolds(
+    queue: string[],
+  ): { itemIds: string[]; earliestReclaimMs: number } | null {
+    // Items this controller is actively claiming/running are OURS, never
+    // external holds — even if a stale queue snapshot still lists them.
+    const queued = new Set(queue.filter((id) => !this.activeClaims.has(id)));
+    const now = this.nowMs();
+    let earliest: number | null = null;
+    const itemIds: string[] = [];
+    for (const lease of this.leases.inFlight(now)) {
+      if (!queued.has(lease.itemId)) continue;
+      itemIds.push(lease.itemId);
+      const reclaimAt = Math.max(lease.expiresAtMs, now);
+      if (earliest === null || reclaimAt < earliest) earliest = reclaimAt;
+    }
+    return itemIds.length > 0 && earliest !== null
+      ? { itemIds, earliestReclaimMs: earliest }
+      : null;
+  }
+
+  /** Sleep until deadline in bounded chunks; returns true when stop() raced. */
+  private async waitUntil(deadlineMs: number): Promise<boolean> {
+    this.blockWaitStartedAtMs = this.nowMs();
+    for (;;) {
+      if (this.stopped || this.ledger.isStopped) return true;
+      const now = this.nowMs();
+      if (now >= deadlineMs) return false;
+      await sleep(Math.min(250, deadlineMs - now));
     }
   }
 
@@ -428,15 +569,45 @@ export class UnattendedCampaign {
         this.removeFromQueue(itemId);
         continue;
       }
-      const acquired = this.leases.acquire(itemId, workerId);
-      if (!acquired.ok) continue; // held/done elsewhere: next candidate
-      this.removeFromQueue(itemId);
+      // HARDENING_2 D10: dependency gate — downstream verify/regress work
+      // starts only after its source item has a durable execution record, so
+      // no race can run downstream work against an unfinished source.
+      const dep = this.dependencyState(snapshot, item);
+      if (dep === "pending") continue;
+      if (dep === "failed") {
+        this.removeFromQueue(itemId);
+        this.recordFailure(
+          itemId,
+          "target-incompatible",
+          `source item '${String(item.targetConfig?.sourceItemId)}' did not complete; downstream work refused`,
+        );
+        continue;
+      }
+      // Claim marker goes up BEFORE the lease write: concurrent scheduling
+      // passes (and the external-hold classifier) must never observe a
+      // half-claimed item as "held by someone else".
       this.activeClaims.add(itemId);
+      const acquired = this.leases.acquire(itemId, workerId);
+      if (!acquired.ok) {
+        this.activeClaims.delete(itemId);
+        continue; // held/done elsewhere: next candidate
+      }
+      this.removeFromQueue(itemId);
       const attempt = (attempts.get(itemId) ?? 0) + 1;
       this.recordAssignment(itemId, workerId, attempt, acquired.lease.generation);
       return { item, generation: acquired.lease.generation, attempt };
     }
     return "empty";
+  }
+
+  /** Claim-time dependency truth for source-referencing items (D10). */
+  private dependencyState(snapshot: CampaignState, item: LegacyWorkItem): "ready" | "pending" | "failed" {
+    const src = item.targetConfig?.sourceItemId;
+    if (typeof src !== "string") return "ready";
+    const executed = new Set(snapshot.executions.map((e) => e.itemId));
+    if (executed.has(src)) return "ready";
+    const dead = snapshot.failed.includes(src) || snapshot.refusals.some((r) => r.itemId === src);
+    return dead ? "failed" : "pending";
   }
 
   /**
@@ -545,13 +716,19 @@ export class UnattendedCampaign {
   ): void {
     if (result.ok) {
       this.persistFindings(result.findings);
-      if (this.leases.complete(item.id, workerId, generation)) {
+      // HARDENING_2 D5: journal the settlement BEFORE touching either store.
+      // A crash anywhere below is replayed deterministically by
+      // reconcilePendingSettlements() in the next controller life.
+      this.journal.add(settlingEntry(item.id, workerId, generation, result));
+      const completed = this.leases.complete(item.id, workerId, generation);
+      if (completed) {
         this.recordExecution(item.id, workerId, result);
       } else {
         // Our lease expired and was reclaimed mid-run: the current holder owns
         // the outcome; our work is never double-recorded.
         this.recordStaleCompletion(item.id, workerId);
       }
+      this.journal.remove(item.id, workerId);
       return;
     }
     // A stop request that raced the executor reconciles against durable lease
@@ -567,16 +744,89 @@ export class UnattendedCampaign {
       return;
     }
     if (budgetRefusal) {
-      this.recordFailure(item.id, "budget-exhausted", result.failureDetail ?? "budget exhausted");
-      this.leases.release(item.id, workerId);
+      this.recordFailureWithJournal(item, workerId, generation, "budget-exhausted", result.failureDetail ?? "budget exhausted");
       return;
     }
-    this.recordFailure(
-      item.id,
+    this.recordFailureWithJournal(
+      item,
+      workerId,
+      generation,
       result.failureClass ?? "execution-failure",
       result.failureDetail ?? "execution failed",
     );
+  }
+
+  /** Failure settlement under the same crash-replay journal as completions. */
+  private recordFailureWithJournal(
+    item: LegacyWorkItem,
+    workerId: string,
+    generation: number | undefined,
+    failureClass: WorkItemFailureClass,
+    failureDetail: string,
+  ): void {
+    this.journal.add({
+      schema: SETTLEMENT_SCHEMA,
+      itemId: item.id,
+      workerId,
+      ...(generation !== undefined ? { generation } : {}),
+      phase: "failing",
+      failureClass,
+      failureDetail,
+      at: new Date().toISOString(),
+    });
+    this.recordFailure(item.id, failureClass, failureDetail);
     this.leases.release(item.id, workerId);
+    this.journal.remove(item.id, workerId);
+  }
+
+  /**
+   * Replay every settlement a dead controller left between its durable
+   * stores (HARDENING_2 D5). Idempotent and fenced: a stale journal entry can
+   * never record a completion over a newer owner.
+   */
+  private reconcilePendingSettlements(): void {
+    for (const entry of this.journal.load()) {
+      try {
+        if (entry.phase === "completing") {
+          const completed = this.leases.complete(entry.itemId, entry.workerId, entry.generation);
+          if (completed) {
+            this.persistFindings(entry.result?.findings ?? []);
+            this.recordExecution(entry.itemId, entry.workerId, entry.result ?? EMPTY_RESULT());
+          } else if (this.leases.isDone(entry.itemId)) {
+            // Crash AFTER leases.complete but BEFORE recordExecution: finish
+            // exactly that half so the item is never queued behind a done
+            // lease (the stranded-item defect).
+            this.ensureExecutionRecord(entry.itemId, entry.workerId, entry.result?.runIds ?? []);
+          } else if (!this.leases.inFlight(this.nowMs()).some((l) => l.itemId === entry.itemId)) {
+            // Ownership vanished without completion; our entry is stale.
+            this.recordStaleCompletion(entry.itemId, entry.workerId);
+          } else {
+            // A live holder still owns the item; leave the queue untouched.
+          }
+        } else {
+          this.recordFailure(
+            entry.itemId,
+            entry.failureClass ?? "execution-failure",
+            entry.failureDetail ?? "execution failed",
+          );
+          this.leases.release(entry.itemId, entry.workerId);
+        }
+      } finally {
+        this.journal.remove(entry.itemId, entry.workerId);
+      }
+    }
+  }
+
+  private ensureExecutionRecord(itemId: string, workerId: string, runIds: string[]): void {
+    this.stateFile.update((s) => {
+      normalizeInPlace(s);
+      if (s.executions.some((e) => e.itemId === itemId)) return;
+      s.executions.push({
+        itemId,
+        workerId,
+        ...(runIds.length > 0 ? { runIds: [...runIds] } : {}),
+      });
+    });
   }
 
   /**
@@ -612,6 +862,30 @@ export class UnattendedCampaign {
     generation: number | undefined,
   ): Promise<WorkItemResult> {
     const ws = this.createWorkspace(item.id, attempt);
+    // HARDENING_2 D4: the scheduler owns leasing (ADR-0011), so it owns the
+    // heartbeat too. Renew at half-TTL while the executor runs, using the
+    // exact fencing generation; a renewal failure means ownership was lost —
+    // the stale execution is aborted immediately through its abort signal.
+    const itemSignal = new AbortController();
+    const propagateStop = () => itemSignal.abort();
+    if (this.abort.signal.aborted) propagateStop();
+    this.abort.signal.addEventListener("abort", propagateStop, { once: true });
+    let lastRenewMs = this.nowMs();
+    const epochAtStart = this.epoch;
+    const heartbeat = setInterval(() => {
+      // A simulated controller death must stop renewing exactly like a real
+      // one: heartbeats from earlier epochs stand down immediately.
+      if (this.epoch !== epochAtStart) {
+        itemSignal.abort();
+        return;
+      }
+      const t = this.nowMs();
+      if (t - lastRenewMs < this.ttlMs / 2) return;
+      lastRenewMs = t;
+      if (!this.leases.renew(item.id, workerId, generation)) {
+        itemSignal.abort(); // fenced: stop the stale execution now
+      }
+    }, Math.max(1, Math.floor(this.ttlMs / 4)));
     const ctx: ExecutionContext = {
       itemId: item.id,
       workerId,
@@ -621,26 +895,38 @@ export class UnattendedCampaign {
       artifactsDir: this.artifactsPath,
       charge: (usage) =>
         // Work already consumed resources: record usage even while a stop is
-        // racing this item; only genuine budget overruns return false.
+        // racing this item; only genuine budget overruns return false. The
+        // item's declared budgets are enforced atomically in the same locked
+        // critical section (HARDENING_2 D14) — accepted configuration can no
+        // longer be silently ignored.
         this.ledger.charge(
           { workerId, itemId: item.id, ...usage },
-          { allowWhenStopped: true },
+          { allowWhenStopped: true, ...(item.budgets ? { itemBudget: item.budgets } : {}) },
+        ),
+      admit: (usage) =>
+        // Permission BEFORE consumption (HARDENING_2 D1): projection only.
+        this.ledger.wouldAdmit(
+          { workerId, itemId: item.id, ...usage },
+          { ...(item.budgets ? { itemBudget: item.budgets } : {}) },
         ),
       renewLease: () => this.leases.renew(item.id, workerId, generation),
       persistPartial: (findings) => this.persistFindings(findings),
-      signal: this.abort.signal,
+      signal: itemSignal.signal,
       progress: (line) => this.opts.onProgress?.(line),
       now: () => this.nowMs(),
     };
     try {
       return await this.executor.execute(item, ctx);
     } finally {
+      clearInterval(heartbeat);
+      this.abort.signal.removeEventListener("abort", propagateStop);
       if (!this.keepItemWorkspaces) {
-        // Remove every attempt workspace of this item (parents included).
-        rmSync(join(this.artifactsPath, "items", sanitize(item.id)), {
-          recursive: true,
-          force: true,
-        });
+        // D13: remove ONLY this execution's own attempt directory. Concurrent
+        // lives/workers own different attempt dirs under the same item root;
+        // their workspaces must never be touched here. The root itself goes
+        // too when this was the last attempt left.
+        rmSync(ws, { recursive: true, force: true });
+        tryRemoveItemWorkspaceRoot(this.artifactsPath, item.id);
       }
     }
   }
@@ -676,10 +962,12 @@ export class UnattendedCampaign {
       stopReason: this.resolveStopReason(s),
       elapsedMs: Math.max(0, this.nowMs() - (s.startedAtMs ?? this.nowMs())),
       findingSummary: summarizeFindings(s.findings, this.clusterFindings()),
+      ...(this.blockedOutcome ? { blocked: { ...this.blockedOutcome } } : {}),
     };
   }
 
   private resolveStopReason(s: CampaignState): string | null {
+    if (this.blockedOutcome) return "blocked-external-holds";
     if (this.stopped && this.stopReason) return this.stopReason;
     return s.stopReason;
   }

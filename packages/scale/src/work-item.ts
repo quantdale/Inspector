@@ -185,16 +185,25 @@ export function validateWorkItem(raw: unknown, path: string, index: number, issu
   const exclusiveRaw = raw.exclusive ?? false;
   if (typeof exclusiveRaw !== "boolean") fail("exclusive-invalid", "exclusive must be a boolean");
 
-  // Graduated autonomy: repair NEVER runs without explicit per-item opt-in.
-  const repairAuthorized = raw.repairAuthorized === true;
-  if (workflow === "repair" && !repairAuthorized) {
-    fail("repair-not-authorized", "repair items require explicit repairAuthorized: true (discovery never implies repair)");
+  // HARDENING_2 D11 — reconciled contract: campaign repair is UNSUPPORTED.
+  // Repair is an operator-supervised workflow (`inspector repair <findingId>`
+  // with explicit provider configuration); discovery never implies repair.
+  // Preflight rejects repair items deterministically instead of accepting
+  // them into the queue to be refused at runtime.
+  if (workflow === "repair") {
+    fail("repair-unsupported", "campaign items cannot run repair; use operator-supervised 'inspector repair <findingId>' with explicit authorization");
   }
   if (raw.repairAuthorized !== undefined && typeof raw.repairAuthorized !== "boolean") {
     fail("repair-auth-invalid", "repairAuthorized must be a boolean");
   }
 
   const budgets = validateBudget(`${path}.budgets`, raw.budgets, issues);
+
+  // HARDENING_2 D10: optional narrow source reference for verify/regress.
+  const sourceRaw = isRecord(configRaw) ? configRaw.sourceItemId : undefined;
+  if (sourceRaw !== undefined && (typeof sourceRaw !== "string" || !isId(sourceRaw))) {
+    fail("source-id-invalid", "targetConfig.sourceItemId must match the Inspector id grammar when present");
+  }
 
   if (!valid) return undefined;
   return {
@@ -211,7 +220,6 @@ export function validateWorkItem(raw: unknown, path: string, index: number, issu
     ...(budgets ? { budgets } : {}),
     ...(Array.isArray(requiresRaw) && requiresRaw.length > 0 ? { requiresCapabilities: requiresRaw as string[] } : {}),
     ...(exclusiveRaw ? { exclusive: true } : {}),
-    ...(repairAuthorized ? { repairAuthorized: true } : {}),
   };
 }
 
@@ -289,6 +297,44 @@ export function validateCampaignManifest(doc: unknown): CampaignManifestConfig {
         }
       }
     });
+  }
+
+  // HARDENING_2 D10: deterministic dependency validation for source
+  // references — existence, self-reference, producer workflow, retention,
+  // and cycle freedom, all BEFORE any work exists.
+  const byId = new Map(items.map((i) => [i.id, i]));
+  for (const item of items) {
+    const src = item.targetConfig?.sourceItemId;
+    if (typeof src !== "string") continue;
+    const path = `items[${items.indexOf(item)}].targetConfig.sourceItemId`;
+    const source = byId.get(src);
+    if (!source) {
+      issues.push(issue(path, "source-unknown", `source item '${src}' is not declared in this manifest`));
+      continue;
+    }
+    if (src === item.id) {
+      issues.push(issue(path, "source-self", "an item cannot reference itself as its source"));
+      continue;
+    }
+    if (source.mode !== "hunt" && source.mode !== "explore") {
+      issues.push(issue(path, "source-workflow-invalid", `source item '${src}' must be a hunt or explore item (producer of durable findings)`));
+    }
+    // Cycle walk with bounded depth.
+    let cursor: string | undefined = src;
+    const seen = new Set<string>([item.id]);
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      cursor = typeof byId.get(cursor)?.targetConfig?.sourceItemId === "string"
+        ? (byId.get(cursor)!.targetConfig!.sourceItemId as string)
+        : undefined;
+    }
+    if (cursor !== undefined) {
+      issues.push(issue(path, "source-cycle", `source references form a cycle at '${cursor}'`));
+    }
+  }
+  const needsRetention = items.some((i) => typeof i.targetConfig?.sourceItemId === "string");
+  if (needsRetention && keepRaw !== true) {
+    issues.push(issue("keepWorkspaces", "source-retention-required", "keepWorkspaces: true is required when any item declares targetConfig.sourceItemId"));
   }
 
   const idRaw = doc.id;

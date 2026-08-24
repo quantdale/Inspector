@@ -1,6 +1,6 @@
 # SPEC-012 — Real-Target Fleet Campaigns, Capability-Aware Scheduling, and Unattended Runtime Efficiency
 
-Status: ACTIVE
+Status: COMPLETE (M12 exit gate 2026-08-24; fleet-runtime hardening HARDENING_2 closed the remaining reliability gaps on this surface — see ADR-0012 and `.inspector/state/HARDENING-CHECKPOINT.md`)
 Milestone: M12
 Depends on: SPEC-003, SPEC-007, SPEC-009, SPEC-010, SPEC-011
 

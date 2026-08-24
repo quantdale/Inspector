@@ -4,12 +4,16 @@ This file is the operating contract for autonomous coding agents working on Insp
 
 ## Campaign mode
 
-The repository has completed **M10 — RESUMABLE_EXPLORATION**. RC1 field
-validation and M9 native autonomous exploration are complete; M10 closes the
-remaining Spec-003 E7 gap for resumable web/native exploration. M8 iOS remains
-`DEFERRED_ENVIRONMENT`. Continue only when the next roadmap milestone is
-explicitly activated; do not infer a release or hardening campaign from this
-state.
+The repository has completed the **M12 — REAL_TARGET_FLEET_CAMPAIGNS**
+implementation milestone and, separately invoked under `docs/HARDENING-CAMPAIGN.md`,
+the **HARDENING_2 — fleet runtime integrity, recovery, and state truth**
+campaign (budgets-before-consumption, cancellation reaching real workflows,
+scheduler-managed lease liveness, crash-safe settlement, durable wall budgets,
+truthful blocked/refused lifecycle states, fail-closed semantic state
+validation, verify/regress source references). RC1 field validation and M9-M11
+are complete; M8 iOS remains `DEFERRED_ENVIRONMENT`. Continue only when the
+next roadmap milestone is explicitly activated; do not infer a release or a
+further hardening campaign from this state.
 
 The intent is unattended forward development: continue implementing the roadmap without waiting for routine human approval. Deep audits, broad refactors whose only purpose is cleanup, exhaustive fuzzing, and other hardening-only work belong to a separately invoked hardening campaign.
 

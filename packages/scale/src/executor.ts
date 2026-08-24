@@ -66,6 +66,13 @@ export interface ExecutionContext {
    * exceeded; executors must stop cleanly with `budget-exhausted`.
    */
   charge(usage: ItemUsage): boolean;
+  /**
+   * Permission check WITHOUT accounting (HARDENING_2): would this usage be
+   * admitted right now against global/worker/item budgets? Executors MUST
+   * obtain permission through this before starting any budgeted unit of work,
+   * then record actual consumption with {@link charge}.
+   */
+  admit(usage: ItemUsage): boolean;
   /** Extend this item's lease; false means the generation was lost (fenced). */
   renewLease(): boolean;
   /**
@@ -140,10 +147,12 @@ export interface WorkItemExecutor {
   capabilities(): Promise<WorkerCapabilitySnapshot> | WorkerCapabilitySnapshot;
   /**
    * Execute one work item inside the isolated context. Implementations must:
-   * honor ctx.signal cooperatively (throw ItemCancelledError), charge usage
-   * through ctx.charge before consuming budgeted resources, renew long leases
-   * via ctx.renewLease(), and contain their own adapter crashes into a
-   * structured failure result instead of throwing arbitrary errors.
+   * honor ctx.signal cooperatively (throw ItemCancelledError), obtain budget
+   * permission via ctx.admit BEFORE consuming budgeted resources and record
+   * actual consumption via ctx.charge, contain their own adapter crashes into
+   * a structured failure result instead of throwing arbitrary errors. Lease
+   * liveness is scheduler-managed: the scheduler renews the lease while the
+   * executor runs and aborts ctx.signal if the fencing generation is lost.
    */
   execute(item: unknown, ctx: ExecutionContext): Promise<WorkItemResult>;
 }

@@ -313,6 +313,69 @@ debt_audit:
 
 hardening:
   active: false
+  campaign: HARDENING_2
+  status: COMPLETE
+  started_at: "2026-08-24"
+  completed_at: "2026-08-24"
+  base_commit: 702b33a4b5897cbcdec8b4b0170ca16e8043f79e
+  scope: >-
+    M12 fleet runtime integrity, recovery, and state truth: real budget
+    enforcement at consumption boundaries, cooperative cancellation reaching
+    production workflows, scheduler-managed lease liveness, crash-safe
+    multi-store settlement, durable wall budgets, external-hold liveness
+    semantics, fail-closed semantic state validation, truthful terminal/
+    refusal status, verify/regress cross-item provenance, concurrency/fault
+    torture, real-runtime validation, repository truth reconciliation.
+  protocol: docs/HARDENING-CAMPAIGN.md
+  ledger: .inspector/state/HARDENING-CHECKPOINT.md (campaign #2 section)
+  defects: >-
+    14 confirmed and CLOSED (D1-D14): 2 CRITICAL (settlement stranding;
+    post-hoc budget charging), 8 HIGH (cancellation reach, lease liveness,
+    wall durability, external-hold liveness, semantic corruption fail-open,
+    verify/regress provenance impossibility, plus the accounting/classification
+    pair), 4 MEDIUM/LOW. Every fix carries deterministic regression coverage.
+    Contract changes recorded in ADR-0012.
+  phases:
+    - {id: H2.0, name: baseline-and-truth-table, state: DONE}
+    - {id: H2.1, name: budgets-pre-consumption, state: DONE}
+    - {id: H2.2, name: cancellation-reaches-work, state: DONE}
+    - {id: H2.3, name: lease-liveness-scheduler, state: DONE}
+    - {id: H2.4, name: settlement-crash-windows, state: DONE}
+    - {id: H2.5, name: durable-wall-budget, state: DONE}
+    - {id: H2.6, name: external-hold-semantics, state: DONE}
+    - {id: H2.7, name: semantic-state-validation, state: DONE}
+    - {id: H2.8, name: truthful-status-contracts, state: DONE}
+    - {id: H2.9, name: workflow-claims-audit, state: DONE}
+    - {id: H2.10, name: stress-and-fault-injection, state: DONE}
+    - {id: H2.11, name: real-runtime-validation, state: DONE}
+    - {id: H2.12, name: repo-truth-reconciliation, state: DONE}
+  last_verified_commit: HEAD (HARDENING_2 final gate run on this exact tree)
+  last_full_gate: >-
+    FINAL GATE PASS on the exact final tree: pnpm install --frozen-lockfile OK;
+    lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit 568 passed /
+    3 skipped (51 files); integration 175 passed / 1 skipped across 41 files
+    (including android real-backend on a live AVD after clearing stale emulator
+    contention — environmental, not product); pnpm release:smoke PASS from a
+    clean installed prefix including M12 campaign steps. Real-runtime proofs:
+    fake campaigns, REAL web campaign vs live local app, REAL CLI/PTY campaign,
+    REAL android campaign item (3 actions, honest usage). Windows/UIA and
+    Electron campaign lanes remain unwritten/deferred respectively (Electron
+    executable absent). No release/tag/publication action taken.
+  blockers: []
+  deferred_debt:
+    - >-
+      No automated Windows/UIA or Electron CAMPAIGN lane exists (pre-M12-final
+      either); the UIA bridge is healthy and proven via interactive/native
+      paths; Electron executable is absent on this host.
+    - >-
+      In-process executors that ignore ctx.signal cannot be force-killed by
+      design (cooperative model); real engines honor stop. Paused wall time
+      counts toward the campaign allowance (documented choice).
+    - >-
+      Web exploration replay cost (~4-6 min full E2E) remains
+      product-acceptable debt carried from M12.
+
+hardening1_history:
   campaign: HARDENING_1
   status: COMPLETE
   started_at: "2026-08-21"
