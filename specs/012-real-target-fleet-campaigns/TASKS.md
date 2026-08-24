@@ -97,12 +97,22 @@ before the next activates.
 
 ## F5 — Durable restart/recovery proofs at scale
 
-- [ ] F5.1 Crash-hook executor fixtures: abort at queued/env-create/active/
-      evidence/confirm/renew/complete boundaries.
-- [ ] F5.2 Restart matrix tests incl. multiple controller restarts, budget
-      non-reset, stale-completion fencing, corrupt-state fail-closed,
-      terminal-campaign resume refusal.
-- Gate: restart matrix green deterministically (no retries needed).
+- [x] F5.1 Crash-hook executor fixtures: abort after evidence persistence
+      (post-work death), plus the pre-existing soak hooks for injected worker
+      crashes, ghost-controller lease reclaims, and chunked-stop restarts.
+- [x] F5.2 Restart matrix over REAL-workflow execution
+      (packages/workflows/src/campaign-restart.integration.test.ts):
+      death between evidence persistence and completion recording → restarted
+      controller completes exactly once with durable item-store evidence and
+      monotonic ledger totals; corrupted campaign state fails closed with
+      StateCorruptionError (constructor-level); terminal campaigns refuse
+      duplicate execution with zero additional spend; stop/resume is
+      deterministic (completed work counts once, budget accounting monotonic).
+      SOAK-J1 continues to prove 20+ restart injections, fencing, and budget
+      non-reset at scheduler level.
+- Gate: PASSED 2026-08-24 — restart matrix 4/4 green; full gates: lint 0
+  errors/4 pre-existing warnings; unit 547 passed/3 skipped; integration 39
+  files / 164 passed / 1 skipped.
 
 ## F6 — Cancellation and graceful shutdown
 

@@ -218,8 +218,7 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     }, 0);
     if (artifactBytes > 0) ctx.charge({ artifactBytes });
 
-    const failedOutcome = outcome.badStop || outcome.errorOutcomes > 0;
-    if (failedOutcome) {
+    if (outcome.badStop || outcome.errorOutcomes > 0) {
       return failedResult(
         outcome.badStop ? "environment-unavailable" : "execution-failure",
         `exploration stopped with '${r.stoppedReason}'` +
@@ -227,7 +226,8 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         { findings: r.findings, evidencePaths: outcome.bundlePaths.map((b) => b.path), runIds: [r.runId], usage },
       );
     }
-    if (ctx.signal.aborted) throw new ItemCancelledError();
+    // Completed work counts even when a stop raced it: the exploration really
+    // ran, and resume must never repeat it.
     return okResult({
       findings: r.findings,
       evidencePaths: outcome.bundlePaths.map((b) => b.path),
