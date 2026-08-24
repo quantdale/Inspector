@@ -308,7 +308,19 @@ with exact evidence. No release or tag publication is performed.
 
 Spec: `specs/012-real-target-fleet-campaigns/SPEC.md`
 
-**Status: ACTIVE (2026-08-23).**
+**Status: COMPLETE (2026-08-24).** Exit gate PASS: scheduler has no adapter
+dependency (pluggable `WorkItemExecutor`, F1); versioned work items + YAML/JSON
+manifests with pre-flight validation and a backward-compatible quick path (F2);
+shared workflow services in `@inspector/workflows` drive REAL hunt/explore/
+verify/regress machinery as campaign items with per-item isolation, provenance,
+and honest usage accounting (F3); capability routing from probed backends with
+durable refusals (F4); restart/recovery matrix over real-work execution (F5);
+graceful SIGINT shutdown (F6); finding aggregation + observability additions
+(F7); ≥3 genuinely different real adapter families proven through the campaign
+scheduler — web (Playwright), CLI/PTY (ConPTY), android (AVD) — plus the full
+fake-engine pipeline (F8); replay-phase optimization with recorded measurements
+and behavior-preserving E2E proofs (F9); installed-artifact campaign smoke PASS
+(F10); documentation and durable state synchronized (F11).
 
 Goal: remove the fake-target limitation from the campaign product surface so
 `inspector campaign` orchestrates real Inspector workflows against real

@@ -1,21 +1,51 @@
 # Project Status
 
-Last updated: M11 COMPLETE (2026-08-23)
+Last updated: M12 COMPLETE (2026-08-24)
 
 ## Campaign
 
-- Mode: **M11 — Operator-grade product workflows and distribution: COMPLETE**.
-  M9 native autonomous exploration and M10 resumability are complete. M11
-  P0-P7 and its exit gate are complete.
+- Mode: **M12 — Real-target fleet campaigns, capability-aware scheduling,
+  and unattended runtime efficiency: COMPLETE**. M11 and all earlier
+  milestones remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`.
   Canonical state is recorded in `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
 - Implementation campaign M0–M7 + M9: **COMPLETE**. HARDENING_1:
-  **COMPLETE**. DOGFOOD_RC1: **COMPLETE**. RC1_FINALIZATION: **COMPLETE** —
-  `v0.1.0-rc.1` tagged at `ddeea86`, never moved.
+  **COMPLETE**. DOGFOOD_RC1: **COMPLETE**.
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
+
+## M12 outcome
+
+`inspector campaign` is now a real-target fleet surface. The scale scheduler
+owns queueing, leasing/fencing, budgets, cancellation, resume, and durable
+accounting while item EXECUTION is delegated to pluggable executors — the
+deterministic fake fixture and a new `InspectorWorkflowExecutor` that runs the
+same exploration/replay engines the interactive CLI uses, in per-item isolated,
+retained workspaces with campaign→item→worker→run provenance recorded durably.
+
+- Versioned assignments (`inspector-campaign-workitem/1` semantics) and YAML/
+  JSON manifests (`inspector-campaign-manifest/1`) validate fully before any
+  work starts (`campaign run --manifest`, `campaign validate --manifest`);
+  the legacy `--items id=target` quick path is intact.
+- Workers route from probed backend capability snapshots (browser/pty/uia/adb/
+  electron); unroutable items are durably refused with stable classifications
+  — never faked. Snapshots, assignments, refusals, failure classes, stop
+  reason, elapsed time, and finding summaries appear in campaign JSON views.
+- Restart guarantees hold over REAL work: death between evidence persistence
+  and completion recording still completes exactly once after restart with
+  monotonic budgets; corrupt state fails closed; terminal campaigns refuse
+  duplicate execution; SIGINT drains to a deterministic final state.
+- Real multi-family portfolio proven through the scheduler on this host:
+  web (Playwright vs a live local app), CLI/PTTY (real ConPTY), android (live
+  AVD), plus the full fake-engine pipeline. Repair remains policy-refused for
+  campaign items; discovery never implies repair.
+- Replay efficiency: persistent per-finding replay drivers remove N−1 adapter
+  launches per confirmation cycle with unchanged clean-state semantics;
+  measurements recorded in SPEC-012 TASKS F9.
+- Installed-artifact smoke now validates a manifest and runs a bounded fake
+  multi-worker campaign end-to-end from the packaged CLI.
 
 ## M9 outcome
 
@@ -111,10 +141,11 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 | frozen install | PASS |
 | lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
-| test (unit) | PASS (533 passed / 3 skipped) |
-| test:integration | PASS — 155 passed / 1 skipped across 37 files on the first run of the latest full sweep (`91411fa`); the prior P7 sweep passed after bounded retries |
-| M11 acceptance matrix | PASS |
-| installed release smoke | PASS (fresh npm prefix) |
+| test (unit) | PASS (549 passed / 3 skipped at the M12 final sweep) |
+| test:integration | PASS — 164 passed / 1 skipped across 39 files (M12 final sweep) |
+| M12 acceptance | PASS (SPEC-012 task graph gates F0–F11) |
+| installed release smoke | PASS (fresh npm prefix, incl. M12 campaign steps) |
+| hosted CI | NOT RUN — no push authority this session; lanes remain CONFIGURED-not-yet-run |
 
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration
@@ -152,5 +183,6 @@ None blocking continued validation.
 | M9 Platform-neutral exploration | COMPLETE |
 | M10 Resumable exploration | COMPLETE |
 | M11 Operator workflows/distribution | COMPLETE |
+| M12 Real-target fleet campaigns | COMPLETE |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

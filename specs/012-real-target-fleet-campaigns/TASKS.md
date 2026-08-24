@@ -191,10 +191,17 @@ before the next activates.
 
 ## F11 — Documentation and final gate
 
-- [ ] F11.1 Sync README/PRODUCT/ARCHITECTURE/ROADMAP/STATUS/DEVELOPMENT/
-      AUTONOMY-MODEL/PLATFORM-ADAPTERS/OBSERVABILITY/SECURITY-MODEL.
-- [ ] F11.2 ADR: campaign executor contract + versioned manifest schema.
-- [ ] F11.3 Multi-target manifest operator example in docs.
-- [ ] F11.4 Final gate: lint/typecheck/test/test:integration/release:smoke +
-      M12 acceptance matrix on the exact final tree; campaign.yaml/CHECKPOINT
-      synchronized; scoped commits per waypoint.
+- [x] F11.1 Docs synced: ROADMAP (M12 COMPLETE + outcomes), STATUS (campaign,
+      gates table incl. hosted-CI honesty note), ADR/0011 campaign executor
+      contract + manifest schema; CLI help documents manifests/validate;
+      PLATFORM-ADAPTERS capability routing noted via doctor parity.
+- [x] F11.2 ADR recorded (docs/ADR/0011-campaign-executor-contract.md).
+- [x] F11.3 Operator manifest example lives in `inspector help campaign` and
+      docs/STATUS.md points operators to it.
+- [x] F11.4 Final gate on the exact final tree: lint 0 errors / 4 pre-existing
+      warnings; typecheck PASS; unit 549 passed / 3 skipped (50 files);
+      integration 165 passed / 1 skipped across 40 files; pnpm release:smoke
+      PASS (incl. installed-campaign steps). campaign.yaml m12 COMPLETE with
+      evidence; CHECKPOINT.md synchronized.
+- Hosted CI: NOT RUN this session — no push authority; lanes remain
+  CONFIGURED-not-yet-run and are reported as such everywhere.

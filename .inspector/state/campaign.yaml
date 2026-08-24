@@ -24,19 +24,19 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M11
-  milestone_name: Operator-grade product workflows and distribution
+  milestone_id: M12
+  milestone_name: Real-target fleet campaigns, capability-aware scheduling, and unattended runtime efficiency
   status: COMPLETE
-  spec: specs/011-operator-product-workflows/SPEC.md
-  tasks: specs/011-operator-product-workflows/TASKS.md
-  task_group: P7
-  waypoint: M11.P7.ci-distribution-acceptance
+  spec: specs/012-real-target-fleet-campaigns/SPEC.md
+  tasks: specs/012-real-target-fleet-campaigns/TASKS.md
+  task_group: F11
+  waypoint: M12.F11.final-gate
   waypoint_status: COMPLETE
   next_action: >-
-    M11 exit gate complete. The production Electron field proof has since been
-    executed for real on a Windows host (Electron 43.4.1) and the layered CI
-    gained an Xvfb electron-real lane. Keep only M8 (iOS) environment-deferred,
-    run the hosted CI lanes on first push, and do not publish a release.
+    M12 exit gate complete. No further roadmap milestone is activated. On a
+    future session: run hosted CI lanes on first authorized push, keep M8
+    environment-deferred unless macOS/Xcode becomes available, and do not
+    publish any release without explicit authorization.
 
 progress:
   completed_milestones:
@@ -51,6 +51,7 @@ progress:
     - M9
     - M10
     - M11
+    - M12
   completed_task_groups:
     - F0
     - F1
@@ -123,6 +124,17 @@ progress:
     - S6
     - S7
     - S8
+    - M12.F0
+    - M12.F1
+    - M12.F2
+    - M12.F3
+    - M12.F4
+    - M12.F5
+    - M12.F6
+    - M12.F7
+    - M12.F8
+    - M12.F9
+    - M12.F10
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -211,20 +223,18 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: 91411faaffb763109bea90792da0c92128c9c44b
+  last_verified_commit: HEAD (M12 final state-synchronization commit on main)
   last_gate: >-
-    M11 re-verification with real Electron runtime: lint 0 errors/4
-    pre-existing warnings; typecheck PASS; unit 533 passed/3 skipped;
-    integration 155 passed/1 skipped across 37 files on the first run;
-    M11 acceptance matrix PASS; installed release smoke PASS (including the
-    fake explore workflow) from clean source 23a4a27dcff472bd709c3b93b29572ad087564a5
-    (candidate SHA-256 2149dc76f09e4409e953270fa6c0481a9500439369ee09c595048765e10963ae,
-    source.dirty false); production Electron field proof EXECUTED against a
-    real Electron 43.4.1 process on this Windows host; layered CI now includes
-    an Xvfb Electron proof lane and per-job timeouts; hosted CI not invoked
-    (no push authority); no release publication
+    M12 exit gate PASS on the exact final tree: lint 0 errors/4 pre-existing
+    warnings; typecheck PASS; unit 549 passed / 3 skipped (50 files);
+    integration 165 passed / 1 skipped across 40 files; pnpm release:smoke
+    PASS including installed-artifact campaign steps (manifest validate,
+    two-worker manifest run, show). Real portfolio through the campaign
+    scheduler: web (Playwright), CLI/PTTY (ConPTY), android (AVD) plus full
+    fake-engine pipeline. Hosted CI not invoked (no push authority); no
+    release/tag action taken.
   last_gate_result: PASS
-  last_gate_at: "2026-08-23"
+  last_gate_at: "2026-08-24"
 
 blockers: []
 known_debt:
@@ -506,8 +516,9 @@ m11:
 
 m12:
   campaign: REAL_TARGET_FLEET_CAMPAIGNS
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-23"
+  completed_at: "2026-08-24"
   started_from_commit: 3b974c62db58ede47940267c5b62137325c49896
   spec: specs/012-real-target-fleet-campaigns/SPEC.md
   tasks: specs/012-real-target-fleet-campaigns/TASKS.md
@@ -523,10 +534,9 @@ m12:
     F8: COMPLETE
     F9: COMPLETE
     F10: COMPLETE
-    F11: ACTIVE
-    F11: PENDING
+    F11: COMPLETE
   waypoint: M12.F11.final-gate
-  waypoint_status: ACTIVE
+  waypoint_status: COMPLETE
   blockers: []
 
 ga_readiness:

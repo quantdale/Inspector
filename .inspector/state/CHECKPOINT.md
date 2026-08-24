@@ -15,6 +15,41 @@ M12 activated from a clean tree at `3b974c62db58ede47940267c5b62137325c49896`
 the M12 milestone; campaign.yaml `active` now points at SPEC-012 with an
 `m12:` block tracking F0-F11. Baseline facts carried into M12:
 
+### M12 COMPLETE (2026-08-24)
+
+All F0-F11 task groups complete; exit gate PASS on the exact final tree
+(lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit 549/3 skipped;
+integration 165 passed / 1 skipped across 40 files; release:smoke PASS incl.
+installed-campaign steps). Highlights:
+
+- Pluggable `WorkItemExecutor` in @inspector/scale; scheduler imports no
+  adapter handler; concurrent capability-aware workers with durable refusals,
+  assignments, failure classes, stop reason, elapsed time, and finding
+  summaries in campaign state/views.
+- Versioned work items + YAML/JSON manifests (`campaign run --manifest`,
+  `campaign validate --manifest`) with fail-closed pre-flight validation;
+  legacy quick path intact.
+- New `@inspector/workflows` package: exploration/replay services shared by
+  CLI and fleet; `InspectorWorkflowExecutor` runs REAL hunt/explore/verify/
+  regress machinery per-item-isolated with provenance and honest usage.
+- Restart matrix over real work: death after evidence persistence still
+  completes exactly once post-restart with monotonic budgets; corrupt state
+  fails closed; terminal campaigns refuse duplicates; stop/resume
+  deterministic; SIGINT graceful shutdown.
+- Real portfolio through the scheduler: web (Playwright), CLI/PTTY (ConPTY),
+  android (AVD) — plus the full fake-engine pipeline. Repair stays
+  policy-refused for campaign items.
+- Replay efficiency: persistent per-finding replay driver (reset-based) with
+  measured replay-phase savings and unchanged E2E behavior/determinism.
+- Installed-artifact smoke proves manifest validation + multi-worker campaign
+  operation from the packaged CLI.
+- Two concurrency defects fixed with regression coverage: drain-before-report
+  in the scheduler loop; stop-racing-charge misclassification (now recorded
+  via allowWhenStopped + lease-truth reconciliation). Finding persistence is
+  idempotent per finding id.
+- Hosted CI remains CONFIGURED-not-yet-run (no push authority). M8 iOS stays
+  DEFERRED_ENVIRONMENT. No package/release/tag action taken.
+
 - `@inspector/scale` `UnattendedCampaign` (packages/scale/src/campaign.ts)
   constructs `FakeAdapterHandler` inline in `executeItem`; this is the product
   limitation M12 removes behind a pluggable executor contract.
