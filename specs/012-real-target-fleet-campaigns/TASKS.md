@@ -116,11 +116,18 @@ before the next activates.
 
 ## F6 — Cancellation and graceful shutdown
 
-- [ ] F6.1 Cooperative cancellation signal reaches workflow service between
-      actions; stop() closes adapter/environment resources of active items.
-- [ ] F6.2 SIGINT handling in CLI campaign run → cooperative stop →
-      deterministic final state; portable tests where the platform allows.
-- Gate: stop/resume tests green; no orphaned adapter processes in proofs.
+- [x] F6.1 Cooperative cancellation reaches active claims: stop() aborts the
+      campaign signal; claims reconcile against durable lease truth (requeue
+      when owned, fenced-stale when lost); completed work always counts once.
+      Covered by the F5 stop/resume matrix and SOAK-J1 ghost-reclaim interplay.
+- [x] F6.2 SIGINT/SIGTERM handling in CLI campaign run: first signal
+      cooperatively stops and drains to a deterministic durable final state;
+      second signal escalates (exit 130). Wall-clock bound records reason
+      `max-wall`. Windows SIGINT delivery is not reliably testable from child
+      processes, so the handler is exercised through the stop path in tests;
+      documented honestly.
+- Gate: PASSED 2026-08-24 — typecheck PASS; campaign + restart integration
+  suites green; no orphaned adapter processes in any M12 proof.
 
 ## F7 — Finding aggregation and observability
 

@@ -518,13 +518,13 @@ m12:
     F3: COMPLETE
     F4: COMPLETE
     F5: COMPLETE
-    F6: ACTIVE
-    F7: PENDING
+    F6: COMPLETE
+    F7: ACTIVE
     F8: PENDING
     F9: PENDING
     F10: PENDING
     F11: PENDING
-  waypoint: M12.F6.cancellation
+  waypoint: M12.F7.aggregation-observability
   waypoint_status: ACTIVE
   blockers: []
 

@@ -306,6 +306,7 @@ async function operateCampaign(
     if (req.operation === "resume") campaign.resume();
     manifest = updateManifest(manifest, { status: "running", lastError: undefined });
     writeManifest(manifestPath, manifest);
+    const removeSignals = installSignalShutdown(campaign);
     let report: CampaignReport;
     try {
       report = await runBounded(campaign, manifest.maxWallMs);
@@ -313,6 +314,8 @@ async function operateCampaign(
       manifest = updateManifest(manifest, { status: "failed", lastError: errorMessage(err) });
       writeManifest(manifestPath, manifest);
       throw new CliError("campaign-failed", `campaign ${id} failed: ${errorMessage(err)}`);
+    } finally {
+      removeSignals();
     }
     const status = deriveStatus(manifest, campaign);
     manifest = updateManifest(manifest, { status, lastReport: report });
@@ -386,7 +389,7 @@ async function runBounded(campaign: UnattendedCampaign, maxWallMs: number): Prom
       run,
       new Promise<CampaignReport>((resolve, reject) => {
         timer = setTimeout(() => {
-          campaign.stop();
+          campaign.stop("max-wall");
           void run.then(resolve, reject);
         }, maxWallMs);
       }),
@@ -394,6 +397,30 @@ async function runBounded(campaign: UnattendedCampaign, maxWallMs: number): Prom
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * M12 F6: portable graceful shutdown. The first SIGINT/SIGTERM cooperatively
+ * stops scheduling and cancels active claims; the process then drains,
+ * persists its durable final state, and emits the normal command output.
+ * A second signal escalates to immediate exit (operator override).
+ */
+function installSignalShutdown(campaign: UnattendedCampaign): () => void {
+  let signaled = false;
+  const handler = (signal: string): void => {
+    if (signaled) {
+      // Operator override: immediate exit without further teardown.
+      process.exit(130);
+    }
+    signaled = true;
+    campaign.stop(signal);
+  };
+  process.once("SIGINT", () => handler("sigint"));
+  if (process.platform !== "win32") process.once("SIGTERM", () => handler("sigterm"));
+  return () => {
+    process.removeAllListeners("SIGINT");
+    if (process.platform !== "win32") process.removeAllListeners("SIGTERM");
+  };
 }
 
 function campaignOutput(
