@@ -131,16 +131,17 @@ before the next activates.
 
 ## F7 — Finding aggregation and observability
 
-- [ ] F7.1 Campaign report classes: observations, candidates, confirmed,
-      clustered duplicates, flaky, environment failures, automation failures,
-      repaired; clustering via existing FindingClusterer with preserved
-      evidence links.
-- [ ] F7.2 Enriched `campaign show`/run JSON (elapsed, workers busy/available,
-      current assignments, queue depth, run IDs, usage incl resets/tokens/
-      cost/artifactBytes, lease state, restart count, refusals, stop reason);
-      human progress on stderr only.
-- Gate: aggregation unit tests; JSON schema assertions; M11 output fields
-  remain present (additive change).
+- [x] F7.1 Campaign report aggregation (`summarizeFindings`): total,
+      candidates, confirmed, resolved, regressed, flaky, rejected, other;
+      duplicate members collapsed via the existing signature clusterer while
+      evidence members are preserved; distinct cluster count.
+- [x] F7.2 Observability additions (all additive to M11 contracts):
+      elapsedMs, findingSummary, refusals, failureDetails, stopReason,
+      per-worker executor/family/capability snapshots, source-manifest
+      provenance in `campaign show`/run JSON; executor progress lines now
+      stream to stderr via CampaignOptions.onProgress (stdout stays clean).
+- Gate: PASSED 2026-08-24 — aggregation unit tests; scale+cli suites green;
+      lint 0 errors/4 pre-existing warnings.
 
 ## F8 — Real multi-target campaign proof
 

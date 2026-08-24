@@ -45,6 +45,8 @@ export interface CampaignOptions {
   keepItemWorkspaces?: boolean;
   /** Poll interval when runnable work exists only behind external holds. */
   claimPollMs?: number;
+  /** Progress sink for executor progress lines (stderr in the CLI). */
+  onProgress?: (line: string) => void;
 }
 
 export interface CampaignRefusal {
@@ -90,6 +92,10 @@ export interface CampaignReport {
   failureDetails: Record<string, { class: WorkItemFailureClass; detail: string }>;
   /** M12 additive: why scheduling stopped (null = queue drained). */
   stopReason: string | null;
+  /** M12 additive: wall-clock elapsed for the whole campaign (ms). */
+  elapsedMs: number;
+  /** M12 additive: finding aggregation over the standard lifecycle. */
+  findingSummary?: FindingSummary;
 }
 
 interface CampaignState {
@@ -623,7 +629,7 @@ export class UnattendedCampaign {
       renewLease: () => this.leases.renew(item.id, workerId, generation),
       persistPartial: (findings) => this.persistFindings(findings),
       signal: this.abort.signal,
-      progress: () => {},
+      progress: (line) => this.opts.onProgress?.(line),
       now: () => this.nowMs(),
     };
     try {
@@ -668,6 +674,8 @@ export class UnattendedCampaign {
       assignments: [...s.assignments],
       failureDetails: { ...s.failureDetails },
       stopReason: this.resolveStopReason(s),
+      elapsedMs: Math.max(0, this.nowMs() - (s.startedAtMs ?? this.nowMs())),
+      findingSummary: summarizeFindings(s.findings, this.clusterFindings()),
     };
   }
 
@@ -743,4 +751,65 @@ export function familyOf(item: LegacyWorkItem): AdapterFamily {
     return raw;
   }
   return "fake";
+}
+
+/** M12 F7: campaign-level finding aggregation over the standard lifecycle. */
+export interface FindingSummary {
+  /** Total durable findings recorded by the campaign. */
+  total: number;
+  candidates: number;
+  confirmed: number;
+  resolved: number;
+  regressed: number;
+  flaky: number;
+  rejected: number;
+  other: number;
+  /** Findings collapsed into an existing signature cluster (evidence kept). */
+  duplicateMembers: number;
+  /** Distinct signature clusters. */
+  clusters: number;
+}
+
+/**
+ * Aggregate campaign findings by lifecycle status and the existing signature
+ * clustering. Duplicates keep their provenance members; only the count here
+ * collapses them, never the evidence.
+ */
+export function summarizeFindings(findings: Finding[], clusterer: FindingClusterer): FindingSummary {
+  const byStatus = { candidates: 0, confirmed: 0, resolved: 0, regressed: 0, flaky: 0, rejected: 0, other: 0 };
+  for (const f of findings) {
+    switch (f.status) {
+      case "CANDIDATE":
+      case "REPRODUCING":
+      case "MINIMIZED":
+        byStatus.candidates += 1;
+        break;
+      case "CONFIRMED":
+        byStatus.confirmed += 1;
+        break;
+      case "RESOLVED":
+        byStatus.resolved += 1;
+        break;
+      case "REGRESSED":
+        byStatus.regressed += 1;
+        break;
+      case "FLAKY":
+        byStatus.flaky += 1;
+        break;
+      case "REJECTED":
+        byStatus.rejected += 1;
+        break;
+      default:
+        byStatus.other += 1;
+    }
+  }
+  const clusters = clusterer.list();
+  let duplicateMembers = 0;
+  for (const c of clusters) duplicateMembers += Math.max(0, c.members.length - 1);
+  return {
+    total: findings.length,
+    ...byStatus,
+    duplicateMembers,
+    clusters: clusters.length,
+  };
 }

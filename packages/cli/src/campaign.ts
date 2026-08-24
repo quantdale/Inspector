@@ -89,6 +89,19 @@ interface CampaignSnapshot {
   failureDetails: Record<string, { class: string; detail: string }>;
   stopReason: string | null;
   workers: Array<{ workerId: string; executorId: string | null; families: string[]; capabilities: string[] }>;
+  elapsedMs: number;
+  findingSummary?: {
+    total: number;
+    candidates: number;
+    confirmed: number;
+    resolved: number;
+    regressed: number;
+    flaky: number;
+    rejected: number;
+    other: number;
+    duplicateMembers: number;
+    clusters: number;
+  };
   sourceManifest?: { path: string; sha256: string };
   lastError?: string;
 }
@@ -293,7 +306,7 @@ async function operateCampaign(
     return { code: 0, data: output };
   }
 
-  const campaign = createCampaign(manifest);
+  const campaign = createCampaign(manifest, ctx.progress);
   try {
     if (req.operation === "stop") {
       campaign.stop();
@@ -351,7 +364,7 @@ function anyBudgetFlagProvided(req: CampaignRequest): boolean {
   );
 }
 
-function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
+function createCampaign(manifest: CampaignManifest, onProgress?: (line: string) => void): UnattendedCampaign {
   const workerBudget = manifest.workerBudget;
   const workerBudgets = workerBudget
     ? Object.fromEntries(Array.from({ length: manifest.workerCount }, (_, i) => [`worker-${i}`, workerBudget]))
@@ -371,6 +384,7 @@ function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
       ...(workerBudgets ? { workerBudgets } : {}),
       leaseTtlMs: manifest.leaseTtlMs,
       leaseBackend: manifest.leaseBackend,
+      ...(onProgress ? { onProgress } : {}),
       ...(needsRealExecutor
         ? { executor: new InspectorWorkflowExecutor({ campaignId: manifest.id }), keepItemWorkspaces: true }
         : manifest.keepWorkspaces
@@ -482,6 +496,8 @@ function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampai
         families: caps.families ?? [],
         capabilities: caps.capabilities ?? [],
       })),
+      elapsedMs: report?.elapsedMs ?? 0,
+      ...(report?.findingSummary ? { findingSummary: report.findingSummary } : {}),
       ...(manifest.sourceManifest ? { sourceManifest: manifest.sourceManifest } : {}),
       ...(manifest.lastError ? { lastError: manifest.lastError } : {}),
     };
