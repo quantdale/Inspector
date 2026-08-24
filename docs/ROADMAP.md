@@ -363,6 +363,49 @@ adapter families are exercised through `UnattendedCampaign` on an available
 host (honest deferrals elsewhere); installed artifact operates campaigns;
 repository gates pass on the final tree; documentation and durable state match.
 
+## M13 — Intelligence-Guided Autonomous QA: model runtime, deliberate exploration, semantic reasoning, source-aware diagnosis, and safe repair assistance (product development)
+
+Spec: `specs/013-intelligence-guided-autonomy/SPEC.md`
+
+Goal: connect Inspector's intentionally incomplete intelligence seams into one
+provider-neutral model runtime that can optionally improve exploration
+decisions, weak semantic reasoning, context compression, source diagnosis,
+and repair proposals — without letting model opinion bypass evidence, policy,
+budget, replay, restart, or isolation guarantees. Offline/no-provider
+operation remains first-class and deterministic.
+
+Deliverables:
+
+- `@inspector/model-runtime`: provider-neutral contracts, typed invocation
+  with attribution, truthful usage reporting, stable failure classification,
+  deadline/cancellation, deterministic fallback, response validation hooks;
+- durable `model_calls` control plane (additive migration) with hashes and
+  redacted metadata — never raw prompts;
+- reservation-before-consumption enforcement of `maxModelRequests` /
+  `maxTokens` / `maxCostUsd` across global/worker/item scopes with
+  crash-safe conservative settlement;
+- bounded versioned context packets (planner/oracle/repair) with redaction
+  and prompt-injection inertness;
+- optional semantic planner inside the existing inventory-bound Planner seam
+  with cadence/plateau activation, strict output validation, deterministic
+  fallback, and checkpoint/resume continuity;
+- optional model-backed weak semantic suspicion that can never confirm a
+  defect or authorize repair;
+- source/change-intelligent ranking for diagnosis and bounded repair
+  context;
+- provider-neutral `PatchAgent` proposal path through the existing isolated
+  verification pipeline (campaign repair remains unsupported);
+- CLI/provider-module configuration, shared workflow wiring, campaign model
+  accounting with two-worker concurrency proofs, capability routing for
+  model-capable workers, aggregate observability;
+- credential-free deterministic test provider, acceptance fixture,
+  adversarial/property/restart coverage, installed-artifact smoke.
+
+Exit gate: all SPEC-013 acceptance tests pass on the final tree; full
+repository gates plus release smoke pass; a scripted provider proves the
+entire intelligence layer with zero credentials/network; docs and durable
+state match the implementation.
+
 ## Explicitly not required before implementation completion
 
 These are valuable but belong to later hardening/productization unless needed by a milestone gate:

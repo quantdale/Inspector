@@ -24,19 +24,17 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M12
-  milestone_name: Real-target fleet campaigns, capability-aware scheduling, and unattended runtime efficiency
-  status: COMPLETE
-  spec: specs/012-real-target-fleet-campaigns/SPEC.md
-  tasks: specs/012-real-target-fleet-campaigns/TASKS.md
-  task_group: F11
-  waypoint: M12.F11.final-gate
+  milestone_id: M13
+  milestone_name: Intelligence-guided autonomous QA — model runtime, deliberate exploration, semantic reasoning, source-aware diagnosis, safe repair assistance
+  status: ACTIVE
+  spec: specs/013-intelligence-guided-autonomy/SPEC.md
+  tasks: specs/013-intelligence-guided-autonomy/TASKS.md
+  task_group: F0
+  waypoint: M13.F0.activation
   waypoint_status: COMPLETE
   next_action: >-
-    M12 exit gate complete. No further roadmap milestone is activated. On a
-    future session: run hosted CI lanes on first authorized push, keep M8
-    environment-deferred unless macOS/Xcode becomes available, and do not
-    publish any release without explicit authorization.
+    Implement F1/F2 (@inspector/model-runtime package + invocation contract),
+    then proceed through the SPEC-013 task graph in dependency order.
 
 progress:
   completed_milestones:

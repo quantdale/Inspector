@@ -3,10 +3,42 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE — M12 Real-Target Fleet Campaigns closed 2026-08-24; HARDENING_2 (separately invoked) also COMPLETE — see `.inspector/state/HARDENING-CHECKPOINT.md`**
+- Status: **ACTIVE — M13 Intelligence-Guided Autonomous QA activated 2026-08-24 from a clean synced tree at `385d3c62fe2c8ecabc4e985fbf22dc5754e8e35d` (== origin/main)**
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: HARDENING_2 ACTIVE at M12 open; see the hardening ledger for its final state.
+- Hardening: none active (HARDENING_2 COMPLETE; hardening stays separately invoked)
+
+### M13 activation (2026-08-24)
+
+M13 activated from a clean tree at `385d3c6` (M12 + HARDENING_2 COMPLETE,
+synced with origin/main). SPEC-013 and its task graph were created; the
+roadmap gained the M13 milestone; ADR-0013 records the model-runtime /
+durable-call-ledger / reservation-budget architecture decisions. Baseline
+gates on the exact starting tree: install --frozen-lockfile OK; lint 0 errors
+/ 4 pre-existing warnings (adapter-web); typecheck PASS; unit 568 passed /
+3 skipped across 51 files.
+
+F0 audit findings driving the design:
+
+- `ModelRouter` (@inspector/scale/src/router.ts) is bare (`complete(role,
+  input)`), consumed only by the fleet harness and tests — effectively test
+  production code. `ModelRole` lacks oracle; providers are plain
+  `{complete(input)}` objects.
+- `ExploreController` hardcodes `NoopPlanner` (campaign.ts:212); the planner
+  seam sits in `select()` behind near-tie/repeat heuristics; checkpoints
+  already persist RNG/graph/toxic/rejected sets — the natural home for
+  planner decision state.
+- `Budget.maxModelRequests|maxTokens|maxCostUsd` exist in scale types and
+  ledger projection but NOTHING charges them; ExecutionContext.admit/charge
+  plus ExplorationControl(admit/commit action|reset) is the established
+  pre-consumption pattern to extend for model units.
+- store-sqlite has 11 additive migrations with schema_version rebuild history;
+  model_calls becomes migration #12 with nullable usage fields.
+- Repair: PatchAgent contract = whole-file patches; SourceContextBuilder is
+  lexical-only; CLI loads provider modules via local ESM/CJS loader in
+  packages/cli/src/repair.ts (loadProvider) — extract/shared, don't duplicate.
+- Release bundles via esbuild from package sources; new workspace package is
+  picked up automatically once imported by CLI entry points.
 
 ### M12 activation (2026-08-23)
 
