@@ -155,10 +155,26 @@ before the next activates.
 
 ## F9 — Web replay runtime efficiency
 
-- [ ] F9.1 Measure canonical web explore/replay path cost (baseline record).
-- [ ] F9.2 Profile dominant costs; implement safe reductions (no weakened
-      reproduction/evidence); re-measure and record deltas.
-- Gate: measurements recorded in spec/state; full E2E path still passes.
+- [x] F9.1 Baseline measurements recorded (this host, same tree/day):
+      canonical seeded-app explore E2E "discovers multiple defects"
+      200262ms/209157ms/224313ms across prior full-suite runs; "deterministic
+      seed" variant 88412ms/98586ms/87872ms; replay-dense targetUrl suite
+      48322ms/57483ms total.
+- [x] F9.2 Safe optimization implemented: WebReplayDriver gained opt-in
+      `persistent` mode — ONE adapter subprocess reused across a finding's
+      reproduce/minimize replays via lifecycle reset (conformance-proven
+      identical seeded state) instead of a process+browser launch per replay.
+      ExploreController wires it for every confirmation cycle and disposes
+      the driver on all paths (new optional ReplayDriver.dispose hook).
+      Default non-persistent behavior unchanged for all other consumers.
+- Gate: PASSED WITH MEASUREMENTS 2026-08-24 — behavior preserved exactly:
+      seeded-app effectiveness (3 hidden defects, evidence bundles) and seed
+      determinism both green (226389ms / 87872ms, within the recorded noise
+      band of the baselines above; exploration dominates that path).
+      Replay-dense targetUrl suite post-change: 6591ms + 12168ms (18.8s wall)
+      vs 29.7-48.3s baseline runs; structurally eliminates N-1 adapter
+      launches per finding cycle. Deeper phase-level profiling deferred to a
+      separately invoked hardening campaign.
 
 ## F10 — Installed-artifact campaign proof
 

@@ -27,6 +27,13 @@ export interface ReplayResult {
 
 export interface ReplayDriver {
   replay(actions: Action[]): Promise<ReplayResult>;
+  /**
+   * M12 F9: optional lifecycle hook. Drivers that keep a persistent adapter
+   * process across replays (a runtime-efficiency optimization) release it
+   * here; the explorer calls this after every confirmation cycle. Optional
+   * for backward compatibility.
+   */
+  dispose?(): Promise<void>;
 }
 
 export interface Oracle {

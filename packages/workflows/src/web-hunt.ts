@@ -63,7 +63,13 @@ export async function runWebHunt(
     config: webExploreConfig(req),
     resume,
     replayDriverFactory: () =>
-      new WebReplayDriver({ artifactBaseDir: join(base, "replay"), targetUrl: req.targetUrl }),
+      new WebReplayDriver({
+        artifactBaseDir: join(base, "replay"),
+        targetUrl: req.targetUrl,
+        // M12 F9: one adapter subprocess reused across this finding's
+        // reproduce/minimize replays; the explorer disposes it per cycle.
+        persistent: true,
+      }),
   });
 
   const result = await controller.run_();

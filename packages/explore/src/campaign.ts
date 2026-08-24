@@ -919,7 +919,9 @@ export class ExploreController {
   private resolveReplayDriverFactory(): (() => ReplayDriver) | undefined {
     if (this.replayDriverFactory) return this.replayDriverFactory;
     if (this.config.targetUrl !== undefined) {
-      return () => new WebReplayDriver({ targetUrl: this.config.targetUrl });
+      // M12 F9: persistent driver — one adapter subprocess reused across this
+      // finding's reproduce/minimize replays via proven reset semantics.
+      return () => new WebReplayDriver({ targetUrl: this.config.targetUrl, persistent: true });
     }
     return undefined;
   }
@@ -932,6 +934,21 @@ export class ExploreController {
   private async processAnomaly(a: DiscoveredAnomaly, base: ExploreResult): Promise<void> {
     const engine = this.findingEngine!;
     const driver = this.resolveReplayDriverFactory()!();
+    try {
+      await this.processAnomalyWithDriver(a, base, engine, driver);
+    } finally {
+      // M12 F9: drivers may hold a persistent adapter process across replays;
+      // always release it, on every path, before the anomaly settles.
+      await driver.dispose?.();
+    }
+  }
+
+  private async processAnomalyWithDriver(
+    a: DiscoveredAnomaly,
+    base: ExploreResult,
+    engine: FindingEngine,
+    driver: ReplayDriver,
+  ): Promise<void> {
     const signal: OracleSignal = {
       kind: a.kind as OracleSignalKind,
       detail: a.message,
