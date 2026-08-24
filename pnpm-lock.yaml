@@ -112,6 +112,9 @@ importers:
       '@inspector/store-sqlite':
         specifier: workspace:*
         version: link:../store-sqlite
+      '@inspector/workflows':
+        specifier: workspace:*
+        version: link:../workflows
 
   packages/cli-adapter:
     dependencies:
@@ -299,6 +302,42 @@ importers:
       '@inspector/protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/workflows:
+    dependencies:
+      '@inspector/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@inspector/android':
+        specifier: workspace:*
+        version: link:../android
+      '@inspector/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@inspector/cli-adapter':
+        specifier: workspace:*
+        version: link:../cli-adapter
+      '@inspector/core':
+        specifier: workspace:*
+        version: link:../core
+      '@inspector/electron-adapter':
+        specifier: workspace:*
+        version: link:../electron-adapter
+      '@inspector/explore':
+        specifier: workspace:*
+        version: link:../explore
+      '@inspector/finding':
+        specifier: workspace:*
+        version: link:../finding
+      '@inspector/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@inspector/store-sqlite':
+        specifier: workspace:*
+        version: link:../store-sqlite
+      '@inspector/windows-adapter':
+        specifier: workspace:*
+        version: link:../windows-adapter
 
 packages:
 

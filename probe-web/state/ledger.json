@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "workerId": "worker-0",
+      "itemId": "web-1",
+      "actions": 120,
+      "resets": 1
+    }
+  ],
+  "stopped": false
+}

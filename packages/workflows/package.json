@@ -1,5 +1,5 @@
 {
-  "name": "@inspector/cli",
+  "name": "@inspector/workflows",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,19 +9,16 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/android": "workspace:*",
     "@inspector/artifact-store": "workspace:*",
+    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/cli-adapter": "workspace:*",
     "@inspector/core": "workspace:*",
+    "@inspector/electron-adapter": "workspace:*",
     "@inspector/explore": "workspace:*",
     "@inspector/finding": "workspace:*",
-    "@inspector/oracle": "workspace:*",
-    "@inspector/repair": "workspace:*",
-    "@inspector/scale": "workspace:*",
-    "@inspector/workflows": "workspace:*",
     "@inspector/protocol": "workspace:*",
-    "@inspector/store-sqlite": "workspace:*"
-  },
-  "bin": {
-    "inspector": "src/bin.ts"
+    "@inspector/store-sqlite": "workspace:*",
+    "@inspector/windows-adapter": "workspace:*"
   }
 }

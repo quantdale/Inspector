@@ -18,6 +18,7 @@ import {
 import { CliError, intFlag, type ParsedInvocation } from "./args.js";
 import { warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
 import { writeJsonAtomic } from "./atomic.js";
+import { InspectorWorkflowExecutor } from "@inspector/workflows";
 
 const CAMPAIGN_SCHEMA = "inspector-cli/campaign/1";
 const CAMPAIGN_LIST_SCHEMA = "inspector-cli/campaign-list/1";
@@ -346,6 +347,11 @@ function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
   const workerBudgets = workerBudget
     ? Object.fromEntries(Array.from({ length: manifest.workerCount }, (_, i) => [`worker-${i}`, workerBudget]))
     : undefined;
+  // M12 F3: any non-fake adapter family routes the campaign through the real
+  // Inspector workflow executor (per-item isolated workspaces, durable
+  // evidence, honest capability routing). Pure-fake campaigns keep the
+  // deterministic fixture executor for exhaustive scheduler testing.
+  const needsRealExecutor = manifest.items.some((item) => (item.adapterFamily ?? item.target) !== "fake");
   return new UnattendedCampaign(
     {
       stateDir: manifest.stateDir,
@@ -356,7 +362,11 @@ function createCampaign(manifest: CampaignManifest): UnattendedCampaign {
       ...(workerBudgets ? { workerBudgets } : {}),
       leaseTtlMs: manifest.leaseTtlMs,
       leaseBackend: manifest.leaseBackend,
-      ...(manifest.keepWorkspaces ? { keepItemWorkspaces: true } : {}),
+      ...(needsRealExecutor
+        ? { executor: new InspectorWorkflowExecutor({ campaignId: manifest.id }), keepItemWorkspaces: true }
+        : manifest.keepWorkspaces
+          ? { keepItemWorkspaces: true }
+          : {}),
     },
     manifest.artifactsDir,
   );

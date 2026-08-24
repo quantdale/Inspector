@@ -52,21 +52,30 @@ before the next activates.
 
 ## F3 — Real workflow services (@inspector/workflows)
 
-- [ ] F3.1 New workspace package @inspector/workflows; move exploration
-      orchestration (request→RunManager→explorer dispatch→evidence) out of
-      packages/cli/src/hunt.ts into service functions; CLI keeps thin output
-      formatting; hunt/explore JSON contracts byte-stable.
-- [ ] F3.2 Inspector workflow executor implementing WorkItemExecutor: per-item
-      isolated workspace under campaign artifacts, real RunManager/engine use,
-      usage charging from executed actions/resets/artifacts, findings +
-      bundle paths returned, provenance (campaignId/workItemId/workerId/runIds)
-      recorded durably.
-- [ ] F3.3 verify/regress items reuse replay/oracle machinery via services;
-      repair items require explicit item authorization AND configured provider,
-      otherwise policy-refusal.
-- Gate: workflows package unit tests + CLI integration tests prove identical
-  command output shapes; campaign integration test runs a REAL web hunt item
-  through UnattendedCampaign.
+- [x] F3.1 New workspace package @inspector/workflows; exploration
+      orchestration moved out of packages/cli/src/hunt.ts into service
+      functions (runExploration); workspace/spawn helpers, durable hunt meta,
+      evidence writing, replay-subject machinery, and the fake/native/web hunt
+      engines all shared. CLI keeps thin flag-parsing/output; hunt/explore JSON
+      contracts byte-stable (17/17 cli integration tests unchanged).
+- [x] F3.2 InspectorWorkflowExecutor implements WorkItemExecutor: per-item
+      isolated workspaces retained under campaign artifacts, real RunManager/
+      explorer use, honest usage charging (actions/resets/artifactBytes),
+      findings + bundle paths returned, campaign/item/worker provenance
+      recorded durably in run meta.
+- [x] F3.3 verify/regress items reuse the replay/oracle machinery
+      (loadReplaySubject/replayDriverFor moved into workflows); repair items
+      are policy-refused by default — discovery never implies repair.
+- [x] F3.4 Capability probing for workers (browser/pty/uia/adb/electron) with
+      deterministic injection seam for tests.
+- Gate: PASSED 2026-08-24 — lint 0 errors/4 pre-existing warnings; typecheck
+  PASS; unit 542/3 skipped; integration 38 files / 160 passed / 1 skipped.
+  Proofs: REAL web hunt item against a live local app through
+  UnattendedCampaign (2 workers, isolated retained workspaces, provenance in
+  run meta); fake-family item through the full engine pipeline with standard
+  evidence bundle; injected-unavailable adb refusal recorded durably;
+  real-device android hunt item proven live (55s, AVD) and gated behind
+  INSPECTOR_M12_ANDROID_E2E to avoid cross-fork emulator contention.
 
 ## F4 — Capability-aware worker routing
 

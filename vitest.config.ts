@@ -26,6 +26,7 @@ const alias = {
   "@inspector/oracle": resolve(__dirname, "packages/oracle/src/index.ts"),
   "@inspector/repair": resolve(__dirname, "packages/repair/src/index.ts"),
   "@inspector/scale": resolve(__dirname, "packages/scale/src/index.ts"),
+  "@inspector/workflows": resolve(__dirname, "packages/workflows/src/index.ts"),
   "@inspector/adapter-web": resolve(__dirname, "packages/adapter-web/src/index.ts"),
   "@inspector/cli-adapter": resolve(__dirname, "packages/cli-adapter/src/index.ts"),
   "@inspector/windows-adapter": resolve(__dirname, "packages/windows-adapter/src/index.ts"),
