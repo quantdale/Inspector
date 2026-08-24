@@ -304,9 +304,11 @@ debt_audit:
     - ios_macos_xcode_runtime
   hosted_ci_pending:
     - >-
-      first hosted execution of the layered CI lanes (Linux quality, Windows,
-      Xvfb electron-real, release smoke) awaits push authority; the equivalent
-      Electron proof already executed locally on Windows
+      PUSHED 2026-08-24: main pushed through f5d27f1 (M12 final) after
+      integrating remote f7fba41 via rebase. Layered CI lanes triggered by
+      the push; run results not inspectable from this host (gh CLI present
+      but unauthenticated). Owner should check the Actions tab; any red lane
+      is triaged as real regression vs environment dependency per SPEC-012 §15.
   product_decision_required: []
 
 hardening:

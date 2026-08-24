@@ -50,6 +50,20 @@ installed-campaign steps). Highlights:
 - Hosted CI remains CONFIGURED-not-yet-run (no push authority). M8 iOS stays
   DEFERRED_ENVIRONMENT. No package/release/tag action taken.
 
+### Push to origin/main (2026-08-24, authorized by operator)
+
+- Operator granted push authority; 12 M12 commits rebased onto remote
+  `f7fba41` (owner-added agent-config files, disjoint changes) and pushed:
+  `f7fba41..f5d27f1 main -> main`. Working tree clean; local synced with
+  origin/main.
+- Layered hosted CI triggered by the push. Results are not inspectable from
+  this host (gh CLI unauthenticated); owner checks the Actions tab. Any
+  failing lane gets triaged (real regression vs environment dependency) per
+  SPEC-012 §15 before M12 hosted-CI evidence can be upgraded from
+  "triggered" to "green".
+- Durable state updated accordingly (hosted_ci_pending note + verification
+  block unchanged: gates were run locally on the exact final tree).
+
 - `@inspector/scale` `UnattendedCampaign` (packages/scale/src/campaign.ts)
   constructs `FakeAdapterHandler` inline in `executeItem`; this is the product
   limitation M12 removes behind a pluggable executor contract.
