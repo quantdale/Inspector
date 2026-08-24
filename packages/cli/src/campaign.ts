@@ -84,6 +84,12 @@ interface CampaignSnapshot {
   staleCompletions: number;
   restartsInjected: number;
   leaseBackend: CampaignManifest["leaseBackend"];
+  /** M12 additive observability. */
+  refusals: Array<{ itemId: string; class: string; detail: string; at: string }>;
+  failureDetails: Record<string, { class: string; detail: string }>;
+  stopReason: string | null;
+  workers: Array<{ workerId: string; executorId: string | null; families: string[]; capabilities: string[] }>;
+  sourceManifest?: { path: string; sha256: string };
   lastError?: string;
 }
 
@@ -409,7 +415,7 @@ function campaignOutput(
 function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampaign): CampaignSnapshot {
   const campaign = existing ?? createCampaign(manifest);
   try {
-    const raw = readJson<Partial<{ queue: string[]; executions: Array<{ itemId: string; workerId: string }>; failed: string[]; restarts: number; staleCompletions: number }>>(join(manifest.stateDir, "campaign.json"), {});
+    const raw = readJson<Partial<{ queue: string[]; executions: Array<{ itemId: string; workerId: string }>; failed: string[]; restarts: number; staleCompletions: number; refusals: Array<{ itemId: string; class: string; detail: string; at: string }>; failureDetails: Record<string, { class: string; detail: string }>; stopReason: string | null; workerCaps: Record<string, { executorId?: string; families?: string[]; capabilities?: string[] }> }>>(join(manifest.stateDir, "campaign.json"), {});
     const report = manifest.lastReport;
     const stopped = campaign.ledgerRef.isStopped;
     const status: CampaignStatus = stopped
@@ -439,6 +445,17 @@ function inspectManifest(manifest: CampaignManifest, existing?: UnattendedCampai
       staleCompletions: report?.staleCompletions ?? raw.staleCompletions ?? 0,
       restartsInjected: report?.restartsInjected ?? raw.restarts ?? 0,
       leaseBackend: manifest.leaseBackend,
+      // M12 additive observability: routing and lifecycle detail.
+      refusals: report?.refusals ?? raw.refusals ?? [],
+      failureDetails: report?.failureDetails ?? raw.failureDetails ?? {},
+      stopReason: report?.stopReason ?? raw.stopReason ?? null,
+      workers: Object.entries(raw.workerCaps ?? {}).map(([workerId, caps]) => ({
+        workerId,
+        executorId: caps.executorId ?? null,
+        families: caps.families ?? [],
+        capabilities: caps.capabilities ?? [],
+      })),
+      ...(manifest.sourceManifest ? { sourceManifest: manifest.sourceManifest } : {}),
       ...(manifest.lastError ? { lastError: manifest.lastError } : {}),
     };
   } finally {

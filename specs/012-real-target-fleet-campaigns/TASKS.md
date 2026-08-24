@@ -79,13 +79,21 @@ before the next activates.
 
 ## F4 — Capability-aware worker routing
 
-- [ ] F4.1 probeWorkerCapabilities(): browser (Playwright+Chromium), PTY
-      (@lydell/node-pty), Windows UIA bridge, ADB, Electron executable.
-- [ ] F4.2 Router matches item required family/capability to worker snapshots;
-      unroutable items classified+recorded (never executed on wrong worker);
-      snapshots + decisions persisted for audit/recovery.
-- Gate: routing unit tests incl. unavailable-capability refusal and mixed-
-  fleet assignment; persisted decisions visible in campaign state/show.
+- [x] F4.1 probeWorkerCapabilities(): browser (Playwright+Chromium via
+      createRequire), PTY (@lydell/node-pty), Windows UIA bridge (encoded
+      PowerShell probe), ADB, Electron executable; display tag on capable
+      hosts; deterministic injection seam for tests.
+- [x] F4.2 Router matches item required family/capability to worker snapshots;
+      unroutable items refused durably up front (never executed on a wrong
+      worker, never faked); snapshots + assignment decisions persisted in
+      campaign state for audit/recovery.
+- [x] F4.3 Routing visibility in `campaign show`/run JSON (additive):
+      refusals with stable classifications, failureDetails, stopReason,
+      per-worker executor/families/capabilities snapshot.
+- Gate: PASSED 2026-08-24 — 5 dedicated routing unit tests (family refusal,
+      capability shortfall, mixed-fleet routing, unavailable-executor,
+      durable refusal/assignment records); CLI campaign integration tests
+      green; lint/typecheck/unit gates green.
 
 ## F5 — Durable restart/recovery proofs at scale
 
