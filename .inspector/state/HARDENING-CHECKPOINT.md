@@ -74,6 +74,8 @@ budget-exhausted tails). This is the documented resume behavior.
 
 ## HARDENING CAMPAIGN #2 RESULT
 
+- Final commit/push: `7278eed` pushed to `origin/main`
+  (702b33a..7278eed); local HEAD and origin verified identical; tree clean.
 - Defects: **14 confirmed and CLOSED (D1–D14): 2 CRITICAL, 8 HIGH, 4 MEDIUM/**
   **LOW** — every fix carries deterministic regression coverage named above.
 - Contract changes recorded in ADR-0012 (operator-only campaign repair;

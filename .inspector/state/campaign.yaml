@@ -309,6 +309,15 @@ debt_audit:
       the push; run results not inspectable from this host (gh CLI present
       but unauthenticated). Owner should check the Actions tab; any red lane
       is triaged as real regression vs environment dependency per SPEC-012 §15.
+    - >-
+      PUSHED 2026-08-24 (second): HARDENING_2 final state pushed as 7278eed
+      (702b33a..7278eed). Local HEAD and origin/main verified identical;
+      working tree clean. Layered CI triggered again by the push; results
+      remain uninspectable from this host (gh unauthenticated) — same owner
+      triage rule applies. All local gates on the exact pushed tree: lint
+      0 errors / 4 pre-existing warnings; typecheck PASS; unit 568 passed /
+      3 skipped (51 files); integration 175 passed / 1 skipped (41 files);
+      release:smoke PASS.
   product_decision_required: []
 
 hardening:
@@ -349,7 +358,7 @@ hardening:
     - {id: H2.10, name: stress-and-fault-injection, state: DONE}
     - {id: H2.11, name: real-runtime-validation, state: DONE}
     - {id: H2.12, name: repo-truth-reconciliation, state: DONE}
-  last_verified_commit: HEAD (HARDENING_2 final gate run on this exact tree)
+  last_verified_commit: 7278eed131d628f26e5cab4252a30125b2e4ed8f (HARDENING_2 final gate run on this exact tree; pushed)
   last_full_gate: >-
     FINAL GATE PASS on the exact final tree: pnpm install --frozen-lockfile OK;
     lint 0 errors / 4 pre-existing warnings; typecheck PASS; unit 568 passed /
