@@ -54,6 +54,8 @@ export interface PlannerPacketCandidate {
 export interface PlannerPacket {
   schema: typeof PLANNER_PACKET_SCHEMA;
   objective: string;
+  /** Advisory session digest (M13 F12); derived cache, never authority. */
+  sessionDigest?: string;
   stateFingerprint: string;
   screenSummary: string;
   candidateActions: PlannerPacketCandidate[];
@@ -77,6 +79,7 @@ export interface PlannerPacket {
 
 export interface PlannerPacketInput {
   objective?: string;
+  sessionDigest?: string;
   stateFingerprint: string;
   screenSummary?: string;
   candidates: Array<{ actionKey: string; kind: string; risk: string; score: number }>;
@@ -122,6 +125,9 @@ export function buildPlannerPacket(input: PlannerPacketInput): { packet: Planner
   const packet: PlannerPacket = {
     schema: PLANNER_PACKET_SCHEMA,
     objective: bounded(input.objective ?? "choose the next legal exploration action that maximizes new knowledge"),
+    ...(input.sessionDigest !== undefined && input.sessionDigest.length > 0
+      ? { sessionDigest: bounded(input.sessionDigest, 400) }
+      : {}),
     stateFingerprint: input.stateFingerprint,
     screenSummary,
     candidateActions: kept.map((c) => ({ actionKey: c.actionKey, kind: c.kind, risk: c.risk })),

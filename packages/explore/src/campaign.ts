@@ -37,6 +37,7 @@ import type {
   ModelRuntime,
 } from "@inspector/model-runtime";
 import { SemanticPlanner, shouldInvokePlanner, type SemanticPlannerConfig } from "./model-planner.js";
+import { SessionSummarizer } from "./session-memory.js";
 import { FaultController } from "./faults.js";
 import { NoopPlanner, type Planner, type PlannerContext } from "./planner.js";
 import { DEFAULT_SEQUENCE_LENGTHS } from "./inputs.js";
@@ -87,6 +88,8 @@ export interface ExploreModelAssistance {
   config?: SemanticPlannerConfig;
   attribution?: ModelAttribution;
   instruction?: string;
+  /** M13 F12: enable bounded session-digest summarization. */
+  summarize?: boolean;
 }
 
 /**
@@ -195,6 +198,8 @@ export class ExploreController {
   private store?: Store;
   private readonly control?: ExplorationControl;
   private readonly semantic?: SemanticPlanner;
+  private readonly summarizer?: SessionSummarizer;
+  private sessionDigest: string | null = null;
   /** Actions executed since the last planner call (cadence floor). */
   private actionsSincePlannerCall = Number.MAX_SAFE_INTEGER;
   /** Bounded ring of rejected planner suggestions (loop avoidance + audit). */
@@ -204,6 +209,8 @@ export class ExploreController {
   /** Set by select() when the returned candidate came from an accepted
    * planner suggestion; consumed by makeAction for provenance metadata. */
   private lastSelectionPlannerSuggested = false;
+  /** Re-entrancy guard for digest refresh inside the exploration loop. */
+  private summarizerBusy = false;
 
   constructor(deps: ExploreDeps) {
     this.run = deps.run;
@@ -257,6 +264,16 @@ export class ExploreController {
           ...(deps.model.instruction ? { instruction: deps.model.instruction } : {}),
         })
       : undefined;
+    this.summarizer =
+      deps.model?.summarize === true && deps.model.runtime
+        ? new SessionSummarizer(
+            deps.model.runtime,
+            {},
+            deps.model.gate,
+            deps.model.sink,
+            deps.model.attribution,
+          )
+        : undefined;
     this.campaignStartedAt = campaign?.createdAt ?? new Date().toISOString();
     if (restored) this.restore(restored);
   }
@@ -319,6 +336,10 @@ export class ExploreController {
         );
       } else if (payload.planner.pendingSuggestion) {
         this.pendingPlannerActionKey = payload.planner.pendingSuggestion;
+      }
+      if (payload.planner.digest !== undefined && this.summarizer) {
+        this.summarizer.restore(payload.planner.digest, payload.planner.digestAtAction ?? 0);
+        this.sessionDigest = payload.planner.digest;
       }
     }
     this.reconcileCommittedState();
@@ -462,6 +483,12 @@ export class ExploreController {
               rejectedSuggestions: this.rejectedSuggestions.slice(),
               actionsSinceCall: this.actionsSincePlannerCall,
               ...(this.pendingPlannerActionKey ? { pendingSuggestion: this.pendingPlannerActionKey } : {}),
+              ...(this.sessionDigest !== null && this.summarizer
+                ? {
+                    digest: this.sessionDigest,
+                    digestAtAction: this.summarizer.snapshot().atAction,
+                  }
+                : {}),
             } satisfies ExplorationCheckpointPayload["planner"],
           }
         : {}),
@@ -587,6 +614,28 @@ export class ExploreController {
       // action metadata on resume.
       this.checkpoint();
 
+      // M13 F12: refresh the advisory session digest on the summarizer's own
+      // interval. Failures leave the previous digest (or null) in place and
+      // never disturb deterministic exploration.
+      if (
+        this.summarizer &&
+        this.actionsExecuted - this.summarizer.lastRefreshAtAction >= 25 &&
+        !this.summarizerBusy
+      ) {
+        this.summarizerBusy = true;
+        try {
+          this.sessionDigest = await this.summarizer.digest({
+            actionsExecuted: this.actionsExecuted,
+            statesVisited: this.graph.stateCount,
+            recentActionKeys: this.recentActionKeys,
+            anomalies: this.anomalies.map((a) => ({ kind: a.kind, message: a.message })),
+            rejectedSuggestions: this.rejectedSuggestions,
+          });
+        } finally {
+          this.summarizerBusy = false;
+        }
+      }
+
       if (executed.stopReason === "adapter-error") {
         // One lost environment must not end the campaign: restore the baseline
         // and continue (the hazard that caused it is now blacklisted).
@@ -709,6 +758,7 @@ export class ExploreController {
     ) {
       const scoredUsable = scored.map(({ c, s }) => ({ ...c, score: s }));
       const decision = await this.semantic.suggest({
+        ...(this.sessionDigest !== null ? { sessionDigest: this.sessionDigest } : {}),
         stateFingerprint: this.currentState,
         screenSummary: this.currentScreen,
         usableCandidates: scoredUsable,

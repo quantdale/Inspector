@@ -1,4 +1,6 @@
 import { WorkflowError, runExploration, validateTargetUrl } from "@inspector/workflows";
+import type { ModelAssistanceConfig } from "@inspector/workflows";
+import { loadModelProviderModule, ProviderModuleError } from "@inspector/model-runtime";
 import type { ParsedInvocation } from "./args.js";
 import { CliError, intFlag } from "./args.js";
 import { isRepoRoot, REPO_ROOT_WARNING } from "./workspace.js";
@@ -52,6 +54,62 @@ export function parseHuntRequest(parsed: ParsedInvocation): import("@inspector/w
     maxMinutes: intFlag(parsed.flags, "--max-minutes", 10),
     maxFindings: intFlag(parsed.flags, "--max-findings", 4),
     ...(typeof resumeRaw === "string" ? { resumeRunId: resumeRaw } : {}),
+  };
+}
+
+/**
+ * M13 F13: parse optional model-assistance flags. Provider configuration is
+ * ALWAYS explicit; no flag here ever requires a provider for the rest of the
+ * command. Provider module paths are trusted operator configuration loaded
+ * through the shared validated loader; load errors are redacted.
+ */
+export async function parseModelAssistance(parsed: ParsedInvocation): Promise<ModelAssistanceConfig | undefined> {
+  const providerPath = parsed.flags["--model-provider"];
+  if (providerPath === undefined) {
+    for (const flag of ["--planner", "--semantic-oracle", "--summarize", "--model-max-requests", "--model-max-tokens", "--model-max-cost", "--model-timeout-ms", "--model-max-calls"]) {
+      if (parsed.flags[flag] !== undefined) {
+        throw new CliError("provider-required", `${flag} requires --model-provider <module path>`);
+      }
+    }
+    return undefined;
+  }
+  if (typeof providerPath !== "string" || providerPath.length === 0) {
+    throw new CliError("invalid-value", "--model-provider requires a module path");
+  }
+  let providers;
+  try {
+    providers = await loadModelProviderModule(providerPath, {
+      redact: (text) => text.replace(/(sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|xox[baprs]-[A-Za-z0-9-]{8,})/g, "***"),
+    });
+  } catch (err) {
+    if (err instanceof ProviderModuleError) {
+      throw new CliError(err.classification, err.message);
+    }
+    throw err;
+  }
+  const wantsPlanner = parsed.flags["--planner"] === true || parsed.flags["--semantic-oracle"] === true || parsed.flags["--summarize"] === true;
+  if (!wantsPlanner && parsed.flags["--model-max-requests"] === undefined && parsed.flags["--model-timeout-ms"] === undefined) {
+    // Loading a provider alone is valid: it enables capability reporting.
+  }
+  const roles = new Set(providers.flatMap((p) => p.meta.roles));
+  const requireRole = (flag: string, role: "planner" | "oracle" | "summarizer") => {
+    if (parsed.flags[flag] === true && !roles.has(role)) {
+      throw new CliError("invalid-provider", `provider does not declare the '${role}' role required by ${flag}`);
+    }
+  };
+  requireRole("--planner", "planner");
+  requireRole("--semantic-oracle", "oracle");
+  requireRole("--summarize", "summarizer");
+  return {
+    providers,
+    planner: parsed.flags["--planner"] === true,
+    semanticOracle: parsed.flags["--semantic-oracle"] === true,
+    summarize: parsed.flags["--summarize"] === true,
+    ...(parsed.flags["--model-max-requests"] !== undefined
+      ? { budgets: { maxRequests: intFlag(parsed.flags, "--model-max-requests", 1000), ...(parsed.flags["--model-max-tokens"] !== undefined ? { maxTokens: intFlag(parsed.flags, "--model-max-tokens", 10_000_000) } : {}) } }
+      : {}),
+    ...(parsed.flags["--model-timeout-ms"] !== undefined ? { timeoutMs: intFlag(parsed.flags, "--model-timeout-ms", 8000) } : {}),
+    ...(parsed.flags["--model-max-calls"] !== undefined ? { maxCallsPerRun: intFlag(parsed.flags, "--model-max-calls", 24) } : {}),
   };
 }
 
@@ -116,6 +174,18 @@ async function runExplorationCommand(
   const req = parseHuntRequest(parsed);
   const dir = workDirOf(ctx, parsed);
   const warning = warnRepoRootWorkspace(ctx, dir);
+  let model;
+  try {
+    model = await parseModelAssistance(parsed);
+  } catch (err) {
+    if (err instanceof CliError) throw err;
+    throw err;
+  }
+  if (model !== undefined && req.adapter !== "web") {
+    ctx.progress(
+      `note: model assistance applies to the web explorer (--adapter web); '${req.adapter}' exploration stays deterministic`,
+    );
+  }
 
   let outcome;
   try {
@@ -126,6 +196,7 @@ async function runExplorationCommand(
       progress: ctx.progress,
       resumeFlags: parsed.flags,
       warning,
+      ...(model !== undefined ? { model } : {}),
     });
   } catch (err) {
     if (err instanceof WorkflowError) throw new CliError(err.kind, err.message);
@@ -157,6 +228,7 @@ async function runExplorationCommand(
     })),
     bundles: bundlePaths,
     warnings: result.warnings,
+    ...(result.model !== undefined ? { model: result.model } : {}),
   };
   const summary = workflow === "explore"
     ? {
@@ -194,6 +266,7 @@ async function runExplorationCommand(
         findings: huntSummary.findings,
         bundles: huntSummary.bundles,
         warnings: result.warnings,
+        ...(result.model !== undefined ? { model: result.model } : {}),
       }
     : huntSummary;
 

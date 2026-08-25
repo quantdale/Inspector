@@ -12,6 +12,7 @@ import { verifyCommand } from "./verify.js";
 import { regressCommand } from "./regress.js";
 import { repairCommand } from "./repair.js";
 import { campaignCommand } from "./campaign.js";
+import { modelsCommand } from "./models.js";
 import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace.js";
 
 // Public workspace/spawn helpers re-exported for library consumers.
@@ -93,9 +94,25 @@ export async function runCli(argv: string[], cwd: string = process.cwd()): Promi
     case "doctor":
       return doctorCommand(rest, ctx);
     case "hunt":
-      return huntCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume"], []), ctx);
+      return huntCommand(
+        parseArgs(
+          rest,
+          ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume", "--model-provider", "--model-max-requests", "--model-max-tokens", "--model-max-cost", "--model-timeout-ms", "--model-max-calls", "--limit"],
+          ["--planner", "--semantic-oracle", "--summarize"],
+        ),
+        ctx,
+      );
     case "explore":
-      return exploreCommand(parseArgs(rest, ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume"], []), ctx);
+      return exploreCommand(
+        parseArgs(
+          rest,
+          ["--adapter", "--url", "--target", "--seed", "--max-actions", "--max-minutes", "--max-findings", "--resume", "--model-provider", "--model-max-requests", "--model-max-tokens", "--model-max-cost", "--model-timeout-ms", "--model-max-calls", "--limit"],
+          ["--planner", "--semantic-oracle", "--summarize"],
+        ),
+        ctx,
+      );
+    case "models":
+      return modelsCommand(parseArgs(rest, ["--limit"], []), ctx);
     case "run":
       return runDemo(parseArgs(rest, ["--adapter"], []), ctx);
     case "runs":

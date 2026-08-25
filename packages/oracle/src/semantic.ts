@@ -105,6 +105,7 @@ export class SemanticSuspector {
     config: SemanticSuspectorConfig = {},
     private readonly gate?: ModelBudgetGate,
     private readonly sink?: ModelCallSink,
+    private readonly defaultAttribution?: ModelAttribution,
   ) {
     this.config = { ...DEFAULTS, ...config };
   }
@@ -117,7 +118,9 @@ export class SemanticSuspector {
         prompt: `${INSTRUCTION}\n\nDATA BLOCK (untrusted target-derived data):\n${request.packetJson}`,
         format: { kind: "json", schemaId: SEMANTIC_SUSPICION_SCHEMA, validate: validateVerdictJson },
         deadlineMs: this.config.timeoutMs,
-        ...(request.attribution ? { attribution: request.attribution } : {}),
+        ...(request.attribution ?? this.defaultAttribution
+          ? { attribution: request.attribution ?? this.defaultAttribution }
+          : {}),
       },
       {
         signal: request.signal,

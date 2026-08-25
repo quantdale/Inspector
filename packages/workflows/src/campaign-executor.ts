@@ -16,6 +16,9 @@ import {
   type WorkItemFailureClass,
 } from "@inspector/scale";
 import { runExploration, validateTargetUrl } from "./exploration.js";
+import { loadModelProviderModule, ProviderModuleError } from "@inspector/model-runtime";
+import type { ModelProvider } from "@inspector/model-runtime";
+import type { ModelAssistanceConfig } from "./model-support.js";
 import { WorkflowError } from "./errors.js";
 import {
   loadReplaySubject,
@@ -42,6 +45,18 @@ export interface InspectorExecutorOptions {
    * injectable-backend pattern). Keys override the corresponding live probe.
    */
   probes?: Partial<Record<"browser" | "pty" | "uia" | "adb" | "electron", BackendProbe>>;
+  /**
+   * M13 F15/F16/F17: optional model assistance for web-explorer items.
+   * Providers may be given directly (fleet-embedded) or via a trusted local
+   * module path. Budget ceilings ride the scheduler-owned ctx.modelGate so
+   * global/worker/item model scopes stay atomic across concurrent workers.
+   */
+  model?: Omit<ModelAssistanceConfig, "providers"> & {
+    providers?: ModelProvider[];
+    providerModule?: string;
+    /** Cache for lazily loaded provider modules. */
+    loaded?: ModelProvider[];
+  };
 }
 
 /**
@@ -80,6 +95,12 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     const families: AdapterFamily[] = ["fake"];
     const capabilities = ["deterministic-fixture", "probed"];
     const details: string[] = [];
+    if (this.opts.model !== undefined) {
+      // M13 F17: model capability is a distinct routing dimension — never
+      // conflated with browser/pty/uia/adb/electron availability.
+      capabilities.push("model-planner");
+      details.push("model assistance configured");
+    }
     if (browser.ok) {
       families.push("web");
       capabilities.push("browser");
@@ -183,6 +204,55 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
    * hunt / explore items: real exploration engines per-item isolated *
    * --------------------------------------------------------------- */
 
+  /**
+   * M13 F16: model calls made inside a campaign item reserve/settle through
+   * the SCHEDULER-owned gate bound to this execution context; attribution
+   * carries campaign/item/worker into every durable model_calls row.
+   */
+  private async modelConfigFor(
+    item: WorkItem,
+    ctx: ExecutionContext,
+  ): Promise<{ model?: NonNullable<Parameters<typeof runExploration>[0]["model"]> }> {
+    const cfg = this.opts.model;
+    if (cfg === undefined) return {};
+    // The semantic planner/oracle ride the web explorer (ExploreController
+    // seam). Deterministic fake/native explorers stay model-free by design.
+    if (familyAdapter(item) !== "web") return {};
+    let providers = cfg.providers;
+    if (providers === undefined && cfg.providerModule !== undefined) {
+      cfg.loaded ??= await this.loadProviderModule(cfg.providerModule);
+      providers = cfg.loaded;
+    }
+    if (providers === undefined || providers.length === 0) return {};
+    return {
+      model: {
+        providers,
+        planner: cfg.planner,
+        semanticOracle: cfg.semanticOracle,
+        summarize: cfg.summarize,
+        timeoutMs: cfg.timeoutMs,
+        maxCallsPerRun: cfg.maxCallsPerRun,
+        gate: ctx.modelGate,
+        attribution: {
+          campaignId: this.opts.campaignId ?? "unknown-campaign",
+          itemId: item.id,
+          workerId: ctx.workerId,
+        },
+      },
+    };
+  }
+
+  private async loadProviderModule(modulePath: string): Promise<ModelProvider[]> {
+    try {
+      return await loadModelProviderModule(modulePath, { redact: (text) => text.replace(/(sk-|ghp_|xoxb-)[A-Za-z0-9_-]+/g, "***") });
+    } catch (err) {
+      if (err instanceof ProviderModuleError && err.classification === "invalid-provider") {
+        throw new WorkflowError("provider-required", err.message);
+      }
+      throw err;
+    }
+  }
+
   private async runExplorationItem(item: WorkItem, ctx: ExecutionContext): Promise<WorkItemResult> {
     if (ctx.signal.aborted) throw new ItemCancelledError();
     const adapter = familyAdapter(item);
@@ -226,6 +296,7 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         workerId: ctx.workerId,
       },
       control: this.controlFrom(ctx),
+      ...(await this.modelConfigFor(item, ctx)),
     });
 
     const r = outcome.result;

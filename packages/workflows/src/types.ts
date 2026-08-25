@@ -33,6 +33,27 @@ export interface HuntOutcomeEntry {
 
 export type ExplorationWorkflow = "hunt" | "explore";
 
+/** M13: additive model-assistance summary on hunt/explore results. */
+export interface HuntModelSummary {
+  providers: string[];
+  planner?: { calls: number; accepted: number; rejected: number };
+  suspicions?: Array<{
+    classKey: string;
+    disposition: string;
+    confidence: number;
+    summary: string;
+    classification?: string;
+  }>;
+  runtimeStats: {
+    requests: number;
+    attempts: number;
+    completed: number;
+    failed: number;
+    denials: number;
+  };
+  budgetTotals?: { requests: number; tokens: number; costUsd: number; activeReservations: number };
+}
+
 /** Shape shared by the web (ExploreController) and fake (walker) hunts. */
 export interface HuntRunResult {
   runId: string;
@@ -46,4 +67,6 @@ export interface HuntRunResult {
   evidenceBundles: import("@inspector/finding").EvidenceBundle[];
   findingOutcomes: HuntOutcomeEntry[];
   warnings: string[];
+  /** M13: present only when model assistance was configured. */
+  model?: HuntModelSummary;
 }

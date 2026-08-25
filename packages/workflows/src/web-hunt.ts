@@ -5,11 +5,15 @@ import { FindingEngine, OracleEngine } from "@inspector/finding";
 import {
   ExploreController,
   WebReplayDriver,
+  buildSuspicionPacket,
+  serializePacket,
 } from "@inspector/explore";
+import { SemanticSuspector } from "@inspector/oracle";
 import type { Store } from "@inspector/store-sqlite";
 import { webExploreConfig } from "./configs.js";
 import { mergeSignals, closeRunGuarded } from "./evidence.js";
-import type { ExplorationControl, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
+import { StoreModelCallSink, type ResolvedModelSupport } from "./model-support.js";
+import type { ExplorationControl, HuntModelSummary, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 export { closeRunGuarded };
 
@@ -35,6 +39,7 @@ export async function runWebHunt(
   progress: ProgressFn,
   resume = false,
   control?: ExplorationControl,
+  model?: ResolvedModelSupport,
 ): Promise<HuntRunResult> {
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
 
@@ -64,6 +69,18 @@ export async function runWebHunt(
     config: webExploreConfig(req),
     resume,
     ...(control ? { control } : {}),
+    ...(model
+      ? {
+          model: {
+            runtime: model.runtime,
+            ...(model.gate !== undefined ? { gate: model.gate } : {}),
+            sink: model.sink ?? new StoreModelCallSink(store),
+            ...(model.plannerConfig !== undefined ? { config: model.plannerConfig } : {}),
+            ...(model.attribution !== undefined ? { attribution: model.attribution } : {}),
+            summarize: model.summarize,
+          },
+        }
+      : {}),
     replayDriverFactory: () =>
       new WebReplayDriver({
         artifactBaseDir: join(base, "replay"),
@@ -75,6 +92,54 @@ export async function runWebHunt(
   });
 
   const result = await controller.run_();
+
+  // M13 F8: optional bounded semantic-suspicion evaluation over discovered
+  // anomalies. Advisory only — it can never confirm a defect or authorize
+  // repair; verdicts surface as warnings + structured model summary.
+  const suspicions: NonNullable<HuntModelSummary["suspicions"]> = [];
+  if (model?.semanticOracle === true && result.anomalies.length > 0) {
+    const suspector = new SemanticSuspector(
+      model.runtime,
+      {},
+      model.gate,
+      model.sink ?? new StoreModelCallSink(store),
+      model.attribution,
+    );
+    for (const anomaly of result.anomalies.slice(0, 5)) {
+      try {
+        const packet = buildSuspicionPacket({
+          beforeFingerprint: anomaly.stateBefore,
+          actionSummary: `${anomaly.kind}: ${anomaly.message}`,
+          hardOracleOutcomes: [],
+          artifactHandles: anomaly.outcome?.artifactRefs ?? [],
+        });
+        const verdict = await suspector.evaluate({ packetJson: serializePacket(packet.packet) });
+        suspicions.push({
+          classKey: anomaly.classKey,
+          disposition: verdict.disposition,
+          confidence: verdict.confidence,
+          summary: verdict.summary.slice(0, 300),
+          ...(verdict.classification !== undefined ? { classification: verdict.classification } : {}),
+        });
+        progress(`semantic suspicion (${verdict.disposition}) for ${anomaly.classKey}`);
+      } catch (err) {
+        result.warnings.push(
+          `semantic suspicion evaluation failed for ${anomaly.classKey}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  const modelSummary: HuntModelSummary | undefined = model
+    ? {
+        providers: model.providers.map((p) => p.meta.id),
+        ...(result.planner !== undefined ? { planner: result.planner } : {}),
+        ...(suspicions.length > 0 ? { suspicions } : {}),
+        runtimeStats: { ...model.runtime.stats },
+        ...(model.standaloneTotals ? { budgetTotals: model.standaloneTotals() } : {}),
+      }
+    : undefined;
+
   return {
     runId: result.runId,
     seed: result.seed,
@@ -92,5 +157,6 @@ export async function runWebHunt(
       ...(o.findingId !== undefined ? { findingId: o.findingId } : {}),
     })),
     warnings: result.warnings,
+    ...(modelSummary !== undefined ? { model: modelSummary } : {}),
   };
 }

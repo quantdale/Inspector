@@ -61,6 +61,8 @@ export function shouldInvokePlanner(
 
 export interface SemanticPlannerRequest {
   objective?: string;
+  /** Advisory digest from the session summarizer (M13 F12); may be absent. */
+  sessionDigest?: string;
   stateFingerprint: string;
   screenSummary: string;
   /** The EXACT usable legal inventory with deterministic scores attached. */
@@ -121,6 +123,7 @@ export class SemanticPlanner {
   async suggest(request: SemanticPlannerRequest): Promise<SemanticPlannerDecision> {
     const { packet } = buildPlannerPacket({
       objective: request.objective,
+      ...(request.sessionDigest !== undefined ? { sessionDigest: request.sessionDigest } : {}),
       stateFingerprint: request.stateFingerprint,
       screenSummary: request.screenSummary,
       candidates: request.usableCandidates.map((c) => ({

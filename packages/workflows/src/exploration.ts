@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { ModelAttribution, ModelBudgetGate, ModelCallSink } from "@inspector/model-runtime";
 import {
   PolicyEngine,
   RunManager,
@@ -20,10 +21,14 @@ import { closeRunGuarded, writeEvidenceBundles } from "./evidence.js";
 import { runFakeHunt } from "./fake-hunt.js";
 import { runNativeHuntCommand } from "./native-hunt.js";
 import { runWebHunt } from "./web-hunt.js";
+import { resolveModelSupport } from "./model-support.js";
+import type { ModelAssistanceConfig, ResolvedModelSupport } from "./model-support.js";
+import { StoreModelCallSink } from "./model-support.js";
 import type { ExplorationControl, ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 export type { ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn };
 export { validateTargetUrl };
+export type { ModelAssistanceConfig, ResolvedModelSupport };
 
 export interface ExplorationOptions {
   /** Directory whose `.inspector` subtree is the workspace. */
@@ -43,6 +48,17 @@ export interface ExplorationOptions {
    * safe boundaries; committed findings stay durable.
    */
   control?: ExplorationControl;
+  /**
+   * M13 F15: optional provider-neutral model assistance for the WEB
+   * explorer (planner / semantic oracle / summarizer). The same shared
+   * service serves CLI and fleet callers; campaign executions inject their
+   * ctx-bound budget gate and per-item attribution.
+   */
+  model?: ModelAssistanceConfig & {
+    gate?: ModelBudgetGate;
+    sink?: ModelCallSink;
+    attribution?: ModelAttribution;
+  };
 }
 
 export interface ExplorationOutcome {
@@ -231,10 +247,28 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
 
     const result =
       req.adapter === "web"
-        ? await runWebHunt(run, store, req, base, progress, resuming, opts.control)
+        ? await runWebHunt(
+            run,
+            store,
+            req,
+            base,
+            progress,
+            resuming,
+            opts.control,
+            opts.model !== undefined && opts.model.providers.length > 0
+              ? resolveModelSupport(opts.model, {
+                  stateDir: base,
+                  ...(opts.model.gate !== undefined ? { gate: opts.model.gate } : {}),
+                  // Durable per-run model-call rows land in THIS workspace's
+                  // store unless a caller supplies its own sink.
+                  sink: opts.model.sink ?? new StoreModelCallSink(store),
+                  ...(opts.model.attribution !== undefined ? { attribution: opts.model.attribution } : {}),
+                })
+              : undefined,
+          )
         : isNative
           ? await runNativeHuntCommand(run, store, req, base, progress, resuming, opts.control)
-           : await runFakeHunt(run, store, req, progress, resuming, opts.control);
+          : await runFakeHunt(run, store, req, progress, resuming, opts.control);
 
     const bundlePaths = writeEvidenceBundles(base, result.runId, result.evidenceBundles);
     const errorOutcomes = result.findingOutcomes.filter((o) => o.outcome === "error");

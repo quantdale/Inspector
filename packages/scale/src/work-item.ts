@@ -10,7 +10,8 @@ export type WorkflowKind = (typeof WORKFLOW_KINDS)[number];
 
 export const ADAPTER_FAMILIES = ["fake", "web", "cli", "windows", "android", "electron"] as const;
 
-/** Capability tags workers can declare and items can require (M12 F4). */
+/** Capability tags workers can declare and items can require (M12 F4;
+ * M13 F17 adds model dimensions distinct from backend availability). */
 export const KNOWN_CAPABILITIES = [
   "browser",
   "pty",
@@ -18,6 +19,8 @@ export const KNOWN_CAPABILITIES = [
   "adb",
   "electron",
   "display",
+  "model-planner",
+  "model-semantic-oracle",
 ] as const;
 
 export interface ItemBudgets extends Budget {

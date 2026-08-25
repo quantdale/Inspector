@@ -55,6 +55,9 @@ export interface PlannerCheckpointState {
   actionsSinceCall: number;
   /** Accepted decision persisted before execution; consumed on next select. */
   pendingSuggestion?: string;
+  /** M13 F12 advisory digest cache (never authoritative). */
+  digest?: string;
+  digestAtAction?: number;
 }
 
 export interface ExplorationCheckpointPayload {
@@ -233,6 +236,10 @@ function assertPlannerState(value: unknown): asserts value is PlannerCheckpointS
   if (value.pendingSuggestion !== undefined && typeof value.pendingSuggestion !== "string") {
     throw new Error("invalid planner pendingSuggestion");
   }
+  if (value.digest !== undefined && (typeof value.digest !== "string" || value.digest.length > 4000)) {
+    throw new Error("invalid planner digest");
+  }
+  if (value.digestAtAction !== undefined) integer(value.digestAtAction, "planner digestAtAction", true);
 }
 
 function assertFakeState(value: unknown): asserts value is FakeCheckpointState {
