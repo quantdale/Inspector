@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@inspector/finding": "workspace:*",
-    "@inspector/protocol": "workspace:*"
+    "@inspector/protocol": "workspace:*",
+    "@inspector/model-runtime": "workspace:*"
   }
 }
