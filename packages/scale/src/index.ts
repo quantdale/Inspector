@@ -4,6 +4,7 @@ export * from "./state-file.js";
 export * from "./lease-store.js";
 export * from "./leases.js";
 export * from "./ledger.js";
+export * from "./model-budget.js";
 export * from "./router.js";
 export * from "./cluster.js";
 export * from "./discovery.js";

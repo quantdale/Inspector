@@ -1,4 +1,5 @@
 import type { Finding } from "@inspector/finding";
+import type { ModelBudgetGate } from "@inspector/model-runtime";
 import type { UsageEntry } from "./types.js";
 
 /**
@@ -75,6 +76,12 @@ export interface ExecutionContext {
   admit(usage: ItemUsage): boolean;
   /** Extend this item's lease; false means the generation was lost (fenced). */
   renewLease(): boolean;
+  /**
+   * M13 F4/F16: durable model-budget reservation gate scoped to this
+   * item/worker. Callers MUST obtain admission BEFORE provider invocation and
+   * settle afterwards; a denied admission means ZERO provider invocation.
+   */
+  modelGate?: ModelBudgetGate;
   /**
    * Persist partial findings so a crash later in the item cannot lose work
    * already committed by the underlying engines.

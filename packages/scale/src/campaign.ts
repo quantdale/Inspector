@@ -5,6 +5,7 @@ import type { Finding } from "@inspector/finding";
 import type { Budget, WorkItem as LegacyWorkItem } from "./types.js";
 import { LeaseManager } from "./leases.js";
 import { ResourceLedger } from "./ledger.js";
+import { ReservationModelBudgetGate } from "./model-budget.js";
 import { FindingClusterer } from "./cluster.js";
 import { StateFile } from "./state-file.js";
 import {
@@ -237,6 +238,7 @@ function tryRemoveItemWorkspaceRoot(artifactsPath: string, itemId: string): void
 export class UnattendedCampaign {
   private readonly leases: LeaseManager;
   private readonly ledger: ResourceLedger;
+  private readonly modelBudget: ReservationModelBudgetGate;
   private readonly stateFile: StateFile<CampaignState>;
   private readonly journal: SettlementJournal;
   private readonly executor: WorkItemExecutor;
@@ -278,6 +280,27 @@ export class UnattendedCampaign {
       backend: opts.leaseBackend,
     });
     this.ledger = new ResourceLedger(stateDir, opts.globalBudget ?? {}, opts.workerBudgets ?? {});
+    // M13 F16: model request/token/cost ceilings become real through a
+    // durable reservation gate sharing the campaign state directory. Item
+    // scopes come from each item's declared model budgets.
+    const itemModelBudgets: Record<string, Budget> = {};
+    for (const item of opts.items) {
+      const b = item.budgets;
+      if (!b) continue;
+      if (b.maxModelRequests !== undefined || b.maxTokens !== undefined || b.maxCostUsd !== undefined) {
+        itemModelBudgets[item.id] = {
+          ...(b.maxModelRequests !== undefined ? { maxModelRequests: b.maxModelRequests } : {}),
+          ...(b.maxTokens !== undefined ? { maxTokens: b.maxTokens } : {}),
+          ...(b.maxCostUsd !== undefined ? { maxCostUsd: b.maxCostUsd } : {}),
+        };
+      }
+    }
+    this.modelBudget = new ReservationModelBudgetGate(stateDir, {
+      ...(opts.globalBudget ? { global: opts.globalBudget } : {}),
+      ...(opts.workerBudgets ? { worker: opts.workerBudgets } : {}),
+      ...(Object.keys(itemModelBudgets).length > 0 ? { item: itemModelBudgets } : {}),
+      ...(opts.now ? { now: opts.now } : {}),
+    });
     this.stateFile = new StateFile<CampaignState>(stateDir, "campaign", initialState, (raw) => validateCampaignState(raw) as CampaignState);
     this.journal = new SettlementJournal(stateDir);
     for (const item of opts.items) this.itemsById.set(item.id, item);
@@ -301,6 +324,11 @@ export class UnattendedCampaign {
 
   get ledgerRef(): ResourceLedger {
     return this.ledger;
+  }
+
+  /** Durable model-budget reservation truth (M13 observability/tests). */
+  get modelBudgetRef(): ReservationModelBudgetGate {
+    return this.modelBudget;
   }
 
   get leasesRef(): LeaseManager {
@@ -910,6 +938,13 @@ export class UnattendedCampaign {
           { ...(item.budgets ? { itemBudget: item.budgets } : {}) },
         ),
       renewLease: () => this.leases.renew(item.id, workerId, generation),
+      // M13 F4/F16: model calls reserve BEFORE invocation and settle after;
+      // worker/item scoping is bound here so no executor can bypass it.
+      modelGate: {
+        admit: (admission) =>
+          this.modelBudget.admit({ ...admission, workerId, itemId: item.id }),
+        settle: (settlement) => this.modelBudget.settle(settlement),
+      },
       persistPartial: (findings) => this.persistFindings(findings),
       signal: itemSignal.signal,
       progress: (line) => this.opts.onProgress?.(line),
