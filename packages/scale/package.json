@@ -18,6 +18,7 @@
     "@inspector/core": "workspace:*",
     "@inspector/electron-adapter": "workspace:*",
     "@inspector/finding": "workspace:*",
+    "@inspector/model-runtime": "workspace:*",
     "@inspector/protocol": "workspace:*",
     "@inspector/store-sqlite": "workspace:*",
     "@inspector/windows-adapter": "workspace:*",

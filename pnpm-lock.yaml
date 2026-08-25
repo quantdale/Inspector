@@ -201,6 +201,8 @@ importers:
         specifier: workspace:*
         version: link:../store-sqlite
 
+  packages/model-runtime: {}
+
   packages/oracle:
     dependencies:
       '@inspector/finding':
@@ -269,6 +271,9 @@ importers:
       '@inspector/finding':
         specifier: workspace:*
         version: link:../finding
+      '@inspector/model-runtime':
+        specifier: workspace:*
+        version: link:../model-runtime
       '@inspector/protocol':
         specifier: workspace:*
         version: link:../protocol

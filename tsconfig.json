@@ -28,6 +28,7 @@
       "@inspector/explore": ["packages/explore/src/index.ts"],
       "@inspector/oracle": ["packages/oracle/src/index.ts"],
       "@inspector/repair": ["packages/repair/src/index.ts"],
+      "@inspector/model-runtime": ["packages/model-runtime/src/index.ts"],
       "@inspector/scale": ["packages/scale/src/index.ts"],
       "@inspector/workflows": ["packages/workflows/src/index.ts"],
       "@inspector/adapter-web": ["packages/adapter-web/src/index.ts"],
