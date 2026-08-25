@@ -118,13 +118,59 @@ try {
   if (shown.campaign.status !== "complete" || typeof shown.campaign.elapsedMs !== "number") {
     throw new Error("release smoke: installed campaign show mismatch");
   }
+
+  // M13 F26: the intelligence surface ships in the installed artifact.
+  // (1) help exposes model configuration; (2) `models summary` operates from
+  // the installed prefix; (3) a local deterministic provider module loads and
+  // a fake hunt stays deterministic with it configured; (4) malformed
+  // provider configuration fails with a stable classification.
+  const huntHelp = runInspector(["help", "hunt"]);
+  if (!huntHelp.stdout.includes("--model-provider") || !huntHelp.stdout.includes("Budget permission is obtained BEFORE any model call")) {
+    throw new Error("release smoke: installed CLI does not document model assistance");
+  }
+  const modelsSummary = JSON.parse(runInspector(["models", "summary", "--json"]).stdout);
+  if (modelsSummary.schema !== "inspector-cli/models/1" || modelsSummary.summary.attempts !== 0) {
+    throw new Error("release smoke: models summary mismatch");
+  }
+  const providerPath = join(prefix, "smoke-provider.mjs");
+  writeFileSync(
+    providerPath,
+    [
+      "export function createModelProviders() {",
+      "  return [{",
+      "    meta: { id: \"smoke-fixture\", roles: [\"planner\"], priority: 10 },",
+      "    healthy: () => true,",
+      "    invoke: async () => ({ text: JSON.stringify({ actionKey: null, confidence: 0 }) }),",
+      "  }];",
+      "}",
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  const modelHunt = JSON.parse(runInspector([
+    "hunt", "--adapter", "fake", "--max-actions", "8", "--max-minutes", "1",
+    "--model-provider", providerPath, "--json",
+  ]).stdout);
+  if (modelHunt.schema !== "inspector-cli/hunt/1" || modelHunt.ok !== true) {
+    throw new Error("release smoke: provider-configured fake hunt failed");
+  }
+  const badProviderPath = join(prefix, "broken-provider.mjs");
+  writeFileSync(badProviderPath, "export default { not: 'a provider' };\n", "utf8");
+  const refused = runInspector(
+    ["hunt", "--adapter", "fake", "--max-actions", "2", "--planner", "--json", "--model-provider", badProviderPath],
+    4,
+  );
+  const refusal = JSON.parse(refused.stdout);
+  if (refusal.error?.kind !== "invalid-provider") {
+    throw new Error(`release smoke: expected invalid-provider classification, got ${JSON.stringify(refusal.error)}`);
+  }
+
   process.stdout.write(JSON.stringify({
     ok: true,
     schema: "inspector-release-smoke/1",
     version,
     tarball,
     workspace: prefix,
-    commands: ["--version", "doctor --json", "hunt --adapter fake", "explore --adapter fake", "findings list", "runs list", "campaign list", "campaign validate --manifest", "campaign run --manifest", "campaign show"],
+    commands: ["--version", "doctor --json", "hunt --adapter fake", "explore --adapter fake", "findings list", "runs list", "campaign list", "campaign validate --manifest", "campaign run --manifest", "campaign show", "models summary", "hunt --model-provider <fixture>", "invalid-provider refusal"],
   }, null, 2) + "\n");
 } finally {
   rmSync(prefix, { recursive: true, force: true });

@@ -167,6 +167,57 @@ describe("M13 F4/F5: reservation-based model budget gate", () => {
     expect(() => validateModelBudgetState({ schemaVersion: 2 })).toThrow(TypeError);
   });
 
+  it("restart inside the TTL keeps the hold conservatively; the ceiling still blocks overspend", () => {
+    const dir = stateDir();
+    const first = new ReservationModelBudgetGate(dir, { global: { maxModelRequests: 2 }, defaultReserveTokens: 10 });
+    const a = admission({ attemptId: "live/a1" });
+    expect(first.admit(a)).toBe(true);
+    // Controller "dies" before settle; a fresh controller over the same
+    // state cannot know whether the call was sent. The hold must survive.
+    const freshGate = new ReservationModelBudgetGate(dir, { global: { maxModelRequests: 2 }, defaultReserveTokens: 10 });
+    expect(freshGate.totals().activeReservations).toBe(1);
+    // No silent overspend across restarts.
+    expect(freshGate.admit(admission({ attemptId: "new/a1" }))).toBe(true);
+    expect(freshGate.admit(admission({ attemptId: "new/a2" }))).toBe(false);
+  });
+
+  it("P: totals stay non-negative and never exceed ceilings under randomized admit/settle storms", () => {
+    let seed = 987654321;
+    const rand = (): number => {
+      // Deterministic xorshift for stable CI runs.
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return Math.abs(seed % 100000) / 100000;
+    };
+    let admitted = 0;
+    for (let round = 0; round < 5; round++) {
+      const gate = new ReservationModelBudgetGate(stateDir(), {
+        global: { maxModelRequests: 12 },
+        defaultReserveTokens: 50,
+      });
+      const open: string[] = [];
+      for (let i = 0; i < 60; i++) {
+        if (open.length > 0 && rand() < 0.4) {
+          const attemptId = open.shift()!;
+          gate.settle({ requestId: "r", attemptId, outcome: "completed", usage: rand() < 0.7 ? { totalChargedTokens: 40 } : undefined });
+        } else {
+          const attemptId = `s${round}/a${i}`;
+          if (gate.admit(admission({ attemptId }))) {
+            admitted += 1;
+            open.push(attemptId);
+          }
+        }
+        const t = gate.totals();
+        expect(t.requests).toBeGreaterThanOrEqual(0);
+        expect(t.tokens).toBeGreaterThanOrEqual(0);
+        expect(t.costUsd).toBeGreaterThanOrEqual(0);
+        expect(t.requests).toBeLessThanOrEqual(12);
+      }
+    }
+    expect(admitted).toBeGreaterThan(0);
+  });
+
   it("two gates racing one shared request ceiling cannot collectively oversubscribe it", async () => {
     const dir = stateDir();
     let admitted = 0;

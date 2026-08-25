@@ -308,4 +308,50 @@ describe("M13 F19/F7: model-assisted exploration against the deterministic engin
     expect(envTwo.clickedSelectors[0]).toBe("#secret");
     store.close();
   });
+
+  it("risk escalation: a planner-accepted action that POLICY rejects never executes", async () => {
+    const env = new FakeEnv(null, "run-policy");
+    const run = new FakeRunController(env, "run-policy");
+    let secretSuggestedOnce = false;
+    const provider = new ScriptedModelProvider({
+      id: "fixture-planner",
+      roles: ["planner"],
+      respond: (spec) => {
+        const dataStart = spec.prompt.indexOf("DATA BLOCK");
+        const jsonStart = spec.prompt.indexOf("{", dataStart);
+        const packet = JSON.parse(spec.prompt.slice(jsonStart)) as {
+          candidateActions?: Array<{ actionKey: string }>;
+        };
+        const secret = (packet.candidateActions ?? []).find((c) => c.actionKey.includes("secret"));
+        if (secret && !secretSuggestedOnce) {
+          secretSuggestedOnce = true;
+          return { text: JSON.stringify({ actionKey: secret.actionKey, confidence: 0.95 }) };
+        }
+        return { text: "{broken" };
+      },
+    });
+    // Policy layer refuses #secret AFTER the planner accepted it.
+    const originalSubmit = run.submitAction.bind(run);
+    run.submitAction = async (action: Action) => {
+      if (String((action.input as Record<string, unknown> | null)?.selector ?? "") === "#secret") {
+        return {
+          kind: "rejected",
+          decision: { allowed: false, reason: "policy denies #secret for this target" },
+        } as never;
+      }
+      return originalSubmit(action);
+    };
+    const controller = new ExploreController({
+      run,
+      config: { ...config(99), maxActions: 40 },
+      model: modelDeps(provider),
+    });
+    const result = await controller.run_();
+    // The planner DID accept the suggestion...
+    expect(result.planner?.accepted).toBeGreaterThan(0);
+    // ...but the policy rejection won: #secret never executed and the run
+    // continued deterministically instead of crashing or retrying blindly.
+    expect(env.clickedSelectors).not.toContain("#secret");
+    expect(result.stoppedReason).not.toBe("adapter-error");
+  }, 120000);
 });
