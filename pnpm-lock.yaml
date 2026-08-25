@@ -292,6 +292,9 @@ importers:
 
   packages/store-sqlite:
     dependencies:
+      '@inspector/model-runtime':
+        specifier: workspace:*
+        version: link:../model-runtime
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0

@@ -1,5 +1,6 @@
 import type { Database } from "better-sqlite3";
 import { createHash } from "node:crypto";
+import type { ModelCallRecord } from "@inspector/model-runtime";
 import { openStore } from "./migrations.js";
 
 export type ActionStatus =
@@ -262,6 +263,143 @@ const FINDING_SELECT = `SELECT id, run_id AS runId, status, title, confidence, s
   minimization_json AS minimizationJson, last_transition_json AS lastTransitionJson, adapter
   , class_key AS classKey
   FROM findings`;
+
+/* --------------------------- model calls (M13 F3) ------------------------- */
+
+export interface ModelCallFilter {
+  runId?: string;
+  campaignId?: string;
+  itemId?: string;
+  workerId?: string;
+  findingId?: string;
+  repairId?: string;
+  role?: ModelCallRecord["role"];
+  status?: ModelCallRecord["status"];
+}
+
+export interface ModelCallsSummary {
+  attempts: number;
+  /** Distinct logical requests. */
+  requests: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  denied: number;
+  /** Rows still `started`: the durable crash window. */
+  startedOpen: number;
+  fallbacks: number;
+  /** Sums are NULL when NO row reported the field — unknown ≠ zero. */
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  totalChargedTokens: number | null;
+  costUsd: number | null;
+}
+
+const MODEL_CALL_STATUSES = new Set(["started", "completed", "failed", "cancelled", "denied"]);
+const MODEL_CALL_ROLES = new Set(["planner", "oracle", "summarizer", "repairer", "vision"]);
+
+/** Fail-closed row validation mirroring the ledger's malformed-usage stance:
+ * negative/non-finite amounts would corrupt accounting truth. */
+function validateModelCallRecord(r: ModelCallRecord): void {
+  const requireText = (value: unknown, what: string) => {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new TypeError(`model call record requires ${what}`);
+    }
+  };
+  const optionalNumber = (value: unknown, what: string) => {
+    if (value !== null && value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) {
+      throw new TypeError(`model call record has invalid ${what}: ${String(value)}`);
+    }
+  };
+  requireText(r.id, "id");
+  requireText(r.requestId, "requestId");
+  requireText(r.schemaVersion, "schemaVersion");
+  if (!MODEL_CALL_STATUSES.has(r.status)) throw new TypeError(`model call record has invalid status '${String(r.status)}'`);
+  if (!MODEL_CALL_ROLES.has(r.role)) throw new TypeError(`model call record has invalid role '${String(r.role)}'`);
+  requireText(r.requestClass, "requestClass");
+  requireText(r.contextSha256, "contextSha256");
+  if (!Number.isSafeInteger(r.attemptNumber) || r.attemptNumber < 1) {
+    throw new TypeError(`model call record has invalid attemptNumber ${String(r.attemptNumber)}`);
+  }
+  if (!Number.isSafeInteger(r.fallbackPosition) || r.fallbackPosition < 0) {
+    throw new TypeError(`model call record has invalid fallbackPosition ${String(r.fallbackPosition)}`);
+  }
+  if (!Number.isSafeInteger(r.promptBytes) || r.promptBytes < 0) {
+    throw new TypeError(`model call record has invalid promptBytes ${String(r.promptBytes)}`);
+  }
+  requireText(r.startedAt, "startedAt");
+  optionalNumber(r.inputTokens, "inputTokens");
+  optionalNumber(r.outputTokens, "outputTokens");
+  optionalNumber(r.cachedInputTokens, "cachedInputTokens");
+  optionalNumber(r.totalChargedTokens, "totalChargedTokens");
+  optionalNumber(r.costUsd, "costUsd");
+  optionalNumber(r.latencyMs, "latencyMs");
+  optionalNumber(r.responseBytes, "responseBytes");
+}
+
+function modelCallFromRow(row: Record<string, unknown>): ModelCallRecord {
+  return {
+    id: String(row.id),
+    requestId: String(row.request_id),
+    attemptNumber: Number(row.attempt_number),
+    fallbackPosition: Number(row.fallback_position),
+    schemaVersion: String(row.schema_version) as ModelCallRecord["schemaVersion"],
+    status: row.status as ModelCallRecord["status"],
+    role: row.role as ModelCallRecord["role"],
+    requestClass: String(row.request_class),
+    providerId: row.provider_id === null || row.provider_id === undefined ? null : String(row.provider_id),
+    modelId: row.model_id === null || row.model_id === undefined ? null : String(row.model_id),
+    errorClassification:
+      row.error_classification === null || row.error_classification === undefined
+        ? null
+        : (String(row.error_classification) as ModelCallRecord["errorClassification"]),
+    attribution: {
+      ...(row.run_id ? { runId: String(row.run_id) } : {}),
+      ...(row.campaign_id ? { campaignId: String(row.campaign_id) } : {}),
+      ...(row.item_id ? { itemId: String(row.item_id) } : {}),
+      ...(row.worker_id ? { workerId: String(row.worker_id) } : {}),
+      ...(row.finding_id ? { findingId: String(row.finding_id) } : {}),
+      ...(row.repair_id ? { repairId: String(row.repair_id) } : {}),
+    },
+    contextSha256: String(row.context_sha256),
+    responseSha256: row.response_sha256 === null || row.response_sha256 === undefined ? null : String(row.response_sha256),
+    promptBytes: Number(row.prompt_bytes),
+    responseBytes: row.response_bytes === null || row.response_bytes === undefined ? null : Number(row.response_bytes),
+    inputTokens: row.input_tokens === null || row.input_tokens === undefined ? null : Number(row.input_tokens),
+    outputTokens: row.output_tokens === null || row.output_tokens === undefined ? null : Number(row.output_tokens),
+    cachedInputTokens:
+      row.cached_input_tokens === null || row.cached_input_tokens === undefined ? null : Number(row.cached_input_tokens),
+    totalChargedTokens:
+      row.total_charged_tokens === null || row.total_charged_tokens === undefined ? null : Number(row.total_charged_tokens),
+    costUsd: row.cost_usd === null || row.cost_usd === undefined ? null : Number(row.cost_usd),
+    latencyMs: row.latency_ms === null || row.latency_ms === undefined ? null : Number(row.latency_ms),
+    startedAt: String(row.started_at),
+    completedAt: row.completed_at === null || row.completed_at === undefined ? null : String(row.completed_at),
+    metadataJson:
+      row.metadata_json === null || row.metadata_json === undefined
+        ? null
+        : (JSON.parse(String(row.metadata_json)) as Record<string, string | number | boolean>),
+  };
+}
+
+function modelCallFilterClauses(filter: ModelCallFilter): { where: string; params: unknown[] } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  const push = (column: string, value: string) => {
+    clauses.push(`${column} = ?`);
+    params.push(value);
+  };
+  if (filter.runId !== undefined) push("run_id", filter.runId);
+  if (filter.campaignId !== undefined) push("campaign_id", filter.campaignId);
+  if (filter.itemId !== undefined) push("item_id", filter.itemId);
+  if (filter.workerId !== undefined) push("worker_id", filter.workerId);
+  if (filter.findingId !== undefined) push("finding_id", filter.findingId);
+  if (filter.repairId !== undefined) push("repair_id", filter.repairId);
+  if (filter.role !== undefined) push("role", filter.role);
+  if (filter.status !== undefined) push("status", filter.status);
+  return { where: clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "", params };
+}
 
 export class Store {
   constructor(private readonly db: Database) {}
@@ -1351,5 +1489,132 @@ export class Store {
       Omit<OracleEvaluationRecord, "reproduced"> & { reproduced: number }
     >;
     return rows.map((r) => ({ ...r, reproduced: r.reproduced !== 0 }));
+  }
+
+  /* --------------------------- model calls (M13 F3) ------------------------- */
+
+  /** Insert or update one durable model-call attempt row (sink start→finish
+   * uses the same upsert; started rows are never deleted). */
+  putModelCall(record: ModelCallRecord): void {
+    validateModelCallRecord(record);
+    this.db
+      .prepare(
+        `INSERT INTO model_calls(
+           id, request_id, attempt_number, fallback_position, schema_version,
+           status, role, request_class, provider_id, model_id, error_classification,
+           run_id, campaign_id, item_id, worker_id, finding_id, repair_id,
+           context_sha256, response_sha256, prompt_bytes, response_bytes,
+           input_tokens, output_tokens, cached_input_tokens, total_charged_tokens,
+           cost_usd, latency_ms, started_at, completed_at, metadata_json)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           provider_id = excluded.provider_id,
+           model_id = excluded.model_id,
+           error_classification = excluded.error_classification,
+           response_sha256 = excluded.response_sha256,
+           response_bytes = excluded.response_bytes,
+           input_tokens = excluded.input_tokens,
+           output_tokens = excluded.output_tokens,
+           cached_input_tokens = excluded.cached_input_tokens,
+           total_charged_tokens = excluded.total_charged_tokens,
+           cost_usd = excluded.cost_usd,
+           latency_ms = excluded.latency_ms,
+           completed_at = excluded.completed_at`,
+      )
+      .run(
+        record.id,
+        record.requestId,
+        record.attemptNumber,
+        record.fallbackPosition,
+        record.schemaVersion,
+        record.status,
+        record.role,
+        record.requestClass,
+        record.providerId,
+        record.modelId,
+        record.errorClassification,
+        record.attribution.runId ?? null,
+        record.attribution.campaignId ?? null,
+        record.attribution.itemId ?? null,
+        record.attribution.workerId ?? null,
+        record.attribution.findingId ?? null,
+        record.attribution.repairId ?? null,
+        record.contextSha256,
+        record.responseSha256,
+        record.promptBytes,
+        record.responseBytes,
+        record.inputTokens,
+        record.outputTokens,
+        record.cachedInputTokens,
+        record.totalChargedTokens,
+        record.costUsd,
+        record.latencyMs,
+        record.startedAt,
+        record.completedAt,
+        record.metadataJson === null ? null : JSON.stringify(record.metadataJson),
+      );
+  }
+
+  getModelCall(id: string): ModelCallRecord | undefined {
+    const row = this.db.prepare(`SELECT * FROM model_calls WHERE id = ?`).get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row ? modelCallFromRow(row) : undefined;
+  }
+
+  listModelCalls(filter: ModelCallFilter = {}, limit = 200): ModelCallRecord[] {
+    const clauses = modelCallFilterClauses(filter);
+    const params = [...clauses.params, limit];
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM model_calls ${clauses.where} ORDER BY started_at DESC, rowid DESC LIMIT ?`,
+      )
+      .all(...params) as Array<Record<string, unknown>>;
+    return rows.map(modelCallFromRow);
+  }
+
+  /**
+   * Aggregate model-call truth for observability. Token/cost sums are NULL
+   * when no row reported that field: unknown usage is never misreported as
+   * zero spend.
+   */
+  summarizeModelCalls(filter: ModelCallFilter = {}): ModelCallsSummary {
+    const clauses = modelCallFilterClauses(filter);
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS attempts,
+           COUNT(DISTINCT request_id) AS requests,
+           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+           SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+           SUM(CASE WHEN status = 'denied' THEN 1 ELSE 0 END) AS denied,
+           SUM(CASE WHEN status = 'started' THEN 1 ELSE 0 END) AS startedOpen,
+           SUM(CASE WHEN fallback_position > 0 THEN 1 ELSE 0 END) AS fallbacks,
+           SUM(input_tokens) AS inputTokens,
+           SUM(output_tokens) AS outputTokens,
+           SUM(cached_input_tokens) AS cachedInputTokens,
+           SUM(total_charged_tokens) AS totalChargedTokens,
+           SUM(cost_usd) AS costUsd
+         FROM model_calls ${clauses.where}`,
+      )
+      .get(...clauses.params) as Record<string, unknown>;
+    return {
+      attempts: Number(row.attempts ?? 0),
+      requests: Number(row.requests ?? 0),
+      completed: Number(row.completed ?? 0),
+      failed: Number(row.failed ?? 0),
+      cancelled: Number(row.cancelled ?? 0),
+      denied: Number(row.denied ?? 0),
+      startedOpen: Number(row.startedOpen ?? 0),
+      fallbacks: Number(row.fallbacks ?? 0),
+      inputTokens: row.inputTokens === null || row.inputTokens === undefined ? null : Number(row.inputTokens),
+      outputTokens: row.outputTokens === null || row.outputTokens === undefined ? null : Number(row.outputTokens),
+      cachedInputTokens:
+        row.cachedInputTokens === null || row.cachedInputTokens === undefined ? null : Number(row.cachedInputTokens),
+      totalChargedTokens:
+        row.totalChargedTokens === null || row.totalChargedTokens === undefined ? null : Number(row.totalChargedTokens),
+      costUsd: row.costUsd === null || row.costUsd === undefined ? null : Number(row.costUsd),
+    };
   }
 }

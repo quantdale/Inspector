@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@inspector/model-runtime": "workspace:*",
     "better-sqlite3": "^11.7.0"
   }
 }

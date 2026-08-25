@@ -273,6 +273,49 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE repair_records ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
   `,
+  // M13 F3 durable model-call control plane (ADR-0013 s3): one row per
+  // attempt with full attribution, truthful nullable usage/cost/latency,
+  // hashes instead of raw prompts/responses, and stable error classes so
+  // audit can answer "which model made this decision, what did it cost,
+  // did it finish before the controller died".
+  `
+  CREATE TABLE IF NOT EXISTS model_calls (
+    id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    attempt_number INTEGER NOT NULL,
+    fallback_position INTEGER NOT NULL,
+    schema_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    role TEXT NOT NULL,
+    request_class TEXT NOT NULL,
+    provider_id TEXT,
+    model_id TEXT,
+    error_classification TEXT,
+    run_id TEXT,
+    campaign_id TEXT,
+    item_id TEXT,
+    worker_id TEXT,
+    finding_id TEXT,
+    repair_id TEXT,
+    context_sha256 TEXT NOT NULL,
+    response_sha256 TEXT,
+    prompt_bytes INTEGER NOT NULL,
+    response_bytes INTEGER,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cached_input_tokens INTEGER,
+    total_charged_tokens INTEGER,
+    cost_usd REAL,
+    latency_ms INTEGER,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    metadata_json TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_model_calls_request ON model_calls(request_id);
+  CREATE INDEX IF NOT EXISTS idx_model_calls_run ON model_calls(run_id, started_at);
+  CREATE INDEX IF NOT EXISTS idx_model_calls_status ON model_calls(status);
+  CREATE INDEX IF NOT EXISTS idx_model_calls_campaign_item ON model_calls(campaign_id, item_id, started_at);
+  `,
 ];
 
 export function applyMigrations(db: Database.Database): void {
