@@ -105,12 +105,14 @@ export type ModelFailureClass =
   | "no-provider"
   | "provider-unhealthy"
   | "budget-denied"
+  | "budget-gate-error"
   | "deadline"
   | "cancelled"
   | "transport-error"
   | "provider-error"
   | "malformed-response"
   | "schema-invalid"
+  | "model-store-error"
   | "unsupported-role"
   | "unknown-after-crash";
 
@@ -258,7 +260,8 @@ export interface ModelCallResult {
   failure?: { classification: ModelFailureClass; detail: string };
 }
 
-/** Aggregate counters exposed for observability (M13 F24). */
+/** Aggregate counters exposed for observability (M13 F24; HARDENING_3 adds
+ * durable-sink failure visibility). */
 export interface ModelRuntimeStats {
   requests: number;
   attempts: number;
@@ -266,6 +269,8 @@ export interface ModelRuntimeStats {
   failed: number;
   fallbacksUsed: number;
   denials: number;
+  /** sink.finish() persistence failures that could not corrupt an outcome. */
+  storeErrors: number;
   failuresByClass: Partial<Record<ModelFailureClass, number>>;
 }
 

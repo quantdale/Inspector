@@ -1,16 +1,19 @@
 # Project Status
 
-Last updated: M13 IN PROGRESS (2026-08-25)
+Last updated: HARDENING_3 COMPLETE (2026-08-25)
 
 ## Campaign
 
-- Mode: **M13 — Intelligence-Guided Autonomous QA: ACTIVE** (model runtime,
-  deliberate exploration, semantic reasoning, source-aware diagnosis, safe
-  repair assistance; SPEC-013 / ADR-0013). M12 — real-target fleet campaigns:
-  COMPLETE; HARDENING_2 (separately invoked): COMPLETE. M11 and all earlier
-  milestones remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`.
-  Canonical state is recorded in `.inspector/state/campaign.yaml`; the
-  HARDENING_2 ledger lives in `.inspector/state/HARDENING-CHECKPOINT.md`.
+- Mode: **HARDENING_3 — whole-system reliability, intelligence safety,
+  clean-CI correctness, concurrency torture: COMPLETE** (separately invoked
+  via `.agent/EXECUTION_PROMPT.md`; ledger:
+  `.inspector/state/HARDENING-CHECKPOINT.md`). Six defects closed
+  (1 CRITICAL, 4 HIGH, 1 MEDIUM), each with regression coverage.
+- M13 — Intelligence-Guided Autonomous QA: **COMPLETE** (2026-08-25; exit
+  gate PASS on `9d65d334`). M12 — real-target fleet campaigns: COMPLETE;
+  HARDENING_2 (separately invoked): COMPLETE. M11 and all earlier milestones
+  remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`. Canonical state is
+  recorded in `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
@@ -18,6 +21,28 @@ Last updated: M13 IN PROGRESS (2026-08-25)
   **COMPLETE**. DOGFOOD_RC1: **COMPLETE**.
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
+
+## HARDENING_3 outcome (whole-system hardening)
+
+- **Fleet liveness made deterministic**: scheduler heartbeat renewals are
+  contained (a thrown `LockAcquireError` can no longer crash a controller —
+  the exact hosted-CI red class), failed attempts no longer consume the
+  cadence slot, and ownership truth is generation fencing only. The
+  two-controller scenario reports blocked truth with zero duplicate execution,
+  stably.
+- **CI hermeticity**: browser-backed proofs reclassified into the integration
+  lane; Linux quality gate provisions Chromium explicitly; unit lane runs
+  browser-free everywhere. No skips added.
+- **ModelRuntime contract made true**: admission/persistence faults are
+  fail-closed classified terminal outcomes (`budget-gate-error`,
+  `model-store-error`) instead of process crashes or unaccounted spend;
+  terminal persistence loss is observable (`storeErrors`).
+- **Budget numerics fail closed**: provider estimates/usage are untrusted —
+  NaN/Infinity/negative/unsafe values can no longer poison holds, fabricate
+  refunds, create headroom, stick ceilings open, or quarantine durable state.
+- **Taint audit clean**: model/target-derived text stays inside bounded,
+  labeled DATA BLOCKs through planner/suspicion/repair decisions
+  (models propose; deterministic gates dispose).
 
 ## HARDENING_2 outcome (fleet runtime integrity)
 
@@ -184,11 +209,10 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 | frozen install | PASS |
 | lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
-| test (unit) | PASS (549 passed / 3 skipped at the M12 final sweep) |
-| test:integration | PASS — 164 passed / 1 skipped across 39 files (M12 final sweep) |
-| M12 acceptance | PASS (SPEC-012 task graph gates F0–F11) |
-| installed release smoke | PASS (fresh npm prefix, incl. M12 campaign steps) |
-| hosted CI | NOT RUN — no push authority this session; lanes remain CONFIGURED-not-yet-run |
+| test (unit) | PASS — 640 passed / 3 skipped across 59 files (HARDENING_3 final sweep; unit lane now hermetic) |
+| test:integration | PASS — 203 passed / 1 skipped across 47 files, first-run green (HARDENING_3 final sweep) |
+| installed release smoke | PASS (fresh npm prefix, incl. M13 model steps) |
+| hosted CI | Push-triggered; results not inspectable from this host (gh unauthenticated) — owner triages per SPEC-012 §15 |
 
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration
@@ -227,6 +251,6 @@ None blocking continued validation.
 | M10 Resumable exploration | COMPLETE |
 | M11 Operator workflows/distribution | COMPLETE |
 | M12 Real-target fleet campaigns | COMPLETE |
-| M13 Intelligence-guided autonomy | ACTIVE (SPEC-013) |
+| M13 Intelligence-guided autonomy | COMPLETE |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

@@ -899,7 +899,7 @@ export class UnattendedCampaign {
     const propagateStop = () => itemSignal.abort();
     if (this.abort.signal.aborted) propagateStop();
     this.abort.signal.addEventListener("abort", propagateStop, { once: true });
-    let lastRenewMs = this.nowMs();
+    let lastRenewAttemptMs = this.nowMs();
     const epochAtStart = this.epoch;
     const heartbeat = setInterval(() => {
       // A simulated controller death must stop renewing exactly like a real
@@ -909,11 +909,22 @@ export class UnattendedCampaign {
         return;
       }
       const t = this.nowMs();
-      if (t - lastRenewMs < this.ttlMs / 2) return;
-      lastRenewMs = t;
-      if (!this.leases.renew(item.id, workerId, generation)) {
-        itemSignal.abort(); // fenced: stop the stale execution now
+      if (t - lastRenewAttemptMs < this.ttlMs / 2) return;
+      lastRenewAttemptMs = t;
+      // Ownership truth is GENERATION fencing, never wall-clock inference:
+      // a definitive false means another controller owns the current
+      // generation — abort the stale execution now. Lock contention or
+      // transient IO leaves ownership UNKNOWN: a timer callback must never
+      // crash the process, and a failed attempt must not consume the
+      // cadence slot as a success; the next tick retries while fencing
+      // continues to guard settlement against any genuinely lost lease.
+      let renewed: boolean;
+      try {
+        renewed = this.leases.renew(item.id, workerId, generation);
+      } catch {
+        return;
       }
+      if (!renewed) itemSignal.abort(); // fenced: stop the stale execution now
     }, Math.max(1, Math.floor(this.ttlMs / 4)));
     const ctx: ExecutionContext = {
       itemId: item.id,

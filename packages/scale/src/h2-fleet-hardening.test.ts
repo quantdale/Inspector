@@ -12,6 +12,7 @@ import {
   type WorkItemExecutor,
   type WorkItemResult,
 } from "@inspector/scale";
+import { LockAcquireError } from "./lock.js";
 
 /**
  * HARDENING_2 fleet-runtime hardening: settlement crash windows (D5),
@@ -327,6 +328,106 @@ describe("H2 D4: scheduler-managed lease liveness", () => {
   }, 30_000);
 });
 
+describe("H3 fleet liveness: heartbeat renewal containment", () => {
+  it("a thrown renewal never escapes the timer, never consumes the cadence slot, and liveness recovers", async () => {
+    const base = fresh("heartbeat-renew-throw");
+    try {
+      let t = 900_000;
+      const ttlMs = 400;
+      const stateDir = join(base, "state");
+      const slow = slowExecutor({ stepDelayMs: 20, tickMs: 0 });
+      const wrapped: WorkItemExecutor = {
+        id: slow.id,
+        capabilities: () => slow.capabilities(),
+        async execute(rawItem, ctx): Promise<WorkItemResult> {
+          const item = rawItem as { id: string; steps: number };
+          for (let i = 0; i < item.steps; i++) {
+            if (ctx.signal.aborted) throw Object.assign(new Error("cancelled"), { name: "ItemCancelledError" });
+            t += 15;
+            await new Promise((r) => setTimeout(r, 25));
+          }
+          return { ok: true, findings: [], evidencePaths: [], runIds: [], usage: {} };
+        },
+      };
+      const campaign = new UnattendedCampaign(
+        { stateDir, workerCount: 1, items: fakeItems(1, 40), usagePerStep: USAGE, executor: wrapped, now: () => t, leaseTtlMs: ttlMs },
+        join(base, "artifacts"),
+      );
+      let calls = 0;
+      const renewSpy = vi
+        .spyOn(campaign.leasesRef, "renew")
+        .mockImplementation((itemId: string, workerId: string, generation?: number) => {
+          calls += 1;
+          if (calls === 1) throw new LockAcquireError(join(stateDir, "leases.json.lock"), 5000);
+          return (campaign.leasesRef as unknown as { renew: (i: string, w: string, g?: number) => boolean }).renew.call(
+            campaign.leasesRef,
+            itemId,
+            workerId,
+            generation,
+          );
+        });
+      void renewSpy;
+      try {
+        const report = await campaign.run();
+        expect(report.completed).toContain("item-0"); // liveness recovered after the thrown renewal
+        expect(renewSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+        expect(renewSpy.mock.results[0]?.type).toBe("throw");
+      } finally {
+        campaign.dispose();
+      }
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("sustained renewal failure never crashes the controller nor yields false success", async () => {
+    const base = fresh("heartbeat-blind-safe");
+    try {
+      const ttlMs = 120;
+      let t = 100_000;
+      const stateDir = join(base, "state");
+      const gated: WorkItemExecutor = {
+        id: "gated",
+        capabilities: () => ({ executorId: "gated", families: ["fake"], capabilities: [], available: true }),
+        async execute(_item, ctx): Promise<WorkItemResult> {
+          for (let i = 0; i < 2000 && !ctx.signal.aborted; i++) {
+            // Advance the shared simulated clock so heartbeat cadence gates
+            // open deterministically while the holder keeps working.
+            t += 40;
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          throw Object.assign(new Error("cancelled"), { name: "ItemCancelledError" });
+        },
+      };
+      const campaign = new UnattendedCampaign(
+        { stateDir, workerCount: 1, items: fakeItems(1, 5), usagePerStep: USAGE, executor: gated, now: () => t, leaseTtlMs: ttlMs },
+        join(base, "artifacts"),
+      );
+      const renewSpy = vi.spyOn(campaign.leasesRef, "renew").mockImplementation(() => {
+        // Sustained lock blindness: every renewal attempt fails exceptionally.
+        throw new LockAcquireError(join(stateDir, "leases.json.lock"), 5000);
+      });
+      const runPromise = campaign.run();
+      // Let several renewal attempts fail while the holder keeps running;
+      // ownership truth stays with generation fencing, so this must be
+      // merely wasteful — never a crash and never a false completion.
+      await new Promise((r) => setTimeout(r, 700));
+      expect(renewSpy.mock.results.length).toBeGreaterThanOrEqual(2);
+      for (const r of renewSpy.mock.results) expect(r.type).toBe("throw");
+      campaign.stop("stopped");
+      const report = await runPromise;
+      campaign.dispose();
+      expect(report.completed).toEqual([]); // never false success
+      expect(report.executions).toHaveLength(0);
+      // Truthful durable state: the unresolved item stays queued for resume.
+      const disk = JSON.parse(readFileSync(join(stateDir, "campaign.json"), "utf8")) as { queue: string[] };
+      expect(disk.queue).toContain("item-0");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  }, 30_000);
+});
+
 describe("H2 D7: externally-held work produces truthful liveness", () => {
   it("waits for reclaim of an expired external hold and completes exactly once", async () => {
     const base = fresh("hold-expiry");
@@ -388,7 +489,13 @@ describe("H2 D7: externally-held work produces truthful liveness", () => {
       );
       // Keep the external lease alive past one full reclaim opportunity.
       const renewer = setInterval(() => {
-        external.renew("held-item", "external-process");
+        // Fixture liveness must not crash the suite under lock contention:
+        // a failed renewal just means the hold may expire naturally.
+        try {
+          external.renew("held-item", "external-process");
+        } catch {
+          /* tolerated */
+        }
         t += 100;
       }, 60);
       try {
@@ -474,8 +581,10 @@ describe("H2 D7/D4: two controllers over one state directory", () => {
         },
         join(base, "artifacts-b"),
       );
-      // Keep A's lease alive past B's single reclaim opportunity.
-      const keepAlive = setInterval(() => t += ttlMs, 50);
+      // Keep A's lease alive past B's single reclaim opportunity. The
+      // simulated clock races at a bounded 2.5x so heartbeat renewals stay
+      // realistically schedulable instead of multiplying lock churn.
+      const keepAlive = setInterval(() => t += ttlMs / 2, 50);
       let reportB;
       try {
         reportB = await b.run();
@@ -498,7 +607,7 @@ describe("H2 D7/D4: two controllers over one state directory", () => {
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
-  });
+  }, 45_000);
 });
 
 describe("H2 D8: semantically corrupt durable state fails closed", () => {

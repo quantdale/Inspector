@@ -63,6 +63,7 @@ export class ModelRuntime {
     failed: 0,
     fallbacksUsed: 0,
     denials: 0,
+    storeErrors: 0,
     failuresByClass: {},
   };
 
@@ -149,7 +150,9 @@ export class ModelRuntime {
         const estimate = this.resolveEstimate(provider, spec);
         reservedTokens = estimate.tokens;
         reservedCostUsd = estimate.costUsd;
-        const admitted = opts.gate.admit({
+        let admitted: boolean;
+        try {
+          admitted = opts.gate.admit({
           requestId,
           attemptId,
           role: spec.role,
@@ -159,7 +162,37 @@ export class ModelRuntime {
           estimateTokens: reservedTokens,
           estimateCostUsd: reservedCostUsd,
           attribution: spec.attribution,
-        });
+          });
+        } catch (err) {
+          // Fail-closed containment (HARDENING_3 H3-D5): a throwing budget
+          // gate is an accounting-boundary fault — never a reason to crash
+          // deterministic callers and never a license for unaccounted spend.
+          // No invocation happens; no reservation is assumed held.
+          void err;
+          this.recordTo(
+            opts.sink,
+            spec,
+            attemptId,
+            requestId,
+            attemptNumber,
+            fallbackPosition,
+            provider,
+            "failed",
+            "budget-gate-error",
+            { contextSha256, promptBytes, startedAt },
+          );
+          return this.failure(
+            requestId,
+            "budget-gate-error",
+            "model budget gate threw during admission; invocation refused fail-closed",
+            {
+              providerId: provider.meta.id,
+              modelId: provider.meta.modelId,
+              attemptNumber,
+              fallbacksUsed,
+            },
+          );
+        }
         if (!admitted) {
           this.statsInternal.denials += 1;
           this.recordTo(
@@ -183,28 +216,50 @@ export class ModelRuntime {
         }
       }
 
-      opts.sink?.start(
-        row({
-          id: attemptId,
-          requestId,
-          attemptNumber,
-          fallbackPosition,
-          status: "started",
-          role: spec.role,
-          requestClass: spec.requestClass,
-          providerId: provider.meta.id,
-          modelId: provider.meta.modelId ?? null,
-          errorClassification: null,
-          attribution: spec.attribution ?? {},
-          contextSha256,
-          responseSha256: null,
-          promptBytes,
-          responseBytes: null,
-          startedAt,
-          completedAt: null,
-          metadataJson: spec.metadata ?? null,
-        }),
-      );
+      if (opts.sink) {
+        try {
+          opts.sink.start(
+            row({
+              id: attemptId,
+              requestId,
+              attemptNumber,
+              fallbackPosition,
+              status: "started",
+              role: spec.role,
+              requestClass: spec.requestClass,
+              providerId: provider.meta.id,
+              modelId: provider.meta.modelId ?? null,
+              errorClassification: null,
+              attribution: spec.attribution ?? {},
+              contextSha256,
+              responseSha256: null,
+              promptBytes,
+              responseBytes: null,
+              startedAt,
+              completedAt: null,
+              metadataJson: spec.metadata ?? null,
+            }),
+          );
+        } catch {
+          // Fail-closed BEFORE external inference (HARDENING_3 H3-D5): an
+          // unpersistable `started` row means the attempt would spend without
+          // durable observability. The provider is not invoked; the just-made
+          // reservation converts conservatively (never silently refunded).
+          settleGate(opts.gate, { requestId, attemptId, outcome: "failed" });
+          this.count("model-store-error");
+          return this.failure(
+            requestId,
+            "model-store-error",
+            "durable model-call persistence failed before invocation; attempt aborted fail-closed",
+            {
+              providerId: provider.meta.id,
+              modelId: provider.meta.modelId,
+              attemptNumber,
+              fallbacksUsed,
+            },
+          );
+        }
+      }
 
       const startedMs = Date.now();
       const outcome = await this.raceAttempt(provider, spec, requestId, attemptId, attemptNumber, opts);
@@ -455,34 +510,45 @@ export class ModelRuntime {
     if (errorClassification && errorClassification !== "budget-denied") this.count(errorClassification);
     else if (errorClassification === "budget-denied") this.count(errorClassification);
     if (!sink) return;
-    sink.finish(
-      row({
-        id: attemptId,
-        requestId,
-        attemptNumber,
-        fallbackPosition,
-        status,
-        role: spec.role,
-        requestClass: spec.requestClass,
-        providerId: provider.meta.id,
-        modelId: provider.meta.modelId ?? null,
-        errorClassification,
-        attribution: spec.attribution ?? {},
-        contextSha256: parts.contextSha256,
-        responseSha256: parts.responseSha256 ?? null,
-        promptBytes: parts.promptBytes,
-        responseBytes: parts.responseBytes ?? null,
-        ...(parts.usage?.inputTokens !== undefined ? { inputTokens: parts.usage.inputTokens } : {}),
-        ...(parts.usage?.outputTokens !== undefined ? { outputTokens: parts.usage.outputTokens } : {}),
-        ...(parts.usage?.cachedInputTokens !== undefined ? { cachedInputTokens: parts.usage.cachedInputTokens } : {}),
-        ...(parts.usage?.totalChargedTokens !== undefined ? { totalChargedTokens: parts.usage.totalChargedTokens } : {}),
-        ...(parts.usage?.costUsd !== undefined ? { costUsd: parts.usage.costUsd } : {}),
-        ...(parts.latencyMs !== undefined ? { latencyMs: parts.latencyMs } : {}),
-        startedAt: parts.startedAt,
-        completedAt: new Date().toISOString(),
-        metadataJson: spec.metadata ?? null,
-      }),
-    );
+    try {
+      sink.finish(
+        row({
+          id: attemptId,
+          requestId,
+          attemptNumber,
+          fallbackPosition,
+          status,
+          role: spec.role,
+          requestClass: spec.requestClass,
+          providerId: provider.meta.id,
+          modelId: provider.meta.modelId ?? null,
+          errorClassification,
+          attribution: spec.attribution ?? {},
+          contextSha256: parts.contextSha256,
+          responseSha256: parts.responseSha256 ?? null,
+          promptBytes: parts.promptBytes,
+          responseBytes: parts.responseBytes ?? null,
+          ...(parts.usage?.inputTokens !== undefined ? { inputTokens: parts.usage.inputTokens } : {}),
+          ...(parts.usage?.outputTokens !== undefined ? { outputTokens: parts.usage.outputTokens } : {}),
+          ...(parts.usage?.cachedInputTokens !== undefined
+            ? { cachedInputTokens: parts.usage.cachedInputTokens }
+            : {}),
+          ...(parts.usage?.totalChargedTokens !== undefined
+            ? { totalChargedTokens: parts.usage.totalChargedTokens }
+            : {}),
+          ...(parts.usage?.costUsd !== undefined ? { costUsd: parts.usage.costUsd } : {}),
+          ...(parts.latencyMs !== undefined ? { latencyMs: parts.latencyMs } : {}),
+          startedAt: parts.startedAt,
+          completedAt: new Date().toISOString(),
+          metadataJson: spec.metadata ?? null,
+        }),
+      );
+    } catch {
+      // Terminal-persistence failure (HARDENING_3 H3-D5): the call outcome is
+      // already decided and must not be corrupted, but the loss of durable
+      // truth becomes observable runtime state instead of an escape.
+      this.statsInternal.storeErrors += 1;
+    }
   }
 
   private count(classification: ModelFailureClass): void {

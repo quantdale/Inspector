@@ -556,3 +556,71 @@ Remaining: phases 3–31 per `.inspector/state/GA-READINESS.yaml`.
 - Next proposed milestone: M10 resumable exploration campaigns (spec-003 E7
   gap). rc.2 publication status remains NOT_PUBLISHED; v0.1.0-rc.1 tag
   untouched; M8 iOS remains DEFERRED_ENVIRONMENT.
+
+## HARDENING_3 ACTIVATION (2026-08-25)
+
+Activated from `.agent/EXECUTION_PROMPT.md` (planner commit `b13c54f`,
+planned-from = M13 final SHA `9d65d334`). Local HEAD == origin/main == b13c54f,
+clean tree, after authorized pull. Ledger:
+`.inspector/state/HARDENING-CHECKPOINT.md` (campaign #3 section).
+
+Early confirmed defects (full evidence in ledger):
+- H3-D1 CRITICAL: scheduler heartbeat threw unhandled LockAcquireError
+  (process crash class seen on hosted CI run 32817613858 AND reproduced
+  locally). CLOSED with containment + regression tests.
+- H3-D2 HIGH: failed renewals consumed the heartbeat cadence slot, silently
+  stopping lease liveness and opening a duplicate-execution reclaim window.
+  CLOSED (generation-fencing-only ownership semantics) with regression tests;
+  fleet file green 3 consecutive full runs.
+- H3-D4 HIGH: browser-backed suites misclassified as unit tests; Linux lane
+  had no explicit Playwright provisioning. CLOSED: target-url suite moved to
+  integration lane (6/6), electron attribution wiring proof made
+  environment-honest (5/5 hermetic), quality job provisions chromium
+  explicitly before test:integration. No skips; no weakened assertions.
+- H3-D3 MEDIUM: docs/STATUS.md still claims M13 IN PROGRESS vs machine state
+  COMPLETE. OPEN — reconciled in H3.9.
+
+Implementation campaign remains COMPLETE; M8 stays DEFERRED_ENVIRONMENT;
+hardening executed separately per protocol. No release/tag/publication.
+
+## HARDENING_3 COMPLETE (2026-08-25)
+
+All H3.0-H3.10 phases complete; every confirmed defect CLOSED with regression
+coverage (ledger: `.inspector/state/HARDENING-CHECKPOINT.md`, campaign #3).
+Final exact-tree gates on this working tree before commit:
+
+- pnpm install --frozen-lockfile OK; lint **0 errors / 4 pre-existing
+  warnings** (adapter-web `any` shims); typecheck PASS.
+- Unit: **640 passed / 3 skipped across 59 files** — now hermetic
+  (browser-backed target-url suite reclassified to integration; +7 new
+  HARDENING_3 regression tests: heartbeat containment ×2, runtime containment
+  ×4, hostile numerics ×7 incl. restart reconciliation).
+- Integration: **203 passed / 1 skipped across 47 files, green on the FIRST
+  run** (~9.6 min wall) including real web/Playwright, CLI/PTY, Android AVD,
+  Windows UIA and Electron lanes plus all fleet/model suites; the only skip
+  remains the long-standing display-gated Electron real-runtime case.
+- release:smoke PASS from a clean installed prefix including the M13 model
+  steps (models summary, fixture provider hunt, invalid-provider refusal).
+
+Closed defects: H3-D1 CRITICAL (heartbeat unhandled LockAcquireError crash —
+the hosted-CI red class), H3-D2 HIGH (cadence-slot consumption duplicate-
+execution window), H3-D4 HIGH (CI hermeticity/test taxonomy), H3-D5 HIGH
+(ModelRuntime Never-throws violations at gate.admit/sink.start/sink.finish;
+new budget-gate-error + model-store-error classes, storeErrors stat),
+H3-D6 HIGH (budget gate hostile-numerics fail-open/refund/quarantine-DoS),
+H3-D3 MEDIUM (STATUS.md M13 truth drift). Audited-no-defect: session-digest
+taint path (layered bounds verified). ADR-0013 amended for the additive
+contract changes.
+
+Hosted CI: the final push triggers layered CI again; results are not
+inspectable from this host (gh CLI present but unauthenticated) — owner
+triages Actions lanes per SPEC-012 §15; the Linux quality lane is expected
+green now that unit is hermetic and chromium provisioning is explicit.
+No tag/release/publication action taken. M8 stays DEFERRED_ENVIRONMENT.
+
+Known debt carried forward: FileLock remains synchronous Atomics.wait-based
+(contended renewal can block its thread up to timeoutMs; SQLite leases are
+the production default); web exploration replay cost measured at ~291s+98s in
+this sweep and remains product-acceptable documented debt; two-controller
+fleet scenario runtime varies with filesystem latency (semantics now
+fencing-deterministic; fixture clock gentled to 2.5x with explicit bound).

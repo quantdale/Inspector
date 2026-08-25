@@ -422,6 +422,34 @@ hardening:
       Web exploration replay cost (~4-6 min full E2E) remains
       product-acceptable debt carried from M12.
 
+hardening3:
+  campaign: HARDENING_3
+  status: COMPLETE
+  started_at: "2026-08-25"
+  base_commit: b13c54f8891f02326df782a1f608658bb7f07740
+  activated_by: .agent/EXECUTION_PROMPT.md (planner commit b13c54f, planned from 9d65d334)
+  protocol: docs/HARDENING-CAMPAIGN.md
+  ledger: .inspector/state/HARDENING-CHECKPOINT.md (campaign #3 section)
+  phases:
+    - {id: H3.0, name: baseline-and-truth-ledger, state: DONE}
+    - {id: H3.1, name: ci-hermeticity-test-taxonomy, state: DONE}
+    - {id: H3.2, name: fleet-lock-lease-concurrency, state: DONE}
+    - {id: H3.3, name: modelruntime-failure-containment, state: DONE}
+    - {id: H3.4, name: model-budget-adversarial-numerics, state: DONE}
+    - {id: H3.5, name: taint-authority-boundaries, state: DONE}
+    - {id: H3.6, name: crash-restart-persistence-torture, state: DONE}
+    - {id: H3.7, name: cross-package-regression-sweep, state: DONE}
+    - {id: H3.8, name: property-fuzz-flake-performance, state: DONE}
+    - {id: H3.9, name: cleanup-truth-reconciliation, state: DONE}
+    - {id: H3.10, name: exact-tree-certification-hosted-ci, state: DONE}
+  defects:
+    - H3-D1 CRITICAL heartbeat-unhandled-lock-error: CLOSED
+    - H3-D2 HIGH cadence-slot-consumption-duplicate-window: CLOSED
+    - H3-D4 HIGH ci-hermeticity-test-taxonomy: CLOSED
+    - H3-D5 HIGH modelruntime-never-throws-violations: CLOSED
+    - H3-D6 HIGH budget-hostile-numerics-fail-open: CLOSED
+    - H3-D3 MEDIUM status-truth-drift: CLOSED
+
 hardening1_history:
   campaign: HARDENING_1
   status: COMPLETE

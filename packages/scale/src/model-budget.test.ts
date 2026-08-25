@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -240,3 +240,137 @@ describe("M13 F4/F5: reservation-based model budget gate", () => {
     expect(admitted).toBeGreaterThan(0);
   });
 });
+
+describe("HARDENING_3 H3-D6: hostile numerics fail closed", () => {
+  it("NaN/Infinity/negative cost estimates fall back to the conservative default instead of poisoning holds", () => {
+    const dir = stateDir();
+    const gate = new ReservationModelBudgetGate(dir, {
+      global: { maxCostUsd: 3 },
+      defaultReserveCostUsd: 0.5,
+      defaultReserveTokens: 10,
+    });
+    for (const bad of [Number.NaN, Infinity, -Infinity, -1]) {
+      expect(gate.admit(admission({ attemptId: `bad/${String(bad)}`, estimateCostUsd: bad }))).toBe(true);
+      // The hold must carry the DEFAULT bound, never the hostile value.
+      expect(gate.totals().costUsd).toBeLessThanOrEqual(3);
+      gate.settle({ requestId: "x", attemptId: `bad/${String(bad)}`, outcome: "failed" });
+    }
+    // State stays loadable/valid after the whole storm.
+    expect(() => validateModelBudgetState(JSON.parse(readFileSync(join(dir, "model-budget.json"), "utf8")))).not.toThrow();
+  });
+
+  it("hostile token estimates cannot oversubscribe or corrupt state", () => {
+    const gate = new ReservationModelBudgetGate(stateDir(), {
+      global: { maxTokens: 100 },
+      defaultReserveTokens: 10,
+    });
+    expect(gate.admit(admission({ attemptId: "t1", estimateTokens: Number.NaN }))).toBe(true); // default 10
+    expect(gate.admit(admission({ attemptId: "t2", estimateTokens: -50 }))).toBe(true); // default 10
+    expect(gate.admit(admission({ attemptId: "t3", estimateTokens: 5.9 }))).toBe(true); // ceil 6
+    expect(gate.totals().tokens).toBe(26);
+    expect(gate.admit(admission({ attemptId: "t4", estimateTokens: Number.MAX_SAFE_INTEGER + 1 }))).toBe(true); // default
+    // 26 + 10 <= 100: admitted with default; a raw unsafe value would have blown past.
+    expect(gate.totals().activeReservations).toBe(4);
+  });
+
+  it("provider-reported usage is sanitized: negative/NaN usage can never refund or fail the gate open", () => {
+    const gate = new ReservationModelBudgetGate(stateDir(), {
+      global: { maxModelRequests: 100 },
+      defaultReserveTokens: 10,
+    });
+    const a = admission({ attemptId: "u1" });
+    expect(gate.admit(a)).toBe(true);
+    gate.settle({
+      requestId: a.requestId,
+      attemptId: a.attemptId,
+      outcome: "completed",
+      usage: { inputTokens: -1000, outputTokens: Number.NaN, totalChargedTokens: -5, costUsd: -3 },
+    });
+    // Hostile fields are treated as absent => conservative conversion of the hold.
+    expect(gate.totals().requests).toBe(1);
+    expect(gate.totals().tokens).toBe(10);
+    // The gate still enforces its ceiling afterwards (never stuck open).
+    for (let i = 2; i <= 12; i++) {
+      const ad = admission({ attemptId: `u${i}` });
+      expect(gate.admit(ad)).toBe(true);
+      gate.settle({ requestId: ad.requestId, attemptId: ad.attemptId, outcome: "completed", usage: { totalChargedTokens: 1 } });
+    }
+  });
+
+  it("partial valid usage charges what is known and treats garbage fields as unknown", () => {
+    const gate = new ReservationModelBudgetGate(stateDir(), { defaultReserveTokens: 100 });
+    const a = admission({ attemptId: "p1" });
+    gate.admit(a);
+    gate.settle({
+      requestId: a.requestId,
+      attemptId: a.attemptId,
+      outcome: "completed",
+      usage: { inputTokens: 30, outputTokens: Number.NaN, costUsd: 0.25 },
+    });
+    expect(gate.totals()).toMatchObject({ requests: 1, tokens: 30, costUsd: 0.25 });
+  });
+
+  it("persisted NaN reservation cost fails closed at load (validator finite check)", () => {
+    const dir = stateDir();
+    writeFileSync(
+      join(dir, "model-budget.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        settled: { requests: 0, tokens: 0, costUsd: 0 },
+        byWorker: {},
+        byItem: {},
+        reservations: [
+          { requestId: "r", attemptId: "r/a", role: "planner", requestClass: "x", requests: 1, tokens: 1, costUsd: Number.NaN, atMs: 1 },
+        ],
+      }),
+      "utf8",
+    );
+    expect(() => new ReservationModelBudgetGate(dir, {})).toThrow(StateCorruptionError);
+  });
+
+  it("honest overage above the reservation remains durable truth (unchanged semantics)", () => {
+    const gate = new ReservationModelBudgetGate(stateDir(), {
+      global: { maxTokens: 15 },
+      defaultReserveTokens: 10,
+    });
+    const a = admission({ attemptId: "o1" });
+    expect(gate.admit(a)).toBe(true);
+    gate.settle({
+      requestId: a.requestId,
+      attemptId: a.attemptId,
+      outcome: "completed",
+      usage: { totalChargedTokens: 14 },
+    });
+    expect(gate.totals().tokens).toBe(14); // truthful overage recorded
+    expect(gate.admit(admission({ attemptId: "o2" }))).toBe(false); // projection sees it
+  });
+
+  it("restart reconciliation converts abandoned hostile holds at their SANITIZED bound", () => {
+    const dir = stateDir();
+    let t = 1_000_000;
+    const first = new ReservationModelBudgetGate(dir, {
+      defaultReserveTokens: 4096,
+      reservationTtlMs: 1_000,
+      now: () => t,
+    });
+    // Hostile estimates are sanitized at admission, so even an abandoned
+    // crash-window hold can never carry NaN/Infinity into durable truth.
+    expect(first.admit(admission({ attemptId: "crash/a1", estimateTokens: Number.NaN }))).toBe(true);
+    expect(first.admit(admission({ attemptId: "crash/a2", estimateTokens: Number.POSITIVE_INFINITY }))).toBe(true);
+    t += 5_000;
+    // "Restart": a fresh instance over the same durable state reconciles
+    // abandoned holds AT CONSTRUCTION (fail-loud load then conservative
+    // conversion); an explicit re-run therefore finds nothing left.
+    const second = new ReservationModelBudgetGate(dir, {
+      defaultReserveTokens: 4096,
+      reservationTtlMs: 1_000,
+      now: () => t,
+    });
+    expect(second.reconcileAbandoned()).toBe(0);
+    const totals = second.totals();
+    expect(totals.activeReservations).toBe(0);
+    expect(totals.tokens).toBe(2 * 4096); // sanitized defaults, never Infinity
+    expect(Number.isFinite(totals.costUsd)).toBe(true);
+  });
+});
+

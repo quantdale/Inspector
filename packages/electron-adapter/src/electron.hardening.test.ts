@@ -63,10 +63,19 @@ describe("electron hardening: unique artifact dirs (D4)", () => {
 describe("electron hardening: attribution threading (D8)", () => {
   it("threads real run/environment ids from lifecycle options into the underlying handler", async () => {
     const handler = new ElectronAdapterHandler({}, ART_BASE, SEED_HTML, "injectable");
-    await handler.lifecycle({ op: "create", options: { runId: "r42", environmentId: "e7" } });
-    const web = handler as unknown as { web: { runId?: string; environmentId?: string } };
-    expect(web.web.runId).toBe("r42");
-    expect(web.web.environmentId).toBe("e7");
+    try {
+      // Attribution is applied BEFORE any browser launch inside create, so
+      // this wiring proof holds whether or not a Chromium executable is
+      // available to complete environment creation (hermetic unit lane).
+      await handler
+        .lifecycle({ op: "create", options: { runId: "r42", environmentId: "e7" } })
+        .catch(() => {});
+      const web = handler as unknown as { web: { runId?: string; environmentId?: string } };
+      expect(web.web.runId).toBe("r42");
+      expect(web.web.environmentId).toBe("e7");
+    } finally {
+      await handler.shutdown().catch(() => {});
+    }
   });
 });
 

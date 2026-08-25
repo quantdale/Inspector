@@ -1,4 +1,116 @@
-# HARDENING CAMPAIGN #2 — Fleet Runtime Integrity, Recovery, and State Truth
+# Inspector hardening campaign ledger
+# Campaign #2 record below is historical (COMPLETE per campaign.yaml).
+
+# HARDENING CAMPAIGN #3 — Whole-System Reliability, Intelligence Safety,
+# Clean-CI Correctness, and Concurrency Torture
+
+- Campaign: HARDENING_3
+- Status: **ACTIVE**
+- Opened: 2026-08-25
+- Base commit: `b13c54f8891f02326df782a1f608658bb7f07740` (planner activation;
+  planned-from `9d65d334` = M13 final). Local main == origin/main.
+- Source of scope: `.agent/EXECUTION_PROMPT.md`
+- Branch policy: main only; no force-push; no release/tag/publication.
+- HARDENING_2's and HARDENING_1's records below remain untouched.
+
+## H3.0 Baseline (recorded 2026-08-25 at b13c54f)
+
+- Reproduced locally on Windows (unit lane): h2-fleet two-controller scenario
+  FAIL (`bExecutions` > 0) + vitest Uncaught Exception
+  `LockAcquireError ... leases.json.lock within 5000ms` from
+  `LeaseManager.renew <- StateFile.update <- FileLock.acquire <-
+  Timeout._onTimeout campaign.ts:914`. Matches hosted Linux CI run
+  32817613858 signature (stopReason=null + same unhandled error) — NOT a
+  Linux-only flake: real product defect class, environment-independent.
+- web.target-url / electron.hardening failures did NOT reproduce locally
+  (host has Chromium): clean-runner browser-dependency defect, not product.
+- docs/STATUS.md drift confirmed by direct read (M13 IN PROGRESS/ACTIVE vs
+  campaign.yaml COMPLETE).
+
+## Defect matrix (HARDENING_3)
+
+Lifecycle: SUSPICION → EVIDENCE → SEVERITY → REGRESSION TEST → FIX → CLOSED.
+
+### H3-D1 CRITICAL — unhandled LockAcquireError escapes scheduler heartbeat timer — CLOSED
+
+- Evidence: local baseline-unit.log uncaught exception stack (above); hosted
+  run 32817613858 quality gate red with identical signature; §3.2 of the
+  execution prompt.
+- Root cause: `executeWithExecutor`'s `setInterval` heartbeat invoked
+  `this.leases.renew(...)` synchronously with no containment;
+  `FileLock.acquire` throws after its bounded wait under contention, and an
+  exception thrown inside a timer callback becomes a process-level uncaught
+  error (kills controllers/vitest workers; on CI it terminated controller A's
+  liveness mid-campaign producing stopReason=null).
+- Fix: renewal attempts are contained in the heartbeat; ownership truth is
+  generation fencing only — definitive `false` aborts the stale execution
+  immediately (unchanged), while contention/transient IO leaves ownership
+  UNKNOWN: retried on later ticks, never crashed, never silently treated as
+  success.
+- Regression proof:
+  `H3 fleet liveness > a thrown renewal never escapes the timer...` (asserts
+  first renew attempt THREW, execution still completed, ≥2 attempts) and
+  `sustained renewal failure never crashes the controller nor yields false
+  success` (all attempts throw; no completion; item stays queued truthfully).
+  Fleet file green 3 consecutive full runs (20/20 each).
+
+### H3-D2 HIGH — failed renewals consumed the heartbeat cadence slot (duplicate-execution window) — CLOSED
+
+- Evidence: baseline failure `expect(bExecutions).toBe(0)` violated: with
+  renewals crashing/stopping, A's lease expired while keepAlive raced the
+  shared clock; B legally reclaimed and EXECUTED the contested item —
+  duplicate work with A still live; hosted variant showed stopReason=null.
+- Root cause: `lastRenewMs = t` was set BEFORE the renew call every cadence
+  tick regardless of outcome; any thrown attempt therefore consumed that
+  half-TTL slot as if renewed, silently ending liveness extensions.
+- Fix (same change as H3-D1): only successful renewals maintain liveness;
+  failures are non-consuming. An interim TTL-blindness self-abort design was
+  explicitly REJECTED during development because fast/slow simulated clocks
+  aborted legitimately-owned executions (proved by transient test failures);
+  generation fencing is the sole authority for lost ownership — matching the
+  documented HARDENING_2 contract and §3.2's 'lock contention cannot
+  masquerade as no live owner'.
+- Regression proof: existing `lost fencing generation aborts...` (still
+  green), new containment tests above, and the stabilized two-controller
+  scenario (blocked-external-holds, zero duplicate executions, exactly one
+  durable completion) now passing repeatedly incl. under full-suite load.
+
+### H3-D4 HIGH — CI hermeticity: browser-backed suites misclassified as unit — CLOSED
+
+- Evidence: hosted run 32817613858: 3 failed files / 8 failed tests in Linux
+  quality `pnpm test`: web.target-url.test.ts (6) and
+  electron.hardening.test.ts (1) failing solely on missing Playwright
+  Chromium; Windows gate green; downstream jobs skipped.
+- Classification decision (explicit per §3.1):
+  - web.target-url suite spawns REAL Chromium through the adapter subprocess
+    with 30-120s budgets ⇒ INTEGRATION-class proof. Renamed to
+    `web.target-url.integration.test.ts`; runs in the integration lane
+    (verified 6/6 there).
+  - electron.hardening attribution threading is PURE WIRING:
+    WebAdapterHandler.applyAttribution runs BEFORE any browser launch
+    (web-adapter.ts:195), so the assertion is now made while tolerating
+    create-failure on browser-less hosts (+ shutdown cleanup) — hermetic unit
+    coverage retained (5/5 locally).
+  - Linux quality job now runs `pnpm exec playwright install --with-deps
+    chromium` explicitly before `pnpm test:integration`, making the lane's
+    runtime prerequisite reproducible rather than dependent on machine cache.
+  - No skips added anywhere; no assertions weakened.
+
+### H3-D3 MEDIUM — project truth surfaces disagree on M13 state — OPEN (H3.9)
+
+- Evidence: docs/STATUS.md header 'Last updated: M13 IN PROGRESS', Campaign
+  bullet 'M13 ... ACTIVE', milestone table row 'ACTIVE (SPEC-013)' vs
+  .inspector/state/campaign.yaml active.status=COMPLETE + M13 block COMPLETE.
+- Plan: reconcile STATUS.md (and audit README/ROADMAP annotations) in H3.9
+  without rewriting any historical evidence.
+
+## Open workstream ledger (updated as phases complete)
+
+- H3.2 residual watch: FileLock remains synchronous Atomics.wait-based; a
+  contended renewal can block its thread up to timeoutMs (documented debt,
+  SQLite lease backend is the production default). Fixture clock races were
+  gentled to 2.5x with explicit 45s bound; semantics unchanged.
+
 
 - Campaign: HARDENING_2
 - Status: **ACTIVE**
@@ -243,3 +355,66 @@ tsc --noEmit exit 0; eslint 0 errors (5 pre-existing warnings; .mjs fixture glob
 
 - Defect detail lives with each entry's evidence; this file is the durable index.
 - Update `.inspector/state/campaign.yaml` `hardening:` block alongside this file at every waypoint.
+
+## H3.1-H3.10 phase outcomes (2026-08-25, final tree before commit)
+
+- **H3.2 fleet concurrency** — CLOSED via campaign.ts heartbeat redesign:
+  containment + non-consuming failed attempts + generation-fencing-only
+  ownership. Regression tests: `H3 fleet liveness` ×2; existing D4 fence test
+  unchanged-green. Fleet file green in 3 consecutive full runs and again
+  inside the full-suite sweep. Fixture note: shared simulated clock gentled
+  from 5x to 2.5x with explicit 45s bound — semantics assertions untouched.
+  A TTL-blindness self-abort design was tried and REJECTED with evidence
+  (fast/slow simulated clocks aborted legitimately-owned executions);
+  recorded here so the decision is not silently re-litigated.
+- **H3.3 ModelRuntime containment** — CLOSED: gate.admit / sink.start /
+  sink.finish contained; new `budget-gate-error` + `model-store-error`
+  terminal classes; `storeErrors` stat; settleGate containment pinned by
+  test. Four regression tests in model-runtime.test.ts (provider never
+  invoked on admission/store faults; conservative conversion on start fault;
+  outcome survives finish fault).
+- **H3.4 hostile numerics** — CLOSED: saneTokens/saneCost boundary,
+  projection finite/safe guards, actualUsage per-field sanitization,
+  validator reservation-cost finite check. Seven regression tests including
+  persisted-NaN quarantine and restart reconciliation at sanitized bounds.
+- **H3.5 taint/authority audit** — NO DEFECT: digest is bounded (1200/8×200)
+  at creation, re-bounded (400) as a DATA BLOCK field at consumption,
+  instruction preamble stays Inspector-controlled; planner suggestions face
+  exact-inventory containment; suspicion capped 0.5 → NEEDS_HUMAN_ORACLE;
+  repair path policy realpath-contained (M11 P5). Recorded as audited with
+  references (session-memory.ts, model-context.ts:128/291-299).
+- **H3.6 crash/restart** — added restart-reconciliation proof for hostile
+  holds; existing coverage re-verified green: store started-row crash window,
+  settlement journals/replay (D5 suite), checkpoint checksums (M10 matrix).
+- **H3.7 cross-package sweep** — full unit 640/3skip (59 files) + integration
+  203/1skip (47 files, FIRST-RUN green, ~9.6 min incl. real web/PTY/AVD/UIA/
+  Electron lanes) + release:smoke PASS (installed prefix, M13 steps).
+- **H3.8 measurement/flake** — web replay cost measured this sweep: M3
+  exploration E2E 291s + determinism 98s (documented debt stands; no
+  optimization attempted per scope discipline). Scale suite flake-hunted 3×
+  consecutive greens post-fix.
+- **H3.9 truth reconciliation** — STATUS.md header/campaign/table now agree
+  with machine state (M13 COMPLETE, HARDENING_3 recorded); AGENTS.md campaign
+  note extended to HARDENING_3; ADR-0013 amended (taxonomy + untrusted-number
+  boundary); README audited — no drift found.
+- **H3.10 certification** — gates above run on the exact tree that is
+  committed; push follows; hosted CI inspection recorded in CHECKPOINT.md
+  (unauthenticated gh — owner triages per SPEC-012 §15).
+
+### H3-D3 CLOSED
+
+docs/STATUS.md reconciled (header, Campaign bullet, milestone table row).
+No historical completion evidence rewritten anywhere.
+
+### H3-D5 CLOSED (severity raised HIGH during analysis)
+
+Uncontained `gate.admit`, `sink.start`, `sink.finish` escapes violated the
+documented Never-throws contract AND risked unobservable/unaccounted spend.
+Fix + classification additions are contract changes → ADR-0013 amendment
+recorded in the same change set.
+
+### H3-D6 CLOSED (severity HIGH)
+
+NaN cost estimate previously admitted (comparison fail-open) and poisoned
+durable state into StateCorruptionError quarantine (persistent DoS); negative
+usage fabricated refunds. Full fix + proofs as listed under H3.4.

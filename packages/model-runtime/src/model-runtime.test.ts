@@ -306,3 +306,76 @@ describe("M13 F1/F2: model runtime", () => {
     ).toThrow(TypeError);
   });
 });
+
+describe("HARDENING_3 H3-D5: runtime failure containment (never-throws made true)", () => {
+  it("a throwing budget gate never escapes invoke(), never invokes, and is classified budget-gate-error", async () => {
+    const provider = new ScriptedModelProvider({ id: "p", respond: { text: "x" } });
+    const sink = new MemorySink();
+    const runtime = new ModelRuntime().register(provider);
+    const result = await runtime.invoke(plannerSpec(), {
+      gate: {
+        admit: () => {
+          throw new Error("gate exploded");
+        },
+        settle: () => {},
+      },
+      sink,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.failure?.classification).toBe("budget-gate-error");
+    // Fail-closed: no invocation, therefore no unaccounted spend.
+    expect(provider.calls.length).toBe(0);
+    expect(sink.records.at(-1)?.status).toBe("failed");
+    expect(sink.records.at(-1)?.errorClassification).toBe("budget-gate-error");
+  });
+
+  it("a throwing sink.start aborts BEFORE invocation and settles the reservation conservatively", async () => {
+    const settlements: string[] = [];
+    const provider = new ScriptedModelProvider({ id: "p", respond: { text: "x" } });
+    const runtime = new ModelRuntime().register(provider);
+    const result = await runtime.invoke(plannerSpec(), {
+      gate: { admit: () => true, settle: (s) => settlements.push(s.outcome) },
+      sink: {
+        start: () => {
+          throw new Error("db closed");
+        },
+        finish: () => {},
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.failure?.classification).toBe("model-store-error");
+    expect(provider.calls.length).toBe(0); // no spend without durable observability
+    expect(settlements).toEqual(["failed"]); // conservative conversion, never a refund
+  });
+
+  it("a throwing sink.finish never corrupts an already-decided outcome and is observable", async () => {
+    const provider = new ScriptedModelProvider({ id: "p", respond: { text: "ok" } });
+    const runtime = new ModelRuntime().register(provider);
+    const result = await runtime.invoke(plannerSpec(), {
+      sink: {
+        start: () => {},
+        finish: () => {
+          throw new Error("disk full");
+        },
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe("ok");
+    expect(runtime.stats.storeErrors).toBe(1);
+  });
+
+  it("a throwing gate.settle stays contained by settleGate (documented contract)", async () => {
+    const provider = new ScriptedModelProvider({ id: "p", respond: { text: "{}" } });
+    const runtime = new ModelRuntime().register(provider);
+    const result = await runtime.invoke(plannerSpec(), {
+      gate: {
+        admit: () => true,
+        settle: () => {
+          throw new Error("settle blew up");
+        },
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(runtime.stats.storeErrors).toBe(0);
+  });
+});

@@ -91,3 +91,26 @@ charged even if Inspector dies before recording it.
 - Crash windows produce honest conservative accounting instead of free calls.
 - Vendor logic stays out of core product semantics; adding a provider is a
   configuration/local-module concern.
+
+## HARDENING_3 amendment (2026-08-25)
+
+Two additive contract clarifications, applied together with their tests:
+
+1. **Failure taxonomy additions.** `ModelFailureClass` gains
+   `"budget-gate-error"` (the configured gate threw during admission —
+   fail-closed, no invocation, no assumed reservation) and
+   `"model-store-error"` (the durable sink could not persist the `started`
+   row — fail-closed BEFORE external inference, reservation converted
+   conservatively). Both are terminal for the request: infrastructure faults
+   are not retried across providers and can never become unaccounted spend.
+   `ModelRuntimeStats` gains `storeErrors` for terminal `finish()`
+   persistence failures that cannot corrupt an already-decided outcome.
+
+2. **Untrusted-number boundary.** Estimates and provider-reported usage are
+   hostile input. Values that are not finite and non-negative (token counts:
+   safe integers after ceiling) are treated as ABSENT, steering admission to
+   conservative defaults and settlement to conservative conversion. NaN,
+   ±Infinity, negative, and unsafe-magnitude values can therefore never
+   poison holds, fabricate refunds, create headroom, fail a ceiling open, or
+   produce unloadable durable state; the state validator's finite checks were
+   aligned accordingly.

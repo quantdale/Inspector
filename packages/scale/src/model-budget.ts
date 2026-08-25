@@ -114,6 +114,7 @@ export function validateModelBudgetState(raw: unknown): ModelBudgetState {
       !finiteNonNegative(r.requests) ||
       !finiteNonNegative(r.tokens) ||
       typeof r.costUsd !== "number" ||
+      !Number.isFinite(r.costUsd) ||
       r.costUsd < 0
     ) {
       throw new TypeError("model-budget reservation amounts are impossible");
@@ -156,6 +157,23 @@ function finiteNonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
+/** Untrusted-number policy: estimates and provider-reported usage cross an
+ * external boundary and are treated as hostile input. A value is usable only
+ * when it is finite and non-negative (token counts additionally safe
+ * integers after ceiling). Anything else — NaN, ±Infinity, negative,
+ * unsafe-magnitude — is treated as ABSENT so conservative defaults or
+ * reservation-conversion apply. This can never produce NaN poisoning,
+ * fabricated refunds, budget headroom, or unloadable durable state. */
+function saneTokens(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  const n = Math.ceil(value);
+  return n >= 0 && Number.isSafeInteger(n) ? n : undefined;
+}
+
+function saneCost(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
 export class ReservationModelBudgetGate implements ModelBudgetGate {
   private readonly file: StateFile<ModelBudgetState>;
   private readonly opts: Required<Pick<ModelBudgetGateOptions, "defaultReserveTokens" | "reservationTtlMs">> &
@@ -192,11 +210,13 @@ export class ReservationModelBudgetGate implements ModelBudgetGate {
   admit(admission: ModelBudgetAdmission): boolean {
     return this.file.update((state) => {
       this.reconcileStaleInPlace(state);
+      const estTokens = saneTokens(admission.estimateTokens);
       const tokens =
-        admission.estimateTokens !== undefined && admission.estimateTokens > 0
-          ? Math.ceil(admission.estimateTokens)
-          : this.opts.defaultReserveTokens;
-      let cost = admission.estimateCostUsd ?? this.opts.defaultReserveCostUsd;
+        estTokens !== undefined && estTokens > 0 ? estTokens : this.opts.defaultReserveTokens;
+      // Hostile estimates (NaN/Infinity/negative/unsafe) fall back to the
+      // configured conservative default instead of poisoning a hold.
+      let cost = saneCost(admission.estimateCostUsd);
+      if (cost === undefined) cost = this.opts.defaultReserveCostUsd;
       if (cost === undefined) {
         if (this.isCostBounded) {
           // No truthful way to reserve against a cost ceiling: refuse rather
@@ -234,6 +254,15 @@ export class ReservationModelBudgetGate implements ModelBudgetGate {
       for (const scope of scopes) {
         if (!scope.bounds) continue;
         const projected = add(scope.subset, hold);
+        // Defensive: even fully-normalized inputs must never project into a
+        // state we would refuse to load back; refuse the admission instead.
+        if (
+          !Number.isSafeInteger(projected.requests) ||
+          !Number.isSafeInteger(projected.tokens) ||
+          !Number.isFinite(projected.costUsd)
+        ) {
+          return false;
+        }
         if (scope.bounds.maxModelRequests !== undefined && projected.requests > scope.bounds.maxModelRequests) {
           return false;
         }
@@ -328,14 +357,23 @@ function actualUsage(
   usage?: { inputTokens?: number; outputTokens?: number; totalChargedTokens?: number; costUsd?: number },
 ): { tokens: number; costUsd: number } | null {
   if (!usage) return null;
+  // Provider-reported usage is UNTRUSTED: every field is sanitized
+  // independently; unusable fields are treated as absent (unknown), which
+  // steers settlement toward conservative conversion — never toward a
+  // fabricated refund, negative consumption, or NaN-poisoned totals.
+  const reportedTotal = saneTokens(usage.totalChargedTokens);
+  const inTok = saneTokens(usage.inputTokens);
+  const outTok = saneTokens(usage.outputTokens);
+  const partsSum = inTok !== undefined || outTok !== undefined ? (inTok ?? 0) + (outTok ?? 0) : undefined;
   const tokens =
-    usage.totalChargedTokens !== undefined
-      ? usage.totalChargedTokens
-      : usage.inputTokens !== undefined || usage.outputTokens !== undefined
-        ? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0)
+    reportedTotal !== undefined
+      ? reportedTotal
+      : partsSum !== undefined && Number.isSafeInteger(partsSum)
+        ? partsSum
         : undefined;
-  if (tokens === undefined && usage.costUsd === undefined) return null;
-  return { tokens: tokens ?? 0, costUsd: usage.costUsd ?? 0 };
+  const cost = saneCost(usage.costUsd);
+  if (tokens === undefined && cost === undefined) return null;
+  return { tokens: tokens ?? 0, costUsd: cost ?? 0 };
 }
 
 function sumReservations(reservations: ModelReservationRecord[]): ConsumptionTotals {

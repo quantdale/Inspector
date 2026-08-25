@@ -29,9 +29,16 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Explicit, reproducible browser prerequisite for the real-browser
+      # proofs in the integration lane (web adapter target/conformance and
+      # exploration E2E). The unit lane stays hermetic: no browser cache is
+      # relied upon and no browser-backed test is classified as unit.
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:integration
 
   # Distribution is exercised after the required gate from a clean npm
