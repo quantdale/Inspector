@@ -1,6 +1,6 @@
 # SPEC-013 — Intelligence-Guided Autonomous QA: Model Runtime, Deliberate Exploration, Semantic Reasoning, Source-Aware Diagnosis, and Safe Repair Assistance
 
-Status: ACTIVE
+Status: COMPLETE (M13 exit gate 2026-08-25 — see TASKS.md and campaign.yaml for exact evidence)
 Milestone: M13
 Depends on: SPEC-003, SPEC-004, SPEC-007, SPEC-009, SPEC-010, SPEC-011, SPEC-012 (incl. HARDENING_2)
 

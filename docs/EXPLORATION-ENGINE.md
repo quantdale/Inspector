@@ -110,15 +110,28 @@ Allow developers to define primitive actions, preconditions, and invariants. A p
 
 ## Planner hierarchy
 
-Use deterministic heuristics for obvious choices; use an LLM for ambiguous semantic planning.
+Use deterministic heuristics for obvious choices; use an LLM only as a bounded adviser on ambiguous semantic planning (M13 F7, implemented):
 
 ```text
-fast deterministic enumerator
+fast deterministic enumerator + scorer (primary controller)
       |
-      +--> high-value candidate exists -> execute
+      +--> high-value unambiguous candidate exists -> execute
       |
-      +--> ambiguity/semantic goal -> model proposes ranked candidates
+      +--> ambiguity (near-tied top candidates) OR novelty stall
+             -> SemanticPlanner consulted within cadence floor + per-run cap
+             -> strict schema; suggested actionKey must EXACTLY match an offered
+                usable-inventory member; confidence threshold applies
+             -> accepted decision checkpointed BEFORE execution (crash-safe:
+                resume consumes it without a duplicate model call or action)
+             -> every failure mode (provider loss, budget denial, deadline,
+                malformed/schema-invalid output, fabricated key, low confidence,
+                policy rejection) falls back to deterministic selection
 ```
+
+The planner NEVER touches the exploration RNG: with no provider configured,
+fixed-seed runs are byte-for-byte identical to pre-M13 behavior. Rejected
+suggestions feed a bounded ring included in later packets so the same bad
+idea is not retried indefinitely.
 
 This conserves model calls while preserving intelligence where it matters.
 

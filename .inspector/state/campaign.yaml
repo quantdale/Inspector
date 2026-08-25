@@ -26,15 +26,17 @@ autonomy:
 active:
   milestone_id: M13
   milestone_name: Intelligence-guided autonomous QA — model runtime, deliberate exploration, semantic reasoning, source-aware diagnosis, safe repair assistance
-  status: ACTIVE
+  status: COMPLETE
   spec: specs/013-intelligence-guided-autonomy/SPEC.md
   tasks: specs/013-intelligence-guided-autonomy/TASKS.md
-  task_group: F0
-  waypoint: M13.F0.activation
+  task_group: F27
+  waypoint: M13.F27.final-gate
   waypoint_status: COMPLETE
   next_action: >-
-    Implement F1/F2 (@inspector/model-runtime package + invocation contract),
-    then proceed through the SPEC-013 task graph in dependency order.
+    M13 exit gate complete. No further roadmap milestone is activated. Keep
+    M8 environment-deferred unless macOS/Xcode becomes available; hardening
+    stays separately invoked; do not publish any release without explicit
+    authorization.
 
 progress:
   completed_milestones:
@@ -50,6 +52,7 @@ progress:
     - M10
     - M11
     - M12
+    - M13
   completed_task_groups:
     - F0
     - F1
@@ -133,6 +136,35 @@ progress:
     - M12.F8
     - M12.F9
     - M12.F10
+  completed_task_groups:
+    - M13.F0
+    - M13.F1
+    - M13.F2
+    - M13.F3
+    - M13.F4
+    - M13.F5
+    - M13.F6
+    - M13.F7
+    - M13.F8
+    - M13.F9
+    - M13.F10
+    - M13.F11
+    - M13.F12
+    - M13.F13
+    - M13.F14
+    - M13.F15
+    - M13.F16
+    - M13.F17
+    - M13.F18
+    - M13.F19
+    - M13.F20
+    - M13.F21
+    - M13.F22
+    - M13.F23
+    - M13.F24
+    - M13.F25
+    - M13.F26
+    - M13.F27
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -221,18 +253,26 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M12 final state-synchronization commit on main)
+  last_verified_commit: HEAD (M13 final gate + state synchronization on main)
   last_gate: >-
-    M12 exit gate PASS on the exact final tree: lint 0 errors/4 pre-existing
-    warnings; typecheck PASS; unit 549 passed / 3 skipped (50 files);
-    integration 165 passed / 1 skipped across 40 files; pnpm release:smoke
-    PASS including installed-artifact campaign steps (manifest validate,
-    two-worker manifest run, show). Real portfolio through the campaign
-    scheduler: web (Playwright), CLI/PTTY (ConPTY), android (AVD) plus full
-    fake-engine pipeline. Hosted CI not invoked (no push authority); no
-    release/tag action taken.
+    M13 exit gate PASS on the exact final tree: pnpm install --frozen-lockfile
+    OK; lint 0 errors / 4 pre-existing warnings (adapter-web); typecheck
+    PASS; unit 633 passed / 3 skipped across 60 files; integration 197
+    passed / 1 skipped (display-gated Electron real-runtime skip) across 46
+    files including real web/Playwright, real CLI/PTY, real Android AVD,
+    real Windows UIA and Electron lanes plus all M13 suites; release:smoke
+    PASS from a clean installed prefix including M13 steps (model help,
+    models summary, deterministic provider module load through a fake hunt,
+    invalid-provider refusal exit 4). No external inference service or
+    credentials used anywhere. During the campaign two environmental flakes
+    were classified per policy: android real-backend uiautomator dump exit
+    137 (stale dual-emulator contention; green after bounded emulator reset,
+    then green in full sweep) and cli hunt--resume timing race (pre-existing;
+    probe robustified, assertions unchanged). One real regression introduced
+    during M13 (router exhaustion message lost fallback ids) was caught by
+    SOAK-J4 and fixed.
   last_gate_result: PASS
-  last_gate_at: "2026-08-24"
+  last_gate_at: "2026-08-25"
 
 blockers: []
 known_debt:
@@ -609,6 +649,88 @@ m12:
     F11: COMPLETE
   waypoint: M12.F11.final-gate
   waypoint_status: COMPLETE
+  blockers: []
+
+m13:
+  campaign: INTELLIGENCE_GUIDED_AUTONOMOUS_QA
+  status: COMPLETE
+  started_at: "2026-08-24"
+  completed_at: "2026-08-25"
+  started_from_commit: 385d3c62fe2c8ecabc4e985fbf22dc5754e8e35d
+  spec: specs/013-intelligence-guided-autonomy/SPEC.md
+  tasks: specs/013-intelligence-guided-autonomy/TASKS.md
+  adr:
+    - docs/ADR/0013-model-runtime-and-budget-reservation.md
+  task_groups:
+    F0: COMPLETE
+    F1: COMPLETE
+    F2: COMPLETE
+    F3: COMPLETE
+    F4: COMPLETE
+    F5: COMPLETE
+    F6: COMPLETE
+    F7: COMPLETE
+    F8: COMPLETE
+    F9: COMPLETE
+    F10: COMPLETE
+    F11: COMPLETE
+    F12: COMPLETE
+    F13: COMPLETE
+    F14: COMPLETE
+    F15: COMPLETE
+    F16: COMPLETE
+    F17: COMPLETE
+    F18: COMPLETE
+    F19: COMPLETE
+    F20: COMPLETE
+    F21: COMPLETE
+    F22: COMPLETE
+    F23: COMPLETE
+    F24: COMPLETE
+    F25: COMPLETE
+    F26: COMPLETE
+    F27: COMPLETE
+  waypoint: M13.F27.final-gate
+  waypoint_status: COMPLETE
+  delivered:
+    - >-
+      @inspector/model-runtime: provider-neutral roles/contracts, typed
+      invocation with attribution/deadline/cancel, truthful usage (unknown
+      stays unknown), stable failure taxonomy, deterministic fallback,
+      response validation hooks, scripted fixture provider, shared validated
+      local-provider loader; scale ModelRouter re-platformed without surface
+      change.
+    - >-
+      Durable model_calls control plane (additive migration #12) with hashes,
+      redacted metadata, crash-window started rows, truthful NULL usage sums;
+      Store APIs + `inspector models summary`.
+    - >-
+      Reservation-before-consumption budgets: ReservationModelBudgetGate over
+      global/worker/item maxModelRequests/maxTokens/maxCostUsd; conservative
+      TTL reconciliation; cost-bounded refusal without estimate source;
+      scheduler-bound ctx.modelGate for campaigns with two-worker race proofs.
+    - >-
+      Bounded versioned context packets (planner/suspicion/repair) with
+      deterministic serialization, shrink-to-ceiling, freeform redaction,
+      injection-inert DATA BLOCK assembly.
+    - >-
+      Semantic planner in the web explorer: strict schema, exact inventory
+      containment, confidence threshold, cadence/caps, checkpoint-persisted
+      accepted decisions, resume without duplicate calls/actions, RNG
+      untouched; scripted-planner acceptance fixture beats deterministic
+      baseline to a seeded anomaly.
+    - >-
+      Semantic suspicion evaluator (model-only stays NEEDS_HUMAN_ORACLE,
+      confidence capped at 0.5, fabricated refs dropped).
+    - >-
+      Source intelligence ranking with reasons + upgraded bounded repair
+      context; provider-neutral ModelPatchAgent proposals through the existing
+      RepairEngine verification pipeline; E2E RESOLVED/rejection proofs with
+      untouched primary checkout.
+    - >-
+      Session digest summarization as derived cache; CLI flags/help/models
+      command; capability tags model-planner/model-semantic-oracle; installed
+      artifact smoke covers help/models/provider load/refusal classification.
   blockers: []
 
 ga_readiness:

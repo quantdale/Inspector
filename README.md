@@ -152,6 +152,10 @@ Details and known limitations: `docs/PLATFORM-ADAPTERS.md`.
 - Treat every actuator as a capability subject to policy and budget.
 - Keep platform-specific complexity behind adapters.
 - Make failures auditable: every finding should have a replayable evidence package.
+- Models propose; Inspector validates (M13): optional provider-neutral model
+  assistance improves planning/suspicion/diagnosis/repair proposals, but
+  evidence, policy, budgets-before-consumption, and verification stay
+  authoritative. No model is required — offline behavior stays deterministic.
 
 ## Core documents
 

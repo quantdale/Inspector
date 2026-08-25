@@ -62,6 +62,13 @@ checkpoint
 
 A model may propose actions, but the core chooses from validated candidates after policy checks.
 
+M13 makes this concrete: an optional semantic planner is consulted only on
+ambiguity/stall within cadence and per-run caps; its suggestion must exactly
+match an offered legal inventory key, passes the same policy/risk gates, is
+checkpointed before execution (resume consumes it without a duplicate model
+call), and every failure degrades to the deterministic path without touching
+the exploration RNG.
+
 ## Crash recovery
 
 A run is resumable only if Inspector can distinguish:
@@ -72,6 +79,13 @@ A run is resumable only if Inspector can distinguish:
 - environment lost
 - process lost
 - model call lost
+
+M13 adds durable model-call truth to this list: a `model_calls` row written
+as `started` before external inference survives restarts as a crash-window
+record; budget reservations held at death block overspend across restarts and
+convert conservatively to consumed truth after a TTL — never silently
+refunded. An accepted planner decision persisted pre-execution is consumed on
+resume instead of re-invoking the provider or duplicating the action.
 
 Retryable actions require idempotency semantics. Non-idempotent actions with unknown outcomes trigger re-observation or environment reset rather than blind replay.
 

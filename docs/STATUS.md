@@ -1,13 +1,14 @@
 # Project Status
 
-Last updated: HARDENING_2 COMPLETE (2026-08-24)
+Last updated: M13 IN PROGRESS (2026-08-25)
 
 ## Campaign
 
-- Mode: **M12 — real-target fleet campaigns: COMPLETE; HARDENING_2 — fleet
-  runtime integrity, recovery, and state truth (separately invoked): 
-  COMPLETE**. M11 and all earlier milestones remain COMPLETE; M8 stays
-  `DEFERRED_ENVIRONMENT`.
+- Mode: **M13 — Intelligence-Guided Autonomous QA: ACTIVE** (model runtime,
+  deliberate exploration, semantic reasoning, source-aware diagnosis, safe
+  repair assistance; SPEC-013 / ADR-0013). M12 — real-target fleet campaigns:
+  COMPLETE; HARDENING_2 (separately invoked): COMPLETE. M11 and all earlier
+  milestones remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`.
   Canonical state is recorded in `.inspector/state/campaign.yaml`; the
   HARDENING_2 ledger lives in `.inspector/state/HARDENING-CHECKPOINT.md`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
@@ -226,5 +227,6 @@ None blocking continued validation.
 | M10 Resumable exploration | COMPLETE |
 | M11 Operator workflows/distribution | COMPLETE |
 | M12 Real-target fleet campaigns | COMPLETE |
+| M13 Intelligence-guided autonomy | ACTIVE (SPEC-013) |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

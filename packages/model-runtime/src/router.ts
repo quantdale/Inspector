@@ -317,7 +317,11 @@ export class ModelRuntime {
       requestId,
       final.classification,
       `all providers for role '${spec.role}' failed (${fallbacksUsed.join(", ")}): ${final.detail}`,
-      { attemptNumber: fallbacksUsed.length, fallbacksUsed },
+      {
+        providerId: fallbacksUsed[fallbacksUsed.length - 1],
+        attemptNumber: fallbacksUsed.length,
+        fallbacksUsed,
+      },
     );
   }
 
@@ -500,7 +504,7 @@ export class ModelRuntime {
       ok: false,
       usage: {},
       failure: { classification, detail },
-      ...(attempt && attempt.providerId
+      ...(attempt && attempt.providerId !== undefined
         ? {
             attempt: {
               providerId: attempt.providerId,

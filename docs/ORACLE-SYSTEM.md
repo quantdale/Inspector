@@ -50,6 +50,15 @@ Visual snapshot, performance baseline, accessibility tree snapshot, previously o
 
 LLM or vision judgments such as clipped content, suspicious navigation, contradictory copy, likely dead controls, or unexpected layout. These generate candidates and investigation tasks, not automatic source changes by default.
 
+M13 implements this class as an OPTIONAL model-backed evaluator
+(`SemanticSuspector` in `@inspector/oracle`): a bounded evidence packet in,
+a strict verdict out, disposition always through `classifySuspicion`.
+Model-only suspicion stays `NEEDS_HUMAN_ORACLE` with confidence soft-capped
+at 0.5 regardless of the model's claimed certainty; fabricated evidence refs
+are dropped; malformed/deadline/denied evaluations degrade to UNEVALUATED.
+Only hard-oracle corroboration can promote a suspicion to CANDIDATE — and
+even then through the unchanged deterministic confirmation policy below.
+
 ## Oracle evaluation record
 
 Every evaluation stores:

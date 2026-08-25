@@ -342,7 +342,7 @@ describe("M13 F19/F7: model-assisted exploration against the deterministic engin
       return originalSubmit(action);
     };
     const controller = new ExploreController({
-      run,
+      run: run as unknown as RunController,
       config: { ...config(99), maxActions: 40 },
       model: modelDeps(provider),
     });

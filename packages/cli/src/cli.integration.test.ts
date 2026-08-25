@@ -491,6 +491,9 @@ describe("cli", () => {
 
   it("continues the autonomous campaign with hunt --resume", async () => {
     dir = mkdtempSync(join(tmpdir(), "inspector-cli-hunt-resume-"));
+    // 800 actions: the fake hunter runs fast (~4s per 200 actions), so a
+    // larger budget keeps the mid-run kill window wide even when the parent's
+    // probe is delayed by SQLite write-lock contention. Assertions unchanged.
     const child = spawn(
       process.execPath,
       [
@@ -501,7 +504,7 @@ describe("cli", () => {
         "--adapter",
         "fake",
         "--max-actions",
-        "200",
+        "800",
         "--max-minutes",
         "5",
         "--json",
@@ -513,23 +516,31 @@ describe("cli", () => {
     const dbPath = join(dir, ".inspector", "runs.db");
     let interruptedId: string | undefined;
     let actionsBeforeKill = 0;
-    for (let i = 0; i < 60 && !interruptedId; i++) {
-      await new Promise((r) => setTimeout(r, 250));
+    // A PERSISTENT read connection avoids re-opening against the child's
+    // write locks every poll (busy_timeout waits made detection lag until
+    // after completion under load, which raced the kill).
+    let probe: Store | undefined;
+    for (let i = 0; i < 200 && !interruptedId; i++) {
+      await new Promise((r) => setTimeout(r, 100));
       if (!existsSync(dbPath)) continue;
-      let probe: Store | undefined;
+      if (!probe) {
+        try {
+          probe = Store.open(dbPath);
+        } catch {
+          continue;
+        }
+      }
       try {
-        probe = Store.open(dbPath);
         const active = probe.listRuns(5).find((r) => r.status === "running");
         if (active && probe.countRunActions(active.id) >= 3) {
           interruptedId = active.id;
           actionsBeforeKill = probe.countRunActions(active.id);
         }
       } catch {
-        // The hunt may hold the short SQLite write lock; retry the probe.
-      } finally {
-        probe?.close();
+        // Short lock contention on this single read; retry next tick.
       }
     }
+    probe?.close();
     expect(interruptedId).toBeTruthy();
     if (process.platform === "win32") {
       spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });

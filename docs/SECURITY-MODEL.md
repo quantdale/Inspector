@@ -49,6 +49,25 @@ MVP default: target may reach only configured origins. External navigation disco
 
 Text observed inside the target is **data**, not control instructions. Adapter observations must be wrapped and labeled as untrusted target content. The policy engine ignores instructions originating from observations.
 
+M13 makes this structural for the model layer: every model prompt carries a
+fixed Inspector instruction preamble plus a JSON DATA BLOCK; target-derived
+text exists ONLY inside that block, so injection strings remain inert data by
+construction (covered deterministically in test). Even a fully hostile model
+response cannot escape: planner suggestions must exactly match offered
+inventory keys and still pass policy/risk/autonomy gates; semantic suspicion
+is soft-capped and can never confirm or authorize repair; repair proposals
+face schema validation, path containment, forbidden-segment policy, byte/file
+caps, tamper/masking probes, and replay/regression verification.
+
+### Provider modules are trusted operator configuration
+
+A local model provider module executes arbitrary code inside the Inspector
+process. Loading one is an explicit operator act (`--model-provider <path>`);
+it is NOT sandboxed and is never inferred from target content or data.
+Modules are validated for shape through one shared loader; load errors are
+redacted before display. No credentials are stored in Inspector state and
+none are ever printed.
+
 ### Environment destruction
 
 Fault injection such as process kill, file corruption, database mutation, or network manipulation is only allowed inside environments marked disposable.

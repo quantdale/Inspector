@@ -28,9 +28,10 @@ describe("M13 F16/F17: campaign-scoped model accounting", () => {
           available: true,
         };
       }
-      async execute(item: unknown, ctx: ExecutionContext): Promise<WorkItemResult> {
+      async execute(raw: unknown, ctx: ExecutionContext): Promise<WorkItemResult> {
+        const item = raw as WorkItem;
         if (ctx.modelGate === undefined) {
-          return okResult({ failureClass: undefined } as never);
+          return okResult();
         }
         let admitted = 0;
         for (let i = 0; i < 8; i++) {
@@ -67,7 +68,6 @@ describe("M13 F16/F17: campaign-scoped model accounting", () => {
 
     const campaign = new UnattendedCampaign(
       {
-        id: "m13-model-ceiling",
         items,
         workerCount: 2,
         executor: new ModelHammerExecutor(),
@@ -97,7 +97,8 @@ describe("M13 F16/F17: campaign-scoped model accounting", () => {
       capabilities() {
         return { executorId: this.id, families: ["fake" as const], capabilities: ["deterministic-fixture"], available: true };
       }
-      async execute(item: unknown, ctx: ExecutionContext): Promise<WorkItemResult> {
+      async execute(raw: unknown, ctx: ExecutionContext): Promise<WorkItemResult> {
+        const item = raw as WorkItem;
         const gate = ctx.modelGate;
         if (!gate) throw new Error("scheduler must bind ctx.modelGate");
         const first = gate.admit({ requestId: `r-${item.id}`, attemptId: `${item.id}-a`, role: "planner", requestClass: "c", estimateTokens: 10 });
@@ -116,7 +117,6 @@ describe("M13 F16/F17: campaign-scoped model accounting", () => {
     }));
     const campaign = new UnattendedCampaign(
       {
-        id: "m13-item-scope",
         items,
         workerCount: 2,
         executor: new SingleShotExecutor(),

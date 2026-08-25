@@ -213,9 +213,12 @@ packages/
   core/            # policy/budget + run manager
   explore/         # autonomous exploration engine
   finding/         # finding lifecycle + reproduction policy
-  oracle/          # oracle evaluation
-  repair/          # isolated repair loop
+  oracle/          # oracle evaluation + model-backed semantic suspicion
+  repair/          # isolated repair loop + source intelligence + ModelPatchAgent
   scale/           # lease/concurrency primitives (FileLock + SQLite lease store)
+                     # + reservation-based model budget gate (M13)
+  model-runtime/   # provider-neutral model boundary (M13, zero workspace deps)
+  workflows/       # shared hunt/explore/verify/regress services (CLI + fleet)
   cli/             # inspector command
 dogfood/           # dogfood target manifests + static server helper
 specs/             # milestone specifications and task lists

@@ -26,7 +26,12 @@ Use OpenTelemetry-compatible concepts for:
 - actions/sec
 - adapter error rate
 - environment reset rate
-- model calls/tokens/cost
+- model calls/tokens/cost (M13: durable per-attempt truth in `model_calls` —
+  attempts, completions, failures by classification, denials, crash-window
+  `started` rows, fallback positions, latency; token/cost sums stay NULL when
+  providers do not report usage. Aggregate via `inspector models summary`;
+  hunt/explore payloads carry an additive `model` block with runtime stats,
+  planner accepted/rejected suggestions, and suspicion verdicts)
 - unique states/transitions
 - coverage delta
 - candidate findings

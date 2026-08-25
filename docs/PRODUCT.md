@@ -49,6 +49,13 @@ Explore until budget exhausted or stop policy fires. Record candidates and
 confirm reproducible defects. Hunt is discovery-only by default; any repair
 requires a separate explicit `inspector repair` authorization.
 
+Optional model assistance (M13): `--model-provider <module> --planner
+--semantic-oracle --summarize` plus durable ceilings (`--model-max-requests
+--model-max-tokens`). Budget permission precedes every model call; denied
+calls never reach a provider; without a provider everything stays
+deterministic. `inspector models summary` reports durable model-call
+accounting (attempts, classifications, known token/cost truth).
+
 ### Verify
 
 `inspector verify <finding>`

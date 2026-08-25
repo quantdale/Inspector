@@ -27,8 +27,9 @@ export interface CampaignOptions {
   workerCount: number;
   items: LegacyWorkItem[];
   /** Deterministic per-action usage charged to the ledger by the default fake executor. */
-  usagePerStep: { modelRequests: number; tokens: number; costUsd: number; actions: number };
-  globalBudget?: { maxActions?: number; maxTokens?: number; maxCostUsd?: number };
+  usagePerStep?: { modelRequests: number; tokens: number; costUsd: number; actions: number };
+  /** Global budget ceilings (M13 F16: includes model scopes). */
+  globalBudget?: Budget;
   workerBudgets?: Record<string, Budget>;
   now?: () => number;
   /** Lease TTL; long items renew at half-TTL intervals while they run. */
@@ -267,7 +268,7 @@ export class UnattendedCampaign {
     this.executor =
       opts.executor ??
       new FakeItemExecutor({
-        usagePerStep: opts.usagePerStep,
+        usagePerStep: opts.usagePerStep ?? { modelRequests: 0, tokens: 0, costUsd: 0, actions: 1 },
         ...(opts.leaseTtlMs !== undefined ? { leaseTtlMs: opts.leaseTtlMs } : {}),
       });
     this.ownsArtifactsDir = artifactsDir === undefined;

@@ -3,7 +3,7 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **ACTIVE — M13 Intelligence-Guided Autonomous QA activated 2026-08-24 from a clean synced tree at `385d3c62fe2c8ecabc4e985fbf22dc5754e8e35d` (== origin/main)**
+- Status: **COMPLETE — M13 Intelligence-Guided Autonomous QA closed 2026-08-25.** M0-M12 and HARDENING_1/2 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
 - Hardening: none active (HARDENING_2 COMPLETE; hardening stays separately invoked)
@@ -40,6 +40,81 @@ F0 audit findings driving the design:
 - Release bundles via esbuild from package sources; new workspace package is
   picked up automatically once imported by CLI entry points.
 
+### M13 COMPLETE (2026-08-25)
+
+All F0-F27 task groups complete; exit gate PASS on the exact final tree.
+Final gates: install --frozen-lockfile OK; lint 0 errors / 4 pre-existing
+warnings; typecheck PASS; unit 633 passed / 3 skipped (60 files);
+test:integration 197 passed / 1 skipped across 46 files (the skip is the
+long-standing display-gated Electron real-runtime case); release:smoke PASS
+from a clean installed prefix including M13 steps. No tag/release/publication.
+
+Delivered capabilities (details in commit messages + ADR-0013):
+
+- `@inspector/model-runtime`: provider-neutral roles/contracts, typed
+  invocation with attribution/deadline/cancellation, truthful usage (unknown
+  stays unknown, never zero-fabricated), stable failure taxonomy,
+  deterministic fallback with terminal validation failures, runtime-owned
+  deadline/cancel enforcement, scripted fixture provider, shared validated
+  local-provider loader (documented trusted-operator boundary). Scale's legacy
+  ModelRouter re-platformed onto it with unchanged public surface/messages.
+- Durable `model_calls` control plane (additive migration #12): per-attempt
+  rows with attribution, status lifecycle incl. crash-window `started` and
+  `denied`, SHA-256 packet/response hashes (never raw prompts), NULL usage =
+  unknown; Store APIs; `inspector models summary`.
+- Reservation-before-consumption budgets: ReservationModelBudgetGate over
+  global/worker/item maxModelRequests/maxTokens/maxCostUsd with conservative
+  TTL reconciliation of abandoned holds, honest overage recording, cost-bounded
+  refusal without estimate source, fail-closed semantic state validation;
+  scheduler binds ctx.modelGate per execution so campaigns enforce atomic
+  shared ceilings (two-worker race proof) and items carry per-item scopes.
+- Bounded versioned context packets (planner/suspicion/repair): deterministic
+  serialization, shrink-to-ceiling, established freeform redaction,
+  instruction preamble vs untrusted DATA BLOCK separation.
+- Semantic planner in the web explorer: exact-inventory containment, strict
+  schema, confidence threshold, cadence floor + per-run cap, checkpoint-
+  persisted accepted decisions consumed on resume without duplicate model
+  calls or actions, rejected-suggestion memory, RNG untouched (fixed-seed
+  runs byte-identical without provider). Acceptance fixture: scripted
+  packet-driven planner reaches a seeded vault anomaly in fewer actions than
+  pure determinism while every executed selector stays legal.
+- Model-backed weak semantic suspicion: disposition always via
+  classifySuspicion (model-only => NEEDS_HUMAN_ORACLE, confidence capped 0.5,
+  fabricated evidence refs dropped, all failure modes UNEVALUATED).
+- Source intelligence ranking with reasons (preferred/referenced/changed/
+  prior-attempt/tokens/selectors/import-proximity/nearby tests) feeding an
+  upgraded bounded auditable repair context.
+- Provider-neutral ModelPatchAgent proposals through the unchanged RepairEngine:
+  strict schema, structural path policy + forbidden segments + caps;
+  E2E RESOLVED via isolated worktree with untouched primary checkout plus
+  traversal-rejection and test-tamper POLICY_BLOCKED proofs.
+- Session digest summarization as derived cache with checkpoint continuity.
+- CLI: hunt/explore model flags with role checks and stable error kinds,
+  additive JSON `model` blocks, help documentation, `models summary` command.
+- Capability tags model-planner/model-semantic-oracle declared from real
+  executor configuration; routing/refusal mechanics reused unchanged.
+
+Defects found and fixed during M13 (all with regression coverage):
+- Router exhaustion result lost fallback provenance ids after the last-failure
+  classification refactor — caught by SOAK-J4 storm, fixed in model-runtime.
+- cli hunt--resume integration race (pre-existing): probe used per-poll store
+  opens that stall on busy_timeout under load, letting the child finish before
+  the kill; probe now uses one persistent read connection and a wider budget.
+  Assertions unchanged; green repeatedly including full sweeps.
+
+Environmental classifications during final gates:
+- android real-backend `uiautomator dump` exit 137 once under dual stale
+  emulators from concurrent suites; green after bounded emulator reset and
+  green again in the full sweep (same environmental class recorded in
+  HARDENING_2).
+- h2-fleet-hardening two-controllers case hit the documented FileLock
+  contention flake class under full-suite fork load once; green in isolation
+  and green in retry run 2 of the full suite.
+
+Hosted CI: pushed through 529ffd2 mid-campaign and the final push triggers
+layered CI again; results not inspectable from this host (gh CLI present but
+unauthenticated) — owner should triage Actions lanes per SPEC-012 s15 rule.
+No release/tag action taken.
 ### M12 activation (2026-08-23)
 
 M12 activated from a clean tree at `3b974c62db58ede47940267c5b62137325c49896`

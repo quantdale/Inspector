@@ -67,7 +67,8 @@ The monorepo under `packages/` currently contains:
 | `@inspector/adapter-sdk` | Line-delimited JSON-RPC 2.0 over stdio transport, `AdapterServer`/`AdapterClient` with deadline enforcement, event notifications, subprocess spawning. |
 | `@inspector/adapter-fake` | Deterministic 5-state / 8-action fake adapter with a deterministic failure oracle, reset, artifact stubs, and fault injection (timeout, crash). |
 | `@inspector/core` | Policy/budget engine and `RunManager`/`RunController`: lifecycle, policy enforcement, durable step commit, checkpointing, crash recovery. |
-| `@inspector/cli` | Installed operator CLI: `hunt`, `verify`, `regress`, `explore`, `repair`, bounded `campaign`, findings/runs inspection, doctor, and stable JSON contracts. |
+| `@inspector/cli` | Installed operator CLI: `hunt`, `verify`, `regress`, `explore`, `repair`, bounded `campaign`, findings/runs inspection, model-call accounting (`models summary`), doctor, and stable JSON contracts. |
+| `@inspector/model-runtime` | Provider-neutral model boundary (M13, ADR-0013): roles, typed invocation with attribution/deadlines/cancellation, truthful usage, stable failure taxonomy, deterministic fallback, scripted fixture provider, shared local-provider module loader. Zero workspace dependencies. |
 | `@inspector/electron-adapter` | Production Playwright Electron handler plus explicit injectable contract backend, deterministic fixture, renderer/main evidence, and backend honesty probes. |
 
 Runtime notes:
@@ -187,30 +188,31 @@ Do not add Redis or a distributed queue before one machine genuinely becomes a b
 
 ## Context/memory strategy
 
-Models do not receive raw history indefinitely. Inspector builds compact, typed context packets:
+Models do not receive raw history indefinitely. Inspector builds compact, typed context packets (M13 F6, implemented in `@inspector/explore/model-context` and `@inspector/repair/source-intel`):
 
 - current state summary
 - recent action window
 - state graph neighborhood
 - active invariants/oracles
 - anomaly signals
-- relevant source map
-- previous failed hypotheses
+- relevant source map (deterministic source intelligence with reasons)
+- previous failed hypotheses / rejected suggestions
 - budgets remaining
 - artifact handles
+
+Packets are versioned, deterministically serialized, byte-ceilinged via
+shrinkage, redact target-controlled freeform fields, and confine all
+target-derived content to the JSON DATA BLOCK below Inspector's fixed
+instruction preamble. Session digests (`SessionSummarizer`) are derived
+caches, never authority.
 
 Large artifacts are fetched only when requested.
 
 ## Source intelligence
 
-The repository layer should eventually expose:
-
-- git diff/history
-- symbol index through LSP/tree-sitter adapters
-- static diagnostics
-- dependency graph
-- test inventory
-- coverage mapping
-- changed-file impact map
-
-Source intelligence informs exploration prioritization and diagnosis but is not required for the earliest black-box web proof.
+Implemented as a deterministic ranking layer for diagnosis and repair (M13
+F9): preferred/evidence-referenced paths, explicitly-known change sets, prior
+repair attempts, error/log tokens, UI selector ids, cheap import proximity,
+nearby test candidates — each ranked file carries machine-readable reasons.
+A full symbol index/LSP platform remains future work; the ranking layer is
+deliberately lightweight and bounded.
