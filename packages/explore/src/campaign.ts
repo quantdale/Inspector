@@ -30,6 +30,13 @@ import {
   type DiscoveredAnomaly,
 } from "./anomaly.js";
 import { mulberry32, type Rng } from "./rng.js";
+import type {
+  ModelAttribution,
+  ModelBudgetGate,
+  ModelCallSink,
+  ModelRuntime,
+} from "@inspector/model-runtime";
+import { SemanticPlanner, shouldInvokePlanner, type SemanticPlannerConfig } from "./model-planner.js";
 import { FaultController } from "./faults.js";
 import { NoopPlanner, type Planner, type PlannerContext } from "./planner.js";
 import { DEFAULT_SEQUENCE_LENGTHS } from "./inputs.js";
@@ -71,6 +78,17 @@ export interface ExploreConfig {
   targetUrl?: string;
 }
 
+/** Optional model assistance wiring (M13 F7). Absent ⇒ fully deterministic
+ * behavior, byte-for-byte identical to pre-M13 runs for a fixed seed. */
+export interface ExploreModelAssistance {
+  runtime: ModelRuntime;
+  gate?: ModelBudgetGate;
+  sink?: ModelCallSink;
+  config?: SemanticPlannerConfig;
+  attribution?: ModelAttribution;
+  instruction?: string;
+}
+
 /**
  * Honest per-anomaly record of what the reproduction pipeline decided.
  * `confirmed-unverified-minimization` means the reproduction policy confirmed
@@ -107,6 +125,8 @@ export interface ExploreResult {
   warnings: string[];
   actionKindSequence: string[];
   stoppedReason: string;
+  /** M13 F7: semantic-planner accounting (absent when no model configured). */
+  planner?: { calls: number; accepted: number; rejected: number };
 }
 
 export interface ExploreDeps {
@@ -123,6 +143,8 @@ export interface ExploreDeps {
    * pre-consumption budget permission at safe loop boundaries.
    */
   control?: ExplorationControl;
+  /** M13 F7: optional provider-neutral model assistance for planning. */
+  model?: ExploreModelAssistance;
 }
 
 const DEFAULT_OBSERVE = ["url", "uiTree", "storage", "pageErrors", "title"];
@@ -172,6 +194,16 @@ export class ExploreController {
   private replayDriverFactory?: () => ReplayDriver;
   private store?: Store;
   private readonly control?: ExplorationControl;
+  private readonly semantic?: SemanticPlanner;
+  /** Actions executed since the last planner call (cadence floor). */
+  private actionsSincePlannerCall = Number.MAX_SAFE_INTEGER;
+  /** Bounded ring of rejected planner suggestions (loop avoidance + audit). */
+  private rejectedSuggestions: string[] = [];
+  /** Accepted planner decision awaiting execution; persisted pre-execution. */
+  private pendingPlannerActionKey: string | null = null;
+  /** Set by select() when the returned candidate came from an accepted
+   * planner suggestion; consumed by makeAction for provenance metadata. */
+  private lastSelectionPlannerSuggested = false;
 
   constructor(deps: ExploreDeps) {
     this.run = deps.run;
@@ -215,6 +247,16 @@ export class ExploreController {
     this.replayDriverFactory = deps.replayDriverFactory;
     this.store = deps.store;
     this.control = deps.control;
+    this.semantic = deps.model
+      ? new SemanticPlanner({
+          runtime: deps.model.runtime,
+          ...(deps.model.gate ? { gate: deps.model.gate } : {}),
+          ...(deps.model.sink ? { sink: deps.model.sink } : {}),
+          ...(deps.model.config ? { config: deps.model.config } : {}),
+          ...(deps.model.attribution ? { attribution: deps.model.attribution } : {}),
+          ...(deps.model.instruction ? { instruction: deps.model.instruction } : {}),
+        })
+      : undefined;
     this.campaignStartedAt = campaign?.createdAt ?? new Date().toISOString();
     if (restored) this.restore(restored);
   }
@@ -265,6 +307,20 @@ export class ExploreController {
     }));
     for (const key of payload.toxicActionKeys) this.toxicActionKeys.add(key);
     for (const key of payload.rejectedActionKeys) this.rejectedActionKeys.add(key);
+    if (payload.planner) {
+      // Semantic-planner continuity (M13 F7). An accepted-but-unexecuted
+      // suggestion survives restart and is consumed without a new model call;
+      // a suggestion already executed is cleared by reconciliation below.
+      this.rejectedSuggestions = payload.planner.rejectedSuggestions.slice();
+      this.actionsSincePlannerCall = payload.planner.actionsSinceCall;
+      if (payload.planner.pendingSuggestion && !this.semantic) {
+        this.warnings.push(
+          "checkpoint carries an accepted planner suggestion but no model runtime is configured; discarding it",
+        );
+      } else if (payload.planner.pendingSuggestion) {
+        this.pendingPlannerActionKey = payload.planner.pendingSuggestion;
+      }
+    }
     this.reconcileCommittedState();
   }
 
@@ -300,6 +356,12 @@ export class ExploreController {
       const committed = actions[i]!;
       const metadata = parseStoredActionMetadata(committed.action.metadata_json);
       const storedMetadata = metadata ?? {};
+      // An accepted planner suggestion that already executed must not be
+      // re-executed after restart (M13 F7 resume semantics).
+      if (storedMetadata.plannerSuggested === true) {
+        this.pendingPlannerActionKey = null;
+        this.actionsSincePlannerCall = 0;
+      }
       const actionKey = storedMetadata.actionKey;
       if (actionKey === undefined) {
         this.warnings.push(
@@ -391,6 +453,18 @@ export class ExploreController {
         ...(outcome.findingId !== undefined ? { findingId: outcome.findingId } : {}),
       } satisfies FindingOutcomeSnapshot)),
       budget: this.budgetFor(this.config),
+      ...(this.semantic
+        ? {
+            planner: {
+              calls: this.semantic.calls.total,
+              accepted: this.semantic.calls.accepted,
+              rejected: this.semantic.calls.rejected,
+              rejectedSuggestions: this.rejectedSuggestions.slice(),
+              actionsSinceCall: this.actionsSincePlannerCall,
+              ...(this.pendingPlannerActionKey ? { pendingSuggestion: this.pendingPlannerActionKey } : {}),
+            } satisfies ExplorationCheckpointPayload["planner"],
+          }
+        : {}),
     };
     writeCheckpoint(this.store, payload);
     this.checkpointStepSequence = payload.stepSequence;
@@ -424,6 +498,7 @@ export class ExploreController {
           actionKey: c.actionKey,
           stateBefore: this.currentState,
           rngAfter: this.rng.snapshot(),
+          ...(this.lastSelectionPlannerSuggested ? { plannerSuggested: true } : {}),
         },
       },
     };
@@ -492,8 +567,8 @@ export class ExploreController {
       const inventory = buildInventory(uiTree, this.caps, {
         allowFaults: this.faults.allowed,
       });
-      const candidates = this.expandCandidates(inventory);
-      const chosen = this.select(candidates);
+      const chosenCandidates = this.expandCandidates(inventory);
+      const chosen = await this.select(chosenCandidates);
 
       if (!chosen) {
         if (this.canReset() && (await this.doReset())) {
@@ -587,7 +662,7 @@ export class ExploreController {
     return out;
   }
 
-  private select(candidates: CandidateAction[]): CandidateAction | null {
+  private async select(candidates: CandidateAction[]): Promise<CandidateAction | null> {
     if (candidates.length === 0) return null;
     // Actions that previously killed the environment or were policy-rejected
     // are excluded. An all-filtered pool is a dead end: deliberately
@@ -606,6 +681,76 @@ export class ExploreController {
     let best = -Infinity;
     for (const x of scored) if (x.s > best) best = x.s;
     const top = scored.filter((x) => x.s >= best - 1e-9).map((x) => x.c);
+
+    // M13 F7: consume an accepted-but-unexecuted planner decision first so a
+    // restart never re-asks the model for a decision it already made.
+    if (this.pendingPlannerActionKey) {
+      const key = this.pendingPlannerActionKey;
+      this.pendingPlannerActionKey = null;
+      const match = usable.find((c) => c.actionKey === key);
+      if (match) return match;
+      // Stale (inventory changed across reset): fall through deterministically.
+      this.warnings.push(`stale planner suggestion '${key}' discarded; inventory changed`);
+    }
+
+    // Semantic planner activation: bounded adviser on ambiguity/stall —
+    // never per-action, never the sole executor, RNG untouched.
+    if (
+      this.semantic &&
+      shouldInvokePlanner(
+        {
+          actionsSincePlannerCall: this.actionsSincePlannerCall,
+          actionsSinceNewState: this.actionsSinceNewState,
+          topCandidateCount: top.length,
+          plannerCallsTotal: this.semantic.calls.total,
+        },
+        this.semantic.conf,
+      )
+    ) {
+      const scoredUsable = scored.map(({ c, s }) => ({ ...c, score: s }));
+      const decision = await this.semantic.suggest({
+        stateFingerprint: this.currentState,
+        screenSummary: this.currentScreen,
+        usableCandidates: scoredUsable,
+        nearbyStates: this.graphSnapshotVisitCounts(),
+        recentActionKeys: this.recentActionKeys,
+        anomalyHints: this.anomalies.slice(-3).map((a) => `${a.kind}: ${a.message}`),
+        rejectedSuggestions: this.rejectedSuggestions,
+        capabilities: this.caps.capabilities.act.slice(),
+        budgetsRemaining: {
+          actions: Math.max(0, this.config.maxActions - this.actionsExecuted),
+          resets: Math.max(0, (this.config.maxResets ?? 0) - this.resets),
+        },
+        actionsSinceNewState: this.actionsSinceNewState,
+      });
+      this.actionsSincePlannerCall = 0;
+      if (decision.accepted && decision.actionKey !== undefined) {
+        // Persist BEFORE execution: a crash here resumes with the decision
+        // intact and never re-invokes the provider for it.
+        this.pendingPlannerActionKey = decision.actionKey;
+        this.checkpoint();
+        const match = usable.find((c) => c.actionKey === decision.actionKey);
+        if (match) {
+          this.lastSelectionPlannerSuggested = true;
+          return match;
+        }
+        this.pendingPlannerActionKey = null;
+        this.warnings.push(`accepted planner suggestion '${decision.actionKey}' vanished from inventory; falling back`);
+      } else {
+        if (decision.actionKey === undefined && decision.classification === "unknown-action") {
+          // Extract the fabricated key from the reason for loop avoidance.
+          const fabricated = /suggested action '([^']+)'/.exec(decision.reason)?.[1];
+          if (fabricated) {
+            this.rejectedSuggestions.push(fabricated);
+            if (this.rejectedSuggestions.length > 20) this.rejectedSuggestions.shift();
+          }
+        }
+        this.warnings.push(
+          `planner suggestion rejected (${decision.classification ?? "unknown"}): ${decision.reason}`,
+        );
+      }
+    }
+
     // Planner fallback: if deterministic selection stalls, ask the planner for
     // a goal, but it can only return a legal inventory member.
     if (
@@ -615,9 +760,23 @@ export class ExploreController {
           3)
     ) {
       const planned = this.planner.propose(this.plannerCtx());
-      if (planned) return planned;
+      if (planned) {
+        this.lastSelectionPlannerSuggested = false;
+        return planned;
+      }
     }
+    this.lastSelectionPlannerSuggested = false;
     return this.rng.pick(top);
+  }
+
+  private graphSnapshotVisitCounts(): Array<{ stateId: string; visitCount: number }> {
+    const out: Array<{ stateId: string; visitCount: number }> = [];
+    let budget = 8;
+    for (const [stateId, node] of this.graph.nodes) {
+      if (budget-- <= 0) break;
+      out.push({ stateId, visitCount: node.visits });
+    }
+    return out;
   }
 
   /**
@@ -682,6 +841,11 @@ export class ExploreController {
       }
 
       const action = this.makeAction({ ...chosen, id: `c_${newId("act")}` });
+      if (this.lastSelectionPlannerSuggested) {
+        // Provenance metadata was stamped inside makeAction; consume the
+        // marker so subsequent actions are not misattributed.
+        this.lastSelectionPlannerSuggested = false;
+      }
       const before = this.lastObs!;
       const submit: SubmitResult = await this.run.submitAction(action);
 
@@ -719,6 +883,7 @@ export class ExploreController {
       if (this.recentActionKeys.length > this.plateauWindow)
         this.recentActionKeys.shift();
       this.actionPath.push(action);
+      this.actionsSincePlannerCall += 1;
 
       if (submit.kind === "adapter-error") {
         // The environment was lost or the deadline raced. Blacklist this
@@ -895,6 +1060,15 @@ export class ExploreController {
       warnings: [],
       actionKindSequence,
       stoppedReason,
+      ...(this.semantic
+        ? {
+            planner: {
+              calls: this.semantic.calls.total,
+              accepted: this.semantic.calls.accepted,
+              rejected: this.semantic.calls.rejected,
+            },
+          }
+        : {}),
     };
     if (this.store && typeof this.store.getFindingByClassKey === "function" && this.findingEngine) {
       const restoredFindingIds = new Set<string>();
@@ -1184,6 +1358,7 @@ interface StoredActionExplorationMetadata {
   actionKey?: string;
   stateBefore?: string;
   rngAfter?: ReturnType<Rng["snapshot"]>;
+  plannerSuggested?: boolean;
 }
 
 function parseStoredActionMetadata(raw: string | null): StoredActionExplorationMetadata | null {
@@ -1204,6 +1379,7 @@ function parseStoredActionMetadata(raw: string | null): StoredActionExplorationM
       ...(exploration.rngAfter !== undefined
         ? { rngAfter: exploration.rngAfter as ReturnType<Rng["snapshot"]> }
         : {}),
+      ...(exploration.plannerSuggested === true ? { plannerSuggested: true } : {}),
     };
   } catch {
     return null;

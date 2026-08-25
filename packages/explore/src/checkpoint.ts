@@ -45,6 +45,18 @@ export interface FakeCheckpointState {
   segment: Action[];
 }
 
+/** M13 F7: semantic-planner continuity (optional; older checkpoints without
+ * it remain valid and resume fully deterministic). */
+export interface PlannerCheckpointState {
+  calls: number;
+  accepted: number;
+  rejected: number;
+  rejectedSuggestions: string[];
+  actionsSinceCall: number;
+  /** Accepted decision persisted before execution; consumed on next select. */
+  pendingSuggestion?: string;
+}
+
 export interface ExplorationCheckpointPayload {
   schema: typeof EXPLORATION_CHECKPOINT_SCHEMA;
   version: typeof EXPLORATION_CHECKPOINT_VERSION;
@@ -80,6 +92,7 @@ export interface ExplorationCheckpointPayload {
   };
   native?: NativeCheckpointState;
   fake?: FakeCheckpointState;
+  planner?: PlannerCheckpointState;
 }
 
 export interface CheckpointIdentity {
@@ -206,6 +219,20 @@ export function assertCheckpointPayload(value: unknown): asserts value is Explor
   assertBudget(value.budget);
   if (value.native !== undefined) assertNativeState(value.native);
   if (value.fake !== undefined) assertFakeState(value.fake);
+  if (value.planner !== undefined) assertPlannerState(value.planner);
+}
+
+function assertPlannerState(value: unknown): asserts value is PlannerCheckpointState {
+  if (!isRecord(value)) throw new Error("invalid exploration planner checkpoint state");
+  for (const key of ["calls", "accepted", "rejected", "actionsSinceCall"] as const) {
+    integer(value[key], `planner ${key}`, true);
+  }
+  if (!Array.isArray(value.rejectedSuggestions) || value.rejectedSuggestions.some((x) => typeof x !== "string")) {
+    throw new Error("invalid planner rejectedSuggestions");
+  }
+  if (value.pendingSuggestion !== undefined && typeof value.pendingSuggestion !== "string") {
+    throw new Error("invalid planner pendingSuggestion");
+  }
 }
 
 function assertFakeState(value: unknown): asserts value is FakeCheckpointState {

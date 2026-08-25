@@ -9,11 +9,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@inspector/protocol": "workspace:*",
+    "@inspector/adapter-fake": "workspace:*",
+    "@inspector/adapter-sdk": "workspace:*",
+    "@inspector/adapter-web": "workspace:*",
     "@inspector/core": "workspace:*",
     "@inspector/finding": "workspace:*",
-    "@inspector/adapter-web": "workspace:*",
-    "@inspector/adapter-fake": "workspace:*",
+    "@inspector/protocol": "workspace:*",
     "@inspector/store-sqlite": "workspace:*"
   }
 }
