@@ -1,236 +1,252 @@
-# Inspector Execution Prompt — HARDENING_5
+# Inspector Execution Prompt — HARDENING_5 Deep-Audit Completion
 
-**Status:** ACTIVE (2026-08-26 — activated by the executor session after reconciling `main`: pulled planner commit `7214ae4`, baseline `217165c` hosted run 32955622320 SUCCESS; HARDENING_5 recorded in canonical state `.inspector/state/campaign.yaml` `hardening5:` block and ledger campaign #5 before implementation edits).  
-**Campaign:** HARDENING_5 — Fleet Execution Truth, Platform Parity, Cross-Platform Durability, and Measured Runtime Efficiency  
+**Status:** ACTIVE — CONTINUATION / PLANNER CORRECTION (2026-08-26)  
+**Campaign:** HARDENING_5 — Fleet Execution Truth, now extended through verification-truth and provenance-integrity closure  
 **Mode:** HARDENING  
 **Target branch:** `main` only  
-**Planned from:** `217165cd4a6c39c0726b12b01edf2c6c4056a6e1` (`HARDENING_4 COMPLETE` state-synchronization HEAD)  
-**Planner date:** 2026-08-26  
+**Audit/planning baseline:** `04d8d841d7d1db322800fa0b8439878639d2c81d`  
 **OpenSpec change:** `openspec/changes/hardening-5-fleet-truth/`  
-**Intended scale:** one substantial autonomous campaign. Continue through the full evidence-backed scope; do not stop after the first defect. Do not invent work merely to consume time.
+**Executor envelope:** target roughly **12 hours of productive autonomous execution**. Do not stop after the first green patch or first closed defect. If correctness work finishes early, spend the remaining useful campaign budget on the specified mutation/property/fault-injection/real-backend/installed-artifact proof. Do not manufacture refactors merely to consume time.
 
-## 1. Why this is the next campaign
+## 0. Why this remains HARDENING_5 instead of opening HARDENING_6
 
-The implementation roadmap ends at M13. M13 is COMPLETE; M8 iOS remains environment-deferred; no M14 exists. `packages/repo-contract/src/campaign-state.test.ts` explicitly guards against inventing M14. Therefore this is a separately invoked hardening campaign, not a new implementation milestone.
+Do **not** create HARDENING_6 yet. H5 remains canonically ACTIVE and its existing OpenSpec still has unfinished H5.4.5, H5.8, and H5.9 requirements. The deep audit found correctness defects that fall directly inside those unfinished replay/error-classification/adversarial/certification gates. Starting a new campaign would hide incomplete H5 truth.
 
-The planning baseline is unusually strong: current `main` HEAD `217165c` has GitHub Actions run `32955622320` completed SUCCESS with Linux lint/typecheck/unit/full integration, Windows native/path coverage, Linux installed-artifact smoke, and real Electron/Xvfb proof. Start from that green exact-tree baseline and preserve it.
+Preserve all landed H5 work. Resume the first genuinely incomplete requirement after reconciling live `main`; do not redo already-evidenced H5.0-H5.7 work except where a new regression disproves an earlier claim.
 
-The audit nevertheless found a concrete cross-layer fleet truth contradiction that current gates do not cover:
+## 1. Planning-baseline facts — recheck, never blindly trust
 
-1. `@inspector/scale` declares `AdapterFamily = fake | web | cli | windows | android | electron` and manifest validation accepts `electron`.
-2. `InspectorWorkflowExecutor` advertises the Electron family when `probeElectron()` succeeds, so the scheduler can legitimately route an Electron work item to it.
-3. `packages/workflows/src/types.ts` cannot represent Electron at all: `ExplorationAdapter` is only `web | fake | cli | windows | android`.
-4. `packages/workflows/src/campaign-executor.ts::familyAdapter()` does not handle Electron and falls through to `fake`.
-5. `packages/workflows/src/workspace.ts::adapterSpawn()` cannot resolve the Electron adapter binary and also falls through to `fake` for unknown names.
-6. `packages/workflows/src/exploration.ts` treats only CLI, Windows, and Android as native; there is no Electron exploration branch.
-7. `packages/workflows/src/replay-subject.ts::replayDriverFor()` has web/fake/CLI/Windows/Android replay but no Electron replay.
-8. The dedicated Electron adapter itself is real and tested; it intentionally reuses browser semantics while preserving Electron identity, and hosted Xvfb now proves the real runtime works. The defect is therefore in orchestration/product integration, not absence of an adapter.
+At planner audit time:
 
-Taken together, an accepted/routed Electron campaign can cross a control plane that claims Electron capability into a workflow path that silently selects the fake adapter. Treat this as a likely HIGH/CRITICAL trust defect until deterministic reproduction establishes exact externally observable behavior and severity. Never fix it by merely rejecting Electron if the intended product contract is to support the already-declared family; reconcile the contract end-to-end.
+- `main` = `04d8d841d7d1db322800fa0b8439878639d2c81d`.
+- The existing H5 tracked-file census reported 530/530 reviewed, zero exclusions. New planner files change that count; regenerate the census on the executor's live tree.
+- `openspec/changes/hardening-5-fleet-truth/tasks.md` still left H5.2.6, H5.4.5, H5.8.1-H5.8.6, and H5.9.1-H5.9.7 unchecked.
+- `.inspector/state/campaign.yaml` nevertheless says H5.8 DONE and H5.9 PENDING: this is durable-state/task truth drift.
+- `AGENTS.md` and `docs/STATUS.md` still describe H4/no-active-campaign current state while `campaign.yaml` says H5 ACTIVE.
+- GitHub Actions run 32985028766 for planner baseline HEAD was queued when audited. A queued run is not certification.
 
-Additional evidence-backed debt belongs in the same campaign because it crosses the same product/runtime boundaries:
+The executor MUST fetch/prune, compare HEAD/origin/main, inspect Actions for the **current** exact SHA, and preserve any legitimate newer concurrent work before editing.
 
-- historical fleet state says Windows/UIA and Electron campaign lanes were unwritten/deferred; Windows now has generic native workflow plumbing, but it still needs a real end-to-end campaign proof and truth reconciliation rather than assumptions;
-- Electron verify/regress replay is unsupported even if hunt/explore is made real;
-- workflows/CLI/artifact atomic rename sites still lack the bounded Windows sharing-violation retry that HARDENING_4 proved necessary for hot reread state files; audit every atomic-write implementation and close only confirmed durability gaps;
-- `FileLock` remains synchronous `Atomics.wait` based while SQLite leases are the production default; change it only if profiling shows a meaningful real bottleneck or liveness problem;
-- web exploration/replay remains expensive (historically ~4–6 minutes in full E2E); optimize from measured profiles, not intuition;
-- an interrupted H4 session preserved an unlanded 17-file speculative performance patch at `.inspector/tmp/h4-stray-perf-batch-2026-08-26.patch` (and a local stash on that machine). Treat it only as a hypothesis source: inspect any available patch, benchmark each idea independently, and never apply it wholesale;
-- durable prose still contains historical Electron-host-unavailable statements that are now stale relative to hosted real Electron/Xvfb success. Reconcile truth without rewriting historical evidence.
+## 2. New deep-audit findings — stable H5 IDs
 
-## 2. OpenSpec is the execution contract
+Treat these IDs as durable ledger keys. Static source evidence is enough to call the contradictory code path CONFIRMED, but establish a deterministic red regression before modifying production behavior and set final severity from demonstrated blast radius.
 
-Read these first, in order:
+### H5-D6 — durable hardening ledger history deletion — CONFIRMED
+
+Current `04d8d841` replaced `.inspector/state/HARDENING-CHECKPOINT.md` with the H5.9 fragment and removed roughly 698 historical lines that existed at parent `05254ffcdc89ada6e1555e448096b56483946f06`. This violates `docs/HARDENING-CAMPAIGN.md` (hardening must never erase durable implementation state) and the H5 activation contract to preserve prior campaign history.
+
+**First blocker:** restore the historical ledger from the last intact parent and append the legitimate H5.9 material without rewriting history. Add a mechanical repo-contract guard so a future state-sync commit cannot delete campaign/defect history referenced by `campaign.yaml`.
+
+### H5-D7 — campaign verify can resolve a confirmed defect after environment failure — CONFIRMED
+
+In `packages/workflows/src/campaign-executor.ts`, verify computes `environment-failure` when replay attempts error, but then transitions a `CONFIRMED` finding to `RESOLVED` for every classification except `reproduced`. Therefore “could not verify because the environment/adapter failed” can become “fixed”.
+
+Required invariant: **absence of valid reproduction is not evidence of a fix**. A confirmed finding may move to `RESOLVED` only after the configured verification policy receives sufficient **successful, environment-valid, clean** replay evidence. Environment/provenance/adapter/cancellation failures leave the finding unresolved and return a typed indeterminate/environment result.
+
+### H5-D8 — campaign regress can count replay errors as clean — CONFIRMED
+
+`runRegressItem` catches replay exceptions and records `reproduced:false`; summary then counts those entries as `clean`. Replay-driver/provenance failures can also be skipped, allowing zero genuinely executed scenarios to return an OK result.
+
+Required invariant: a regression scenario is `clean` only after a replay actually executes in a valid environment and its oracle evaluation is clean. Environment/adapter/provenance/cancellation errors are neither reproduced nor clean. Zero valid scenarios is not success.
+
+### H5-D9 — reproduction engine can reject a finding when every replay errored — CONFIRMED
+
+`packages/finding/src/finding-engine.ts` increments `errors` for replay-driver failures, then maps `successes === 0` to `REJECTED` regardless of whether any clean replay completed. `packages/finding/src/finding.test.ts` currently pins this behavior: a timeout-only `HungDriver` test expects `REJECTED`.
+
+This contradicts the repository's own M2 contract to distinguish environment nondeterminism from target non-reproduction. Correct the semantic contract intentionally; do not preserve the wrong test just because it is green.
+
+Required invariant: `REJECTED` requires positive evidence from valid completed replays that the candidate does **not** reproduce. If all attempts error/timeout/cancel, preserve a non-terminal/indeterminate finding state allowed by the lifecycle (normally CANDIDATE/FLAKY according to the final design) and persist the error evidence.
+
+### H5-D10 — verify/regress bypass the scheduler's admit-before-consume contract — CONFIRMED
+
+`ExecutionContext` requires `ctx.admit(...)` before a budgeted unit and `ctx.charge(...)` after actual consumption. Campaign verify/regress currently call `ctx.charge(...)` before replay and do not use `admit` for those replay units.
+
+Required invariant: authorization precedes replay/action consumption; accounting reflects actual consumption; cancellation/environment failure cannot create fabricated successful work or silently reset budget truth.
+
+### H5-D11 — durable adapter family can survive while backend identity silently changes — REPRO REQUIRED
+
+Electron durable replay accepts missing/unrecognized `INSPECTOR_ELECTRON_BACKEND` and falls back to `ElectronReplayDriver` auto mode; auto may select `real` or `injectable` based on the **current host**. The Electron hunt reproduction factory also constructs a replay driver without explicitly pinning the backend that produced the run. Audit equivalent real/mock seams for Windows/UIA, CLI/PTTY, and Android.
+
+Required invariant: durable replay identity is at least `{adapter family, durable adapter id, backend mode, target identity, revision/environment provenance}` where those dimensions affect behavior. A real finding must never be reclassified using a mock/injectable backend merely because the current machine differs. Missing/malformed backend provenance must be migrated only when logically unambiguous; otherwise fail closed with a typed compatibility/environment outcome.
+
+### H5-D12 — certification can be green without exercising new campaign-level platform paths — CONFIRMED
+
+Audit findings:
+
+- `packages/workflows/src/campaign-executor.integration.test.ts` contains a tautological `webFindings.length >= 0` assertion.
+- Its real Android campaign test returns early when `INSPECTOR_M12_ANDROID_E2E` is absent; the default run can report the test green without executing the real-device proof.
+- the Windows hosted job does not currently execute the new H5 `windows-campaign.integration.test.ts` campaign-level path;
+- the Electron/Xvfb job proves the adapter runtime but not the H5 fleet/campaign orchestration path.
+
+Required invariant: a certification claim names what actually executed. Environment-gated proofs are explicit skipped/deferred evidence, never pass-by-return. Hosted Windows/Electron jobs must exercise the changed campaign-level path when their environment can support it. Installed-artifact proof must cover the changed workflow, not only source checkout behavior.
+
+### H5-D13 — malformed durable finding/provenance data may degrade silently — SUSPICION
+
+`FindingEngine.rehydrate` currently converts malformed JSON fields to empty arrays/null; replay bundle paths are constructed from durable IDs. Determine whether these are protected by lower-layer validation. Add adversarial persisted-state tests before changing behavior. If corruption can reach these paths, fail closed/quarantine instead of silently weakening evidence or escaping contained storage. Do not overstate this defect unless reproduced.
+
+## 3. OpenSpec execution contract
+
+Read in this order before implementation:
 
 1. `openspec/changes/hardening-5-fleet-truth/proposal.md`
-2. every delta under `openspec/changes/hardening-5-fleet-truth/specs/`
-3. `openspec/changes/hardening-5-fleet-truth/design.md`
-4. `openspec/changes/hardening-5-fleet-truth/tasks.md`
+2. `openspec/changes/hardening-5-fleet-truth/design.md`
+3. every existing delta under `openspec/changes/hardening-5-fleet-truth/specs/`
+4. **new** `specs/verification-outcome-truth/spec.md`
+5. **new** `specs/replay-backend-provenance/spec.md`
+6. **new** `specs/durable-history-integrity/spec.md`
+7. `openspec/changes/hardening-5-fleet-truth/AUDIT-ADDENDUM.md`
+8. `openspec/changes/hardening-5-fleet-truth/tasks.md`
 
-If OpenSpec tooling is installed, validate/show the change before implementation and use the equivalent of the apply workflow. If it is not installed, the Markdown artifacts remain authoritative; do not block the campaign merely to install tooling. Do not archive/sync this OpenSpec change until the hardening completion gate passes.
+Before product edits, extend `tasks.md` with an H5.10 deep-audit correction section representing H5-D6..D13 and this prompt's gates. Do not pre-check tasks. Existing unchecked H5.4.5/H5.8/H5.9 tasks remain required; H5.10 is additive and must finish before H5 can be COMPLETE.
 
-## 3. Mandatory activation and rehydration
+If OpenSpec CLI/tooling is available, validate/show the change before implementation and run its normal apply workflow. If not, the Markdown contract remains authoritative.
+
+## 4. Mandatory rehydration and audit mechanics
 
 Before any implementation edit:
 
-1. Fetch/prune origin and verify `main`, worktree cleanliness, HEAD, `origin/main`, ahead/behind state, and current hosted CI. Preserve any legitimate newer work; do not overwrite concurrent changes.
-2. Read `.agent/PLANNER_HANDOFF.md`, this prompt, `.inspector/state/campaign.yaml`, `.inspector/state/CHECKPOINT.md`, `.inspector/state/HARDENING-CHECKPOINT.md`, `AGENTS.md`, `docs/HARDENING-CAMPAIGN.md`, `docs/ROADMAP.md`, and `docs/STATUS.md` completely.
-3. Read SPEC-012, SPEC-013, ADR-0012, ADR-0013, platform/adapters, architecture, security, exploration, evidence, observability, product, development, and release documents as required by the touched contracts.
-4. Inspect at least the most recent 30 meaningful commits and their diffs, including M12, HARDENING_2, M13, HARDENING_3, HARDENING_4 activation/fixes/completion. Understand why existing guards exist before changing them.
-5. Recheck open issues and PRs. Planning-time open PR count was zero; do not assume it remains zero.
-6. Transition HARDENING_5 to ACTIVE in canonical durable state and append campaign #5 to `.inspector/state/HARDENING-CHECKPOINT.md`. Preserve all M0–M13 and H1–H4 history and M8 deferral. Update this prompt status to ACTIVE in the same activation checkpoint so repo-contract truth remains coherent.
-7. Establish stable H5 defect IDs. Every defect must progress: suspicion → deterministic evidence → severity → regression test/proof → fix → transitive verification → CLOSED.
+1. fetch/prune origin, verify `main`, worktree cleanliness, HEAD/origin/main, ahead/behind, open PR/issues, and current Actions;
+2. read `.agent/PLANNER_HANDOFF.md`, this prompt, `AGENTS.md`, `docs/HARDENING-CAMPAIGN.md`, `docs/STATUS.md`, `docs/ROADMAP.md`, `.inspector/state/campaign.yaml`, `.inspector/state/CHECKPOINT.md`, and the hardening ledger;
+3. inspect at least the latest 30 meaningful commits/diffs, with special attention to H4/H5 state-sync commits and H5 workflow/electron/windows changes;
+4. restore H5-D6 history first and create the guard before broad code changes;
+5. regenerate `.inspector/state/HARDENING_5-AUDIT.md` from exact `git ls-files`; every newly added planner/spec/test/source file must be accounted for;
+6. create/update the H5 defect ledger with SUSPICION -> EVIDENCE -> SEVERITY -> RED TEST -> FIX -> TRANSITIVE GATE -> CLOSED lifecycle.
 
-Do not implement from chat history. Re-read live source.
-
-## 4. Mandatory every-file audit proof
-
-The operator explicitly requested a deep audit of every file/system/logic path. Make that mechanically auditable instead of claiming it informally.
-
-Create/update `.inspector/state/HARDENING_5-AUDIT.md` from the live checkout with a tracked-file census produced from `git ls-files` (or an equivalent exact Git index inventory). Every tracked authored file must receive a disposition, either individually or through a clearly enumerated homogeneous group whose member paths are listed. At minimum classify:
-
-- runtime source and package manifests;
-- unit/property/fuzz/integration/soak tests and fixtures;
-- adapter implementations and native helpers;
-- protocol, persistence, artifact, finding/oracle/explore/repair/model/scale/workflow logic;
-- CLI and installed-artifact surfaces;
-- scripts, build/release/CI configuration, workspace config, lockfile implications;
-- docs, ADRs, specs, OpenSpec artifacts, agent instructions, durable state schemas;
-- dogfood/repro assets and intentionally committed Inspector evidence/state;
-- hidden agent/tool configuration that can affect execution.
-
-Generated/vendor/cache files may be excluded only when they are not tracked authored source; record the exclusion rule. The final H5 report MUST state the tracked-file count, reviewed count, excluded count/reasons, and prove `reviewed + justified exclusions == tracked files`. A sample or package-level skim is not sufficient.
-
-For substantive files, trace behavior rather than only reading names. For each major system map happy path, invalid input, failure, cancellation, timeout, crash/restart, concurrent ownership, corruption, platform loss, and installed-package behavior where applicable.
+Do not implement from this prose alone. Re-read the live source and tests after pull.
 
 ## 5. Required system maps
 
-Build/use these maps during the audit:
+Trace each map through happy path plus invalid input, timeout, cancellation, environment loss, crash/restart, corruption, and installed-artifact execution:
 
 ```text
-manifest -> validateWorkItem/AdapterFamily -> capability probe -> scheduler/router -> InspectorWorkflowExecutor -> family mapping -> workspace adapter spawn -> RunManager -> real adapter
+candidate -> reproduce -> replay attempt disposition -> oracle -> finding lifecycle -> evidence
 ```
 
 ```text
-Electron manifest -> electron capability -> workflow types -> spawn -> ElectronAdapterHandler -> real/injectable backend -> observation/action evidence -> finding -> replay -> verify/regress
+campaign verify -> source workspace -> load replay provenance -> driver -> replay -> oracle -> classification -> finding transition -> result
 ```
 
 ```text
-Windows manifest -> UIA capability -> native workflow -> adapter spawn -> RealUiaBackend -> evidence -> replay -> verify/regress
+campaign regress -> durable finding(s) -> driver -> replay -> scenario outcome -> aggregate summary -> campaign settlement
 ```
 
 ```text
-artifact/workflow/CLI state write -> unique temp -> flush/fsync policy -> rename -> Windows sharing violation / POSIX semantics -> reader -> crash recovery / orphan cleanup
+manifest -> scheduler -> ctx.admit -> replay/action -> ctx.charge -> cancellation/lease loss -> settlement/restart
 ```
 
 ```text
-exploration action -> checkpoint -> replay/minimization -> oracle -> evidence -> verify/regress -> fleet settlement -> resume
+adapter family -> durable adapter id -> backend mode -> target/create options -> spawn env -> finding/evidence -> replay/verify/regress/resume
 ```
 
 ```text
-campaign -> scheduler -> SQLite/JSON state -> leases/fencing -> worker -> budget gate -> workflow -> settlement -> restart
+campaign.yaml/OpenSpec/tasks -> hardening ledger -> AGENTS/STATUS -> exact SHA -> hosted jobs -> certification claim
 ```
 
-```text
-source checkout -> build/release -> installed prefix -> adapter executable resolution -> platform prerequisites -> hosted CI certification
-```
+## 6. Twelve-hour execution envelope
 
-## 6. Ordered workstreams
+The times below are sequencing targets, not excuses to stop useful work early or to pad work. Rebalance when a defect takes longer, but preserve order: correctness before optimization/cosmetic cleanup.
 
-### H5.0 — Exact baseline, every-file census, and defect ledger
+### Wave 0 — 00:00–00:45 — baseline, H5-D6 restoration, audit refresh
 
-- Reproduce exact current baseline and query Actions for current HEAD.
-- Build the complete tracked-file audit inventory described above before broad implementation.
-- Identify all adapter-family declarations, switches, default branches, string unions, manifests, replay mappings, binary resolvers, capability tags, docs, fixtures, and tests. Search for every place a new/known adapter family can be silently collapsed to fake/default behavior.
-- Search for all `rename*`, temp-file, atomic-write, cleanup, lock/wait, checkpoint, replay, and capability-fallback implementations.
-- Record initial suspected defects separately from proven defects.
+- reconcile live Git/Actions/OpenSpec state;
+- restore the full hardening ledger history from the last intact commit and append current H5 entries;
+- add a repo-contract history-preservation test/guard;
+- regenerate the every-file census and create the H5.10 task ledger.
 
-### H5.1 — Reproduce and close Electron fleet false-execution risk
+### Wave 1 — 00:45–02:30 — red tests for verification truth
 
-Construct a deterministic campaign manifest with an Electron work item and an Electron-capable injected/real capability snapshot. Prove the exact current path and resulting adapter/run/evidence identity before editing.
+Create deterministic failing regressions before fixes for:
 
-Required invariants after the fix:
+- all replay attempts error/timeout -> finding MUST NOT become REJECTED;
+- verify all attempts environment-fail -> CONFIRMED finding MUST NOT become RESOLVED;
+- verify valid clean replay -> may resolve only when policy is satisfied;
+- regress replay error -> not counted clean;
+- regress zero valid scenarios -> typed failure/indeterminate, not OK-clean;
+- mixed reproduced/clean/error attempts -> exact deterministic classification;
+- cancellation at each replay boundary -> no false clean/fixed state;
+- budget denial before replay -> zero replay invocation.
 
-- a work item accepted as `adapterFamily: electron` can never execute as fake, web, or another family without an explicit, contract-defined transformation that preserves Electron target identity;
-- every accepted adapter family is representable in the workflow layer;
-- adapter resolution is exhaustive and fail-closed: an unknown/unimplemented family returns a typed configuration/capability refusal before work starts, never a fake fallback;
-- campaign result notes, durable run adapter, environment adapter, evidence bundle, finding adapter, usage, and replay provenance all agree;
-- capability advertisement never exceeds executable capability;
-- no test-only injectable backend is reported as a real Electron field proof unless the result explicitly identifies it as injectable.
+### Wave 2 — 02:30–04:15 — implement typed replay/verification semantics
 
-Prefer compile-time exhaustiveness (`never`/exhaustive maps) over default fallthroughs where practical.
+Prefer an explicit multi-valued result over boolean collapse. A narrow union/helper is sufficient if it preserves architecture; do not build a framework for its own sake. The semantic vocabulary must distinguish at least:
 
-### H5.2 — Platform-complete real fleet lanes: Electron and Windows/UIA
+- reproduced target defect;
+- valid clean replay;
+- environment/adapter failure;
+- incompatible/invalid provenance;
+- cancellation/budget refusal.
 
-Electron:
+Only **valid clean replay evidence** can support `fixed`, `clean`, or `REJECTED`. Driver failure is never clean evidence.
 
-- thread Electron through workflow types/config, adapter binary resolution, lifecycle/start/resume, exploration engine choice, target configuration, cancellation, evidence, checkpoints, and installed-artifact resolution;
-- choose the smallest semantically correct exploration model. Electron deliberately reuses browser semantics inside its adapter, but the run must retain `adapter-electron`/Electron identity; do not masquerade it as `web-playwright` or fake;
-- prove injectable deterministic campaign coverage and real Electron/Xvfb field coverage when available;
-- prove capability-unavailable behavior when the executable/display is absent.
+Audit every call site that currently turns exception/absence into `false`, `clean`, `fixed`, `rejected`, `success`, or zero-count OK.
 
-Windows/UIA:
+### Wave 3 — 04:15–05:30 — budget, cancellation, and lifecycle atomicity
 
-- determine whether current generic native plumbing already makes Windows campaigns fully real; if yes, add missing campaign-level proof and reconcile stale debt rather than rewriting working code;
-- if gaps exist, close them through the same manifest → routing → workflow → UIA → evidence → replay chain;
-- hosted Windows CI should execute a bounded campaign-level UIA proof where runner constraints permit, not merely package-level unit tests.
+- enforce admit-before-consume on verify/regress replay work;
+- charge actual usage after execution according to existing scheduler semantics;
+- inject cancellation/lease loss before replay, during replay, between oracle evaluation and finding mutation, and before settlement;
+- prove restart cannot repeat a committed state transition or turn indeterminate work into success.
 
-### H5.3 — Electron replay, verify, regress, resume, and evidence continuity
+### Wave 4 — 05:30–07:00 — exact backend provenance
 
-- Add platform-faithful Electron replay support for durable findings; use durable target/backend provenance and preserve Electron identity.
-- Verify/regress items referencing Electron producer workspaces must reproduce against Electron, never fake/web by accident.
-- Resume must restore the same adapter family/backend/target and reject incompatible provenance.
-- Test missing executable/display, malformed provenance, target drift, crash during replay, cancellation, and evidence artifact failures.
-- Ensure minimization/oracle automation-failure classification stays correct; adapter/environment failures are not target defects.
+- reproduce H5-D11 on Electron first;
+- pin discovery/reproduction/minimization/verify/regress/resume to durable backend mode;
+- audit Windows real/mock, CLI real/mock, Android real/mock/injected seams for the same class;
+- prove current-host capability changes cannot silently change historical replay meaning;
+- add migration/refusal behavior for older records missing backend provenance; never infer a different backend merely because it is available now.
 
-### H5.4 — Adapter-family contract centralization and negative-space sweep
+### Wave 5 — 07:00–08:00 — durable corruption and containment negative space
 
-Audit all duplicated adapter-family vocabularies and switches across scale, workflows, CLI args/config, metadata, workspace spawn, exploration, replay, finding, adapters, tests, release packaging, and docs.
+- malformed finding JSON, evidence JSON, create options, spawn env, IDs, sourceItemId, bundle paths;
+- missing bundles, stale revision, adapter/backend disagreement;
+- symlink/junction/path traversal where a durable field participates in a filesystem path;
+- SQLite corrupt/partial rows and crash windows around relevant writes.
 
-- Remove unsafe default-to-fake behavior where the input comes from validated product configuration.
-- Centralize only when it reduces drift without creating a dependency cycle; otherwise add repo-contract tests that force all declared families to be handled by every required layer.
-- Add a matrix/property test over every declared family covering manifest acceptance, capability requirement, executable mapping, durable adapter identity, and replay support/refusal.
-- Confirm future new adapter families cannot compile/pass CI while silently skipping one layer.
+Close H5-D13 only if reproduced. Otherwise document the exact guard/lower-layer invariant that makes it unreachable.
 
-### H5.5 — Cross-platform atomic-write durability completion
+### Wave 6 — 08:00–09:15 — certification-path repair
 
-Inventory every atomic writer, rename-based commit, orphan-temp cleanup, artifact metadata write, CLI/workflow state write, and repair/worktree write.
+- remove/replace tautological assertions;
+- make environment-gated real proofs explicitly report skipped/deferred rather than pass by returning;
+- extend Windows hosted coverage to the H5 campaign-level UIA path where runner UIA constraints permit;
+- extend Electron Xvfb coverage through the **workflow/fleet campaign path**, not only adapter conformance;
+- exercise source and built/installed artifact parity for changed verify/regress/backend paths;
+- preserve hermetic clean-runner behavior.
 
-Reproduce Windows sharing-violation behavior before broad changes. Then:
+### Wave 7 — 09:15–10:15 — mutation/property/state-machine campaign
 
-- create/reuse a narrow bounded retry primitive only for transient sharing violations (`EPERM`/`EACCES`/platform-equivalent proven by tests); never retry semantic/path/permission errors indefinitely;
-- preserve unique temp ownership and never allow a reader/cleanup sweep to remove a live writer's temp;
-- decide and document flush/fsync/directory-sync guarantees by artifact class rather than pretending all writes have identical durability requirements;
-- keep failures loud and typed; never silently reset or truncate state;
-- prove Windows and POSIX behavior with deterministic tests and hosted runners where possible.
+Manually or with existing repository tools, introduce bounded mutants and prove the new tests catch them. At minimum mutate:
 
-Do not rewrite SQLite-backed production state into JSON or weaken H4 fencing.
+- `environment-failure` -> `fixed`;
+- replay exception -> `clean`;
+- all-error reproduction -> `REJECTED`;
+- omit `ctx.admit` or move charge before replay;
+- remove Electron/backend pinning;
+- delete a historical hardening-ledger section;
+- skip a campaign-level hosted proof.
 
-### H5.6 — Measured performance/resource campaign
+Also run seeded/property matrices for attempt outcome combinations and family/backend pairs. Record mutation evidence; do not leave mutants in Git.
 
-Performance changes are evidence-gated. Establish reproducible baselines first: median plus spread/p95 where feasible, warm/cold separation, CPU/wall/IO counts where useful, and exact fixture/seed.
+### Wave 8 — 10:15–11:00 — soak and resource/lifecycle proof
 
-Priority targets:
+Use remaining useful time for bounded high-value soak, not generic refactors:
 
-1. web exploration/replay 4–6 minute E2E cost;
-2. repeated SQLite prepare/query hot paths;
-3. ledger aggregation/fingerprint recomputation;
-4. state/artifact temp sweeps;
-5. checkpoint frequency and serialization cost;
-6. CI dependency/cache opportunities that do not hide hermeticity bugs;
-7. synchronous FileLock waiting only if it appears in a real hot path.
+- repeated verify/regress with injected target crash vs adapter crash vs environment loss;
+- cancellation/lease loss at boundary matrices;
+- concurrent source-referenced items and restart;
+- Electron real/injectable provenance repetition; Windows real/mock when available;
+- installed artifact repeated executions;
+- assert no orphan subprocess/temp/evidence corruption attributable to Inspector.
 
-The preserved H4 speculative patch is not an implementation plan. For every idea recovered from it, create an independent benchmark/hypothesis, cherry-pick/reimplement only the minimal proven change, and discard anything that weakens crash recovery, cancellation, checkpoint continuity, evidence determinism, CI clean-runner behavior, or test isolation.
+### Wave 9 — 11:00–11:30 — truth reconciliation
 
-Do not delete correctness checkpoints merely for speed. If coalescing/checkpoint reduction is considered, inject crashes at every newly enlarged window and prove bounded recovery/replay equivalence.
+Reconcile OpenSpec/tasks, `.inspector/state/campaign.yaml`, hardening ledger, `AGENTS.md`, `docs/STATUS.md`, audit census, and any current-debt prose. Preserve historical reports verbatim unless they are factually corrupt files; current-state prose may be corrected.
 
-### H5.7 — Truth surfaces, stale debt, OpenSpec, and operator semantics
+Keep M13 COMPLETE, M8 `DEFERRED_ENVIRONMENT`, and no M14. No release/tag/publication.
 
-- Reconcile `docs/STATUS.md`, `docs/ROADMAP.md`, `AGENTS.md`, `.inspector/state/*`, release/dogfood reports, comments, and task/spec claims against actual H5 results.
-- Preserve historical statements as history, but correct current debt surfaces that still say real Electron proof is unavailable when hosted Xvfb has succeeded.
-- Keep M8 iOS environment-deferred unless a genuine macOS/Xcode/simulator becomes available. Do not emulate success through mocks.
-- Do not invent M14 and do not release/tag/publish.
-- Keep the OpenSpec tasks/deltas synchronized as findings change. Archive/sync only after completion.
+### Wave 10 — 11:30–12:00 — exact-tree gates, push, hosted proof
 
-### H5.8 — Adversarial matrix, soak, and flake classification
-
-Run targeted property/state-machine/multi-process campaigns for:
-
-- all adapter families and unknown-family refusal;
-- parallel fleet items across fake/web/CLI/Windows/Android/Electron where environments permit;
-- cancellation at start/observe/action/checkpoint/evidence/settlement boundaries;
-- lease loss and stale completion during slow platform operations;
-- crash/restart around Electron/native lifecycle and atomic renames;
-- malformed/stale replay provenance;
-- executable/display/ADB/UIA disappearance mid-item;
-- artifact/temp cleanup races;
-- model assistance remaining web-only by explicit contract unless deliberately expanded.
-
-Every flake classification needs bounded reproduction evidence. Do not solve red tests by increasing timeouts or skipping assertions without proving environment causality.
-
-### H5.9 — Exact-tree certification
-
-Local/available environment gate on the exact final tree:
+Run on the exact final tree:
 
 ```text
 pnpm install --frozen-lockfile
@@ -242,35 +258,35 @@ pnpm test:integration
 pnpm release:smoke
 ```
 
-Also run targeted Windows, Electron, fleet, replay, atomic-write, and performance suites introduced by H5.
+Plus all targeted H5.10 tests and any real-platform jobs runnable locally.
 
-Push normal commits to `main` without force. Then query GitHub Actions for the exact pushed SHA and require all intended lanes to actually execute—not merely be skipped. A completion report that refers to an older SHA is not certification of the current one.
+Commit coherent verified slices, pull/reconcile if origin moved, and push to `main` without force. Query Actions by the **exact pushed implementation SHA** and inspect job/step conclusions. If hosted CI is still queued/running when the execution window ends, keep H5 ACTIVE/PENDING and record that honestly; never self-certify a SHA whose required hosted lanes have not completed.
 
-## 7. Acceptance gates
+## 7. Acceptance gate — H5 cannot COMPLETE until every item is true
 
-HARDENING_5 may be marked COMPLETE only when all are true:
+1. H5-D6 historical hardening ledger is restored and mechanically protected from destructive state-sync truncation.
+2. No all-error/timeout/cancel reproduction path can produce `REJECTED` as though a clean replay occurred.
+3. No verify environment/adapter/provenance failure can produce `RESOLVED`/`fixed`.
+4. No regress environment/adapter/provenance failure can be counted as `clean`; zero valid scenarios is not an OK-clean result.
+5. Replay outcome semantics are explicit and mutation-sensitive across finding/workflow callers.
+6. Verify/regress obey admit-before-consume and actual-use accounting; cancellation/lease-loss cannot fabricate completion.
+7. Backend provenance is exact across replay-capable families; real/mock/injectable substitutions are explicit test fixtures only, never silent durable replay behavior.
+8. H5.4.5 and H5.8 adversarial requirements are actually exercised or honestly environment-deferred with evidence.
+9. Changed Windows/Electron workflow/fleet paths execute in their suitable hosted environments; installed artifact matches source behavior.
+10. Tests contain no tautological assertions or pass-by-return constructs used as evidence for required real-runtime certification.
+11. Every tracked authored file on the final tree is in the regenerated H5 census and `reviewed + justified exclusions == tracked`.
+12. All Critical/High defects discovered in H5 are CLOSED with deterministic regression coverage; lower-severity debt is explicit.
+13. OpenSpec/tasks, campaign state, hardening ledger, AGENTS/STATUS, and implementation agree.
+14. Local full gates pass on the exact final tree.
+15. Required hosted lanes pass on the exact pushed implementation SHA and are verified to have actually executed intended steps.
+16. No release, tag, deployment, force-push, destructive external action, or hidden assertion weakening occurred.
 
-1. the every-file audit census proves every tracked authored file was reviewed or explicitly justified as non-authored/generated;
-2. the Electron accepted/routed-to-fake contradiction is deterministically reproduced and closed with regression coverage;
-3. no declared adapter family can silently fall through to fake/default execution;
-4. Electron campaign hunt/explore is real and identity-faithful, with honest environment refusal when prerequisites are absent;
-5. Electron verify/regress/replay and resume either work platform-faithfully or are rejected at preflight by an explicit narrowed product contract—never accepted then mis-executed;
-6. Windows/UIA has an end-to-end campaign proof or an evidence-backed environment deferral reflected consistently in truth surfaces;
-7. cross-platform atomic-write debt is either closed where violations are reproducible or narrowed/documented with tests showing why unaffected writers are safe;
-8. performance work has recorded before/after evidence; no speculative patch is landed wholesale and no correctness gate/checkpoint is weakened for speed;
-9. all Critical/High defects discovered during the campaign are CLOSED; lower-severity debt is explicitly recorded with rationale;
-10. installed-artifact behavior matches source-workspace behavior for changed fleet/platform paths;
-11. OpenSpec artifacts and durable campaign/checkpoint state match implementation truth;
-12. local gates pass on the exact final tree;
-13. hosted CI passes on the exact pushed final implementation SHA with expected Linux, Windows, installed-artifact, Electron, and integration steps actually executed;
-14. no release, tag, deployment, destructive external action, or force-push occurred.
+## 8. Git and final reporting
 
-## 8. Git/reporting requirements
+- Persistent branch is `main`; disposable local worktrees are fine but leave no persistent campaign branch.
+- Never force-push or discard concurrent work.
+- Keep implementation + regression + state update together when practical.
+- The final implementation commit message must be a detailed session report containing: baseline SHA/CI; every-file counts; H5-D6..D13 final classifications; root causes; exact fixes/tests; mutation/soak evidence; budget/provenance semantics; local gate counts; hosted run/job IDs for the certified SHA; environment deferrals; remaining debt; and explicit no-release/no-tag statement.
+- Push every durable checkpoint needed for another machine to resume from Git alone.
 
-- Work directly on persistent `main` per `AGENTS.md`; disposable worktrees/branches may be used only locally and must not be left as persistent campaign branches.
-- Pull/reconcile before each push if origin moved. Never force-push.
-- Commit coherent verified slices; include durable state/checkpoint updates with the slice when practical.
-- The final commit message must be a detailed session report: baseline SHA/CI, every-file census counts, confirmed defect table with severities/root causes/fixes/tests, performance before/after data, exact local gate counts, hosted run/job IDs on the certified SHA, environment deferrals, remaining debt, and explicit statement that no release/tag/publication occurred.
-- Push the completed state so the next agent can rehydrate from Git alone.
-
-When this prompt and the OpenSpec artifacts differ, the stricter safety/correctness requirement wins; update both before proceeding if a material contradiction is found.
+If this prompt, an older H5 prompt statement, and the OpenSpec deltas differ, the stricter safety/correctness invariant wins. Update OpenSpec/tasks/state together before claiming completion.
