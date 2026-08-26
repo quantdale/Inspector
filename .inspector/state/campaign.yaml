@@ -551,7 +551,7 @@ hardening5:
     - {id: H5.5, name: exhaustive-adapter-family-contract, state: DONE}
     - {id: H5.6, name: cross-platform-atomic-write-durability, state: DONE}
     - {id: H5.7, name: measured-runtime-efficiency, state: DONE}
-    - {id: H5.8, name: negative-space-soak-installed-artifact, state: ACTIVE}
+    - {id: H5.8, name: negative-space-soak-installed-artifact, state: DONE}
     - {id: H5.9, name: truth-reconciliation-certification, state: PENDING}
   defects:
     - >-
