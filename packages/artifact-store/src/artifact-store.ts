@@ -1,7 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  closeSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -9,7 +12,7 @@ import {
   rmSync,
   statSync,
   unlinkSync,
-  writeFileSync,
+  writeSync,
   type Stats,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -188,16 +191,35 @@ export class ArtifactStore {
    */
   private atomicWrite(dest: string, content: Buffer): void {
     const tmp = `${dest}.tmp-${process.pid}-${randomBytes(6).toString("hex")}`;
+    const fd = openSync(tmp, "w");
     try {
-      writeFileSync(tmp, content, { flag: "wx" });
-      renameSync(tmp, dest);
+      writeSync(fd, content);
+      fsyncSync(fd);
     } finally {
-      // Best-effort cleanup when rename failed; after a successful rename the
-      // temp path no longer exists and unlink fails harmlessly.
+      closeSync(fd);
+    }
+    // Windows rename-over-existing fails EPERM/EACCES/EBUSY while any other
+    // handle holds the destination without FILE_SHARE_DELETE. Retry bounded
+    // (mirrors StateFile / workflows atomic contract, H5.6).
+    const maxAttempts = 12;
+    for (let attempt = 1; ; attempt += 1) {
       try {
-        unlinkSync(tmp);
-      } catch {
-        /* already renamed or never created */
+        renameSync(tmp, dest);
+        return;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code ?? "";
+        const transientShareViolation =
+          process.platform === "win32" &&
+          (code === "EPERM" || code === "EACCES" || code === "EBUSY");
+        if (!transientShareViolation || attempt >= maxAttempts) {
+          try {
+            unlinkSync(tmp);
+          } catch {
+            /* already renamed or never created */
+          }
+          throw err;
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5 * attempt);
       }
     }
   }

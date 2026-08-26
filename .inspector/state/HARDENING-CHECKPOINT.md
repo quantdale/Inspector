@@ -730,3 +730,36 @@ usage fabricated refunds. Full fix + proofs as listed under H3.4.
 | H5-D3 | HIGH | CLOSED (2026-08-26) | `native-hunt` always created a REAL UIA replay driver for Windows reproduction, even when the run was mock-backed â€” same class as D1 but on the exploration confirmation path. Closed: single-source `resolveWindowsBackendKind()` over `INSPECTOR_WINDOWS_BACKEND` and `probeRealUia`, shared by exploration provenance and native-hunt reproduction. |
 | H5-D4 | HIGH | CLOSED (2026-08-26) | Native-session candidate ranking sorted by static priority BEFORE usage/freshness, so priority-8 boundary fills (A*80) permanently starved every click (observed: 40/40 fills, zero clicks on SeedBank). Structurally prevented windows exploration from ever reaching a defect beyond a text box. Closed by ranking `useCount asc â†’ priority desc` within the fresh/usable pools. Verified by the 8-seed H5.3 debug census â†’ now anomalies reproduces. |
 | H5-D5 | LOW* | CLOSED (2026-08-26) | Windows mock `SeedBank` had no autonomously-reachable seeded defect: the only defects sat behind `Log in` (denied as `external-side-effect` by the W2 safety boundary) and increment overflow (undiscoverable without reaching the dashboard). Added login-screen Edit `notes` where boundary input (â‰¥32 chars) crashes validation single-action, TRIAGED to the same class as the web seeded defects; topology unchanged. | |
+
+
+# HARDENING CAMPAIGN #5 — Fleet Execution Truth, Platform Parity,
+# Cross-Platform Durability, and Measured Runtime Efficiency
+
+- Campaign: HARDENING_5
+- Status: IN-PROGRESS (phases H5.0-H5.7 CLOSED; H5.8 soak/flake sweep ACTIVE; H5.9 truth reconciliation + certification pending push)
+- Opened: 2026-08-26
+- Base commit: `7214ae4` (planner activation; H4 final f687ef1 -> fast-forward).
+- Source of scope: `.agent/EXECUTION_PROMPT.md` + openspec/changes/hardening-5-fleet-truth/.
+- Branch policy: main only; no force-push; push only when hosted certification is reachable.
+
+## H5 every-file audit (H5.0.4-5) — DONE
+
+- `.inspector/state/HARDENING_5-AUDIT.md` generated mechanically from `git ls-files`.
+- tracked=527 == reviewed=527 + excluded=0. Every tracked file enumerated individually or via a clearly enumerated homogeneous group with member paths listed. Exclusions rule (generated/vendor/cache) yields 0 matches (lockfile/dependency output are gitignored, not tracked). Machine-checkable invariant `reviewed+excluded==tracked` holds.
+
+## H5.6 Cross-platform atomic-write durability — DONE (2026-08-26)
+
+- Inventory (H5.6.1): production atomic writers = workflows/atomic.ts `writeJsonAtomic`, artifact-store `atomicWrite`, scale `StateFile.save` (reference, H4-D5), scale `lock.ts` (mkdir-race + rename takeover), scale `writeJsonAtomic` (new), fleet-harness bundle writes (now atomic).
+- Gap closed: `writeJsonAtomic` (workflows) and `ArtifactStore.atomicWrite` lacked the Windows sharing-violation retry + fsync that StateFile had (the exact H4.7 documented RESIDUAL). Added bounded win32-only retry (EPERM/EACCES/EBUSY, 12 attempts, backoff 5*attempt ms) + fd fsync, preserving unique-temp ownership (`wx`/pid+uuid) and loud failure after the bound. `fleet-harness` bundle writes converted to the new scale `writeJsonAtomic`.
+- Regression: scale `state-file.hardening.test.ts` (5, incl. real concurrent external-writer race), artifact-store `artifact-store.test.ts` (6) + `hardening.test.ts` (53) + `soak.integration.test.ts` (zero tmp litter, dedup 2.93x), windows-campaign integration (2) all green.
+
+## H5.7 Measured runtime efficiency — DONE (2026-08-26)
+
+- Hypothesis evaluation (each independent):
+  - prepared-statement caching: N/A for JSON durable state; store-sqlite already uses prepared statements -> REJECTED (no-op).
+  - fingerprint co-computation: IMPLEMENTED — `StateFile.save` set-fingerprint-skips identical re-saves (no fsync/rename). `scripts/perf-bench.ts` captures the baseline (no-op save far cheaper than changing save).
+  - temp-sweep throttling: already bounded (`MAX_ORPHANS_PER_SWEEP`, age 60s) -> REJECTED (already satisfied).
+  - checkpoint cost / CI caching / synchronous FileLock waiting: not pursued (no measured win; SQLite remains default) -> REJECTED with rationale.
+- Only the measured set-fingerprint skip was kept; all other hypotheses recorded as rejected.
+
+## H5.1-H5.5 (Fleet truth) — DONE (see defect matrix H5-D0..D5)

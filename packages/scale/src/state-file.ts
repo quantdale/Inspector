@@ -13,7 +13,7 @@ import {
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { FileLock } from "./lock.js";
 
 /** Thrown when durable state exists but cannot be parsed; the file is quarantined first. */
@@ -60,6 +60,13 @@ export class StateFile<T> {
   private readonly validate?: (value: unknown) => T;
   /** Age (ms) at which an orphaned unique-named temp becomes sweepable debris. */
   private readonly tmpStaleMs: number;
+  /**
+   * Set-fingerprint of the last value persisted to disk. When a {@link save}
+   * would write bytes identical to what is already on disk, the fsync + rename
+   * is skipped entirely (H5.7: measured runtime efficiency). Absent until the
+   * first successful load OR save, so a freshly constructed file still writes.
+   */
+  private lastFingerprint?: string;
 
   constructor(
     stateDir: string,
@@ -93,6 +100,9 @@ export class StateFile<T> {
         throw this.quarantine(err);
       }
     }
+    // Seed the fingerprint from the on-disk bytes so a no-op reload does not
+    // force a rewrite on the next save.
+    this.lastFingerprint = createHash("sha256").update(readFileSync(this.path, "utf8")).digest("hex");
     return parsed as T;
   }
 
@@ -130,16 +140,20 @@ export class StateFile<T> {
    * locking: call from inside {@link update}, or hold the state lock yourself.
    */
   save(value: T): void {
+    const serialized = JSON.stringify(value, null, 2);
+    const fingerprint = createHash("sha256").update(serialized).digest("hex");
+    if (fingerprint === this.lastFingerprint) return; // no-op: skip fsync+rename
     const tmp = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
     const fd = openSync(tmp, "w");
     try {
-      writeSync(fd, JSON.stringify(value, null, 2));
+      writeSync(fd, serialized);
       fsyncSync(fd);
     } finally {
       closeSync(fd);
     }
     this.renameWithWindowsShareRetry(tmp, this.path);
     this.fsyncDirectoryBestEffort();
+    this.lastFingerprint = fingerprint;
   }
 
   /**
@@ -238,6 +252,44 @@ export class StateFile<T> {
       } catch {
         // Harmless race.
       }
+    }
+  }
+}
+
+/**
+ * Standalone atomic JSON writer (unique-temp + fsync + rename with the same
+ * Windows share-retry contract as {@link StateFile}). Used for durable JSON
+ * artifacts that are not themselves a StateFile (e.g. evidence bundles).
+ */
+export function writeJsonAtomic(path: string, value: unknown): void {
+  mkdirSync(join(path, ".."), { recursive: true });
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const fd = openSync(tmp, "w");
+  try {
+    writeSync(fd, JSON.stringify(value, null, 2));
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  const maxAttempts = 12;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      renameSync(tmp, path);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "";
+      const transientShareViolation =
+        process.platform === "win32" &&
+        (code === "EPERM" || code === "EACCES" || code === "EBUSY");
+      if (!transientShareViolation || attempt >= maxAttempts) {
+        try {
+          unlinkSync(tmp);
+        } catch {
+          // Unique-named debris; swept later by age.
+        }
+        throw err;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5 * attempt);
     }
   }
 }

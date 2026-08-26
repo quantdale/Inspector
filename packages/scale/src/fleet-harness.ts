@@ -8,7 +8,6 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -35,7 +34,7 @@ import { Store } from "@inspector/store-sqlite";
 
 import { LeaseManager } from "./leases.js";
 import { ResourceLedger } from "./ledger.js";
-import { StateFile } from "./state-file.js";
+import { StateFile, writeJsonAtomic } from "./state-file.js";
 import { ModelRouter } from "./router.js";
 import type { ModelProvider, ModelRole, UsageEntry } from "./types.js";
 
@@ -992,7 +991,7 @@ export function makeWebExecutor(common: {
           },
         );
         const bundlePath = join(common.bundlesDir, `${finding.id}.json`);
-        writeFileSync(bundlePath, JSON.stringify(bundle, null, 2));
+        writeJsonAtomic(bundlePath, bundle);
         common.effects.write(effectId(ctx.item.id, "finding-confirmed", finding.signature ?? finding.id));
         common.effects.write(effectId(ctx.item.id, "evidence-bundle", finding.id));
         findings.push({ itemId: ctx.item.id, lane: "web", finding, bundle, regression, bundlePath });
@@ -1352,7 +1351,7 @@ async function androidConfirm(
       adapter: "android-uiautomator",
     });
     const bundlePath = join(common.bundlesDir, `${confirmed.id}.json`);
-    writeFileSync(bundlePath, JSON.stringify(bundle, null, 2));
+    writeJsonAtomic(bundlePath, bundle);
     common.effects.write(effectId(ctx.item.id, "finding-confirmed", confirmed.signature ?? confirmed.id));
     common.effects.write(effectId(ctx.item.id, "evidence-bundle", confirmed.id));
 

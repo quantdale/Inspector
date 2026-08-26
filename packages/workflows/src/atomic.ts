@@ -1,11 +1,14 @@
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   renameSync,
   unlinkSync,
-  writeFileSync,
+  writeSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { newId } from "@inspector/protocol";
@@ -13,16 +16,49 @@ import { newId } from "@inspector/protocol";
 const ORPHAN_MIN_AGE_MS = 60_000;
 const MAX_ORPHANS_PER_SWEEP = 256;
 
+/**
+ * Windows rename-over-existing fails EPERM/EACCES/EBUSY while ANY other handle
+ * holds the destination without FILE_SHARE_DELETE — including a concurrent
+ * unlocked reader mid-readFileSync. POSIX never exhibits this. Retry bounded:
+ * readers hold their handle for microseconds, so a short retry window preserves
+ * atomicity without masking genuine failures (which still throw after the
+ * bound). Mirrors scale's StateFile contract (HARDENING_4 / H5.6).
+ */
+function renameWithWindowsShareRetry(from: string, to: string): void {
+  const maxAttempts = 12;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "";
+      const transientShareViolation =
+        process.platform === "win32" && (code === "EPERM" || code === "EACCES" || code === "EBUSY");
+      if (!transientShareViolation || attempt >= maxAttempts) {
+        try {
+          unlinkSync(from);
+        } catch {
+          // Unique-named debris; swept later by age.
+        }
+        throw err;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5 * attempt);
+    }
+  }
+}
+
 /** Write a JSON artifact by staging it under a unique name then renaming. */
 export function writeJsonAtomic(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `.${basename(path)}.tmp-${process.pid}-${newId()}`);
+  const fd = openSync(temp, "w");
   try {
-    writeFileSync(temp, JSON.stringify(value, null, 2), { encoding: "utf8", flag: "wx" });
-    renameSync(temp, path);
+    writeSync(fd, JSON.stringify(value, null, 2));
+    fsyncSync(fd);
   } finally {
-    try { unlinkSync(temp); } catch { /* renamed or never created */ }
+    closeSync(fd);
   }
+  renameWithWindowsShareRetry(temp, path);
 }
 
 /**
