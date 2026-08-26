@@ -1,6 +1,6 @@
 # Inspector Execution Prompt — HARDENING_4
 
-**Status:** ACTIVE  
+**Status:** COMPLETE (2026-08-26 — hosted certification run 32936068493 SUCCESS on exact pushed SHA `f687ef1`; canonical truth: `.inspector/state/campaign.yaml` `hardening4:` block; ledger campaign #4). No campaign is currently ACTIVE; a new planner activation replaces this file. Historical scope below is retained verbatim.  
 **Campaign:** HARDENING_4 — Certification Integrity, Durable-State Atomicity, and Cross-Process Ownership Fencing  
 **Mode:** HARDENING  
 **Target branch:** `main`  

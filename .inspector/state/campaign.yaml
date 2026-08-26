@@ -463,8 +463,9 @@ hardening3:
 
 hardening4:
   campaign: HARDENING_4
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-25"
+  completed_at: "2026-08-26"
   base_commit: e030696 (planner activation; planned-from 270b375 = HARDENING_3 final)
   activated_by: .agent/EXECUTION_PROMPT.md (planner commit e030696, pulled and fast-forwarded)
   protocol: docs/HARDENING-CAMPAIGN.md
@@ -480,7 +481,26 @@ hardening4:
     - {id: H4.7, name: whole-repo-negative-space-sweep, state: DONE}
     - {id: H4.8, name: perf-resource-verification, state: DONE}
     - {id: H4.9, name: exact-tree-local-certification, state: DONE}
-    - {id: H4.10, name: hosted-ci-certification, state: IN_PROGRESS}
+    - {id: H4.10, name: hosted-ci-certification, state: DONE}
+  hosted_certification:
+    exact_pushed_sha: f687ef113ade73e5d2e033c4d4b1b084d0a9adef
+    run_id: 32936068493
+    run_attempt: 1
+    conclusion: SUCCESS
+    inspected_at: "2026-08-26"
+    method: PUBLIC GitHub REST API (unauthenticated)
+    jobs:
+      - {id: 98077403447, name: Linux quality gate, conclusion: SUCCESS,
+        proof: "step 9 pnpm --filter @inspector/adapter-web provision:browser success; step 10 pnpm test:integration ran 7m11s to success (full Linux integration executed, not skipped)"}
+      - {id: 98078986668, name: Linux installed-artifact smoke, conclusion: SUCCESS}
+      - {id: 98078986620, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS}
+      - {id: 98077403508, name: Windows path/native gate, conclusion: SUCCESS}
+    anti_circular_truth_note: >-
+      The state-synchronization commit that records this certification has a
+      NEW SHA whose own Actions result is not certified by itself; future
+      sessions must query Actions for the current HEAD SHA per the H4.10
+      rule. No documentation-only 'green' commit was created between the
+      certified SHA and this record beyond the required durable-state truth.
   last_local_gate: >-
     PASS on the exact tree before commit (2026-08-25): install
     --frozen-lockfile OK (21 projects); lint 0 errors / 4 pre-existing

@@ -6,7 +6,23 @@
 - Status: **COMPLETE — M13 Intelligence-Guided Autonomous QA closed 2026-08-25.** M0-M12 and HARDENING_1/2 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: none active (HARDENING_2 COMPLETE; hardening stays separately invoked)
+- Hardening: none active (HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493; hardening stays separately invoked)
+
+### HARDENING_4 COMPLETE (2026-08-26)
+
+All H4.0-H4.10 phases done; defects H4-D1..H4-D8 CLOSED with regression
+coverage (ledger: `.inspector/state/HARDENING-CHECKPOINT.md`, campaign #4).
+Hosted certification: run **32936068493 SUCCESS on exact pushed SHA
+`f687ef1`** — Linux quality gate (browser provisioning + FULL integration,
+step-proven), Linux installed-artifact smoke, Electron Xvfb real-runtime
+proof, and Windows path/native lane all green via public API inspection.
+Session reconciliation: a stray unledgered perf-optimization working-tree
+batch from the interrupted session was preserved verbatim
+(`.inspector/tmp/h4-stray-perf-batch-2026-08-26.patch` + git stash) and NOT
+landed; it was unmeasured, ungated, outside every H4 acceptance criterion,
+and partially contract-risky. No active campaign remains; continue only when
+the next roadmap milestone or hardening campaign is explicitly activated via
+`.agent/EXECUTION_PROMPT.md`. No release/tag/publication.
 
 ### M13 activation (2026-08-24)
 

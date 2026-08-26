@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: HARDENING_4 COMPLETE (2026-08-25)
+Last updated: HARDENING_4 COMPLETE (2026-08-26, hosted-certified)
 
 ## Campaign
 
@@ -11,6 +11,13 @@ Last updated: HARDENING_4 COMPLETE (2026-08-25)
   Seven defects closed (2 HIGH durability primitives redesigned,
   1 HIGH clean-CI executable resolution, 1 MEDIUM stats semantics,
   3 truth-surface/LOW), each with deterministic regression coverage.
+  Hosted certification: Actions run **32936068493 SUCCESS** on the exact
+  pushed SHA **`f687ef1`** — Linux quality gate (browser provisioning +
+  FULL integration, step-proven via public API), Linux installed-artifact
+  smoke, Electron Xvfb real-runtime proof, and Windows path/native lane all
+  green. An eighth defect (H4-D8 MEDIUM, node-pty POSIX spawn parity) was
+  found by that hosted run's first-ever Linux integration execution and
+  closed by `f687ef1` itself.
 - HARDENING_3, HARDENING_2: COMPLETE. M13 — Intelligence-Guided Autonomous
   QA: **COMPLETE** (exit gate PASS on `9d65d334`). M12/M11/M10/M9 and all
   earlier milestones COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`. Canonical
@@ -239,7 +246,7 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 | test (unit) | PASS — 666 passed / 3 skipped across 63 files (HARDENING_4 tree; +26 tests incl. FileLock/StateFile fencing suites and repo-contract guards) |
 | test:integration | PASS — 202 passed / 1 skipped first-run + the single android `uiautomator dump exit 137` environmental flake green in isolation immediately after (documented dual-emulator class from M13/H2); 47 files total incl. real web/PTY/AVD/UIA/Electron lanes |
 | installed release smoke | PASS (fresh npm prefix, full command surface incl. M12 campaign + M13 model steps) |
-| hosted CI | Inspected via PUBLIC GitHub REST API (no auth needed): run 32840538303 on HARDENING_3 final SHA 270b375 = FAILURE at root-level Playwright provisioning → FIXED as H4-D1; the exact HARDENING_4 pushed SHA is certified by its own Actions run (see ledger/commit report) |
+| hosted CI | Inspected via PUBLIC GitHub REST API (no auth needed): run 32840538303 on HARDENING_3 final SHA 270b375 = FAILURE at root-level Playwright provisioning → FIXED as H4-D1; intermediate run 32934944139 on 1b8435c = FAILURE exposing H4-D8 (first-ever Linux integration execution) → FIXED by f687ef1; **final certification: run 32936068493 SUCCESS on exact pushed SHA f687ef1 — Linux quality (provisioning + full integration step-proven), installed-artifact smoke, Electron Xvfb real-runtime, Windows path/native all SUCCESS** |
 
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration

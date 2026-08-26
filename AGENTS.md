@@ -6,15 +6,14 @@ This file is the operating contract for autonomous coding agents working on Insp
 
 The repository has completed the **M13 — INTELLIGENCE_GUIDED_AUTONOMOUS_QA
 (Intelligence-Guided Autonomous QA)** implementation milestone and,
-separately invoked under `docs/HARDENING-CAMPAIGN.md`, the **HARDENING_2**
-and **HARDENING_3 — whole-system reliability, intelligence safety, clean-CI
-correctness, concurrency torture** campaigns (RC1 field validation and M9-M12
-are complete; M8 iOS remains `DEFERRED_ENVIRONMENT`).
-**HARDENING_4 — certification integrity, durable-state atomicity, and
-cross-process ownership fencing — is ACTIVE** via `.agent/EXECUTION_PROMPT.md`
-(planner commit `e030696`). Continue only when the next roadmap milestone or
-campaign is explicitly activated via `.agent/EXECUTION_PROMPT.md`; do not
-infer a release from this state.
+separately invoked under `docs/HARDENING-CAMPAIGN.md`, the **HARDENING_2**,
+**HARDENING_3**, and **HARDENING_4 — certification integrity, durable-state
+atomicity, and cross-process ownership fencing — COMPLETE (2026-08-26;
+hosted certification run 32936068493 SUCCESS on exact pushed SHA `f687ef1`)**
+campaigns (RC1 field validation and M9-M12 are complete; M8 iOS remains
+`DEFERRED_ENVIRONMENT`). No campaign is currently ACTIVE. Continue only when
+the next roadmap milestone or campaign is explicitly activated via
+`.agent/EXECUTION_PROMPT.md`; do not infer a release from this state.
 
 The intent is unattended forward development: continue implementing the roadmap without waiting for routine human approval. Deep audits, broad refactors whose only purpose is cleanup, exhaustive fuzzing, and other hardening-only work belong to a separately invoked hardening campaign.
 

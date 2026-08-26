@@ -7,7 +7,8 @@
 # and Cross-Process Ownership Fencing
 
 - Campaign: HARDENING_4
-- Status: **ACTIVE**
+- Status: **COMPLETE (2026-08-26; hosted certification on exact pushed SHA
+  f687ef1, run 32936068493 SUCCESS — all four required lanes green)**
 - Opened: 2026-08-25
 - Base commit: `e030696` (planner activation; planned-from `270b375` =
   HARDENING_3 final). Local main == origin/main after fast-forward pull.
@@ -151,13 +152,38 @@ Lifecycle: SUSPICION → EVIDENCE → SEVERITY → REGRESSION TEST → FIX → C
   (2 workers), models summary, fixture provider hunt, invalid-provider
   refusal exit 4.
 
-## H4.10 Hosted certification (2026-08-25)
+## H4.10 Hosted certification (2026-08-25/26) — DONE
 
-- Final commit pushed to origin/main without force-push; the exact pushed
+- Final commit(s) pushed to origin/main without force-push; the exact pushed
   SHA's Actions run is inspected through the PUBLIC GitHub REST API.
-- Result recorded in the completion report (commit message). Per the
-  anti-circular-truth rule, no documentation-only "green" commit is created
-  after the fact; future sessions query Actions for the current HEAD SHA.
+- Certification chain: push 1b8435c → run 32934944139 FAILURE exposed H4-D8
+  (first-ever Linux integration execution; node-pty POSIX spawn divergence);
+  fix pushed as f687ef1 → run 32936068493 (attempt 1) **SUCCESS on the exact
+  final SHA f687ef113ade73e5d2e033c4d4b1b084d0a9adef**, jobs:
+  - Linux quality gate 98077403447 SUCCESS — step-level proof that browser
+    provisioning (`pnpm --filter @inspector/adapter-web provision:browser`)
+    ran and full `pnpm test:integration` executed to success (~7m11s), after
+    lint/typecheck/unit green;
+  - Linux installed-artifact smoke 98078986668 SUCCESS;
+  - Electron real-runtime proof (Xvfb) 98078986620 SUCCESS — first hosted
+    real-Electron lane completion in repository history;
+  - Windows path/native gate 98077403508 SUCCESS.
+- Per the anti-circular-truth rule, no documentation-only "green" commit is
+  created between f687ef1 and this record's certification claim; future
+  sessions query Actions for the current HEAD SHA. This state-synchronization
+  commit itself carries a NEW uncertified SHA by construction.
+
+### Session reconciliation note (2026-08-26)
+
+An interrupted session left an UNLEDGERED working-tree batch (17 files):
+speculative performance optimization (CI caches, prepared-statement caches,
+single-pass ledger aggregation, fingerprint co-computation, sweep throttling,
+an explore-loop checkpoint() removal). It was not measured, not gated, not
+part of any H4 acceptance criterion, and partially contract-risky. Disposed
+per policy WITHOUT discarding or landing it: preserved verbatim as
+`.inspector/tmp/h4-stray-perf-batch-2026-08-26.patch` plus `git stash`
+("stray unledgered perf-optimization WIP..."); tree restored to exactly the
+certified SHA before state synchronization.
 
 ### H4-D8 MEDIUM — NodePtyBackend.spawn resolved a doomed session on POSIX for nonexistent programs (platform-semantics parity) — CLOSED
 
