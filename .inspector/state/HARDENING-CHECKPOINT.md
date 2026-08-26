@@ -699,3 +699,29 @@ recorded in the same change set.
 NaN cost estimate previously admitted (comparison fail-open) and poisoned
 durable state into StateCorruptionError quarantine (persistent DoS); negative
 usage fabricated refunds. Full fix + proofs as listed under H3.4.
+
+---
+
+# HARDENING CAMPAIGN #5 — ACTIVE (activated 2026-08-26)
+
+- Campaign: **HARDENING_5 — Fleet Execution Truth, Platform Parity,
+  Cross-Platform Durability, and Measured Runtime Efficiency**.
+- Activated from `.agent/EXECUTION_PROMPT.md` (planner commit `7214ae4`,
+  planned-from `217165c` = HARDENING_4 COMPLETE state-synchronization HEAD).
+  Local `main` fast-forwarded `217165c..7214ae4`; working tree clean.
+- Execution contract: OpenSpec change
+  `openspec/changes/hardening-5-fleet-truth/` (proposal, design, tasks, four
+  capability deltas: fleet-execution-truth, cross-platform-atomic-writes,
+  runtime-efficiency-proof, audit-certification).
+- Baseline CI truth (public Actions API): run 32955622320 on planning baseline
+  `217165c` = SUCCESS; planner commit `7214ae4` run 32961595668 was
+  IN_PROGRESS at activation time.
+- Canonical state: `.inspector/state/campaign.yaml` `hardening5:` block;
+  prompt status set ACTIVE in the same activation checkpoint.
+- Phase ledger H5.0–H5.9 tracked in campaign.yaml; defect lifecycle below.
+
+## Defect ledger
+
+| ID | Sev | Status | Summary |
+| --- | --- | --- | --- |
+| H5-D0 | SUSPECTED HIGH | REPRO_PENDING | Electron family accepted by scale/manifest/capability probe but workflows cannot represent/spawn it — falls through to fake (`familyAdapter`, `adapterSpawn`, exploration native-only set, `replayDriverFor`). Deterministic reproduction required before severity confirmation. |

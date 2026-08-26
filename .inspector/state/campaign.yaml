@@ -519,6 +519,46 @@ hardening4:
     - H4-D7 MEDIUM modelruntime-stats-fallbacksused-semantics: CLOSED
     - H4-D8 MEDIUM pty-spawn-nonexistent-posix-parity: CLOSED
 
+hardening5:
+  campaign: HARDENING_5
+  status: ACTIVE
+  started_at: "2026-08-26"
+  base_commit: 217165cd4a6c39c0726b12b01edf2c6c4056a6e1
+  base_note: HARDENING_4 COMPLETE state-synchronization HEAD (planning baseline)
+  activated_by: .agent/EXECUTION_PROMPT.md (planner commit 7214ae4, pulled fast-forward from 217165c)
+  openspec_change: openspec/changes/hardening-5-fleet-truth/
+  protocol: docs/HARDENING-CAMPAIGN.md
+  ledger: .inspector/state/HARDENING-CHECKPOINT.md (campaign #5 section)
+  audit_census: .inspector/state/HARDENING_5-AUDIT.md
+  scope: >-
+    Fleet execution truth: close the Electron accepted/routed-to-fake
+    contradiction end to end; platform-complete Electron and Windows/UIA
+    campaign lanes with identity-faithful evidence; Electron replay/verify/
+    regress/resume continuity or explicit preflight narrowing; exhaustive
+    adapter-family contract with matrix/repo-contract guards; cross-platform
+    atomic-write durability completion; measured runtime efficiency;
+    every-tracked-file audit census certification; truth reconciliation;
+    exact-SHA local + hosted certification. No M14, no release/tag.
+  baseline_ci:
+    - {sha: 217165cd4a6c39c0726b12b01edf2c6c4056a6e1, run_id: 32955622320, conclusion: SUCCESS}
+    - {sha: 7214ae4, run_id: 32961595668, conclusion: IN_PROGRESS at activation}
+  phases:
+    - {id: H5.0, name: activate-rehydrate-everyfile-census, state: ACTIVE}
+    - {id: H5.1, name: electron-fleet-false-execution-regression, state: PENDING}
+    - {id: H5.2, name: real-electron-campaign-lane, state: PENDING}
+    - {id: H5.3, name: windows-uia-campaign-truth, state: PENDING}
+    - {id: H5.4, name: electron-replay-verify-regress-resume, state: PENDING}
+    - {id: H5.5, name: exhaustive-adapter-family-contract, state: PENDING}
+    - {id: H5.6, name: cross-platform-atomic-write-durability, state: PENDING}
+    - {id: H5.7, name: measured-runtime-efficiency, state: PENDING}
+    - {id: H5.8, name: negative-space-soak-installed-artifact, state: PENDING}
+    - {id: H5.9, name: truth-reconciliation-certification, state: PENDING}
+  defects:
+    - >-
+      H5-D0 SUSPECTED HIGH electron-family-routed-through-workflow-fake-fallback:
+      suspicion recorded at activation from planner audit; deterministic
+      reproduction pending before severity is confirmed
+
 hardening1_history:
   campaign: HARDENING_1
   status: COMPLETE

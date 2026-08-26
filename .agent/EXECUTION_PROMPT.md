@@ -1,6 +1,6 @@
 # Inspector Execution Prompt — HARDENING_5
 
-**Status:** READY_FOR_EXECUTION — planner handoff is complete. On an explicit operator instruction to pull/apply/work on this prompt, the executor MUST first reconcile `main`, then activate HARDENING_5 in canonical durable state before editing implementation code. This status is intentionally not `ACTIVE` yet because `.inspector/state/campaign.yaml` still truthfully records no active hardening campaign at planner time.  
+**Status:** ACTIVE (2026-08-26 — activated by the executor session after reconciling `main`: pulled planner commit `7214ae4`, baseline `217165c` hosted run 32955622320 SUCCESS; HARDENING_5 recorded in canonical state `.inspector/state/campaign.yaml` `hardening5:` block and ledger campaign #5 before implementation edits).  
 **Campaign:** HARDENING_5 — Fleet Execution Truth, Platform Parity, Cross-Platform Durability, and Measured Runtime Efficiency  
 **Mode:** HARDENING  
 **Target branch:** `main` only  

@@ -6,7 +6,7 @@
 - Status: **COMPLETE — M13 Intelligence-Guided Autonomous QA closed 2026-08-25.** M0-M12 and HARDENING_1/2 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: none active (HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493; hardening stays separately invoked)
+- Hardening: **HARDENING_5 ACTIVE** (Fleet Execution Truth; activated 2026-08-26 from planner commit `7214ae4`; ledger campaign #5 in `.inspector/state/HARDENING-CHECKPOINT.md`). HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493.
 
 ### HARDENING_4 COMPLETE (2026-08-26)
 
