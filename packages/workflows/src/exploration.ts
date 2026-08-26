@@ -23,7 +23,7 @@ import { runNativeHuntCommand } from "./native-hunt.js";
 import { runWebHunt } from "./web-hunt.js";
 import { runElectronHunt } from "./electron-hunt.js";
 import { resolveModelSupport } from "./model-support.js";
-import { explorerKindOf } from "./families.js";
+import { explorerKindOf, resolveWindowsBackendKind } from "./families.js";
 import { electronExecutablePath } from "@inspector/electron-adapter";
 import type { ModelAssistanceConfig, ResolvedModelSupport } from "./model-support.js";
 import { StoreModelCallSink } from "./model-support.js";
@@ -192,7 +192,7 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
     const isNative =
       req.adapter === "cli" || req.adapter === "windows" || req.adapter === "android";
     let electronEnvDelta: NodeJS.ProcessEnv | undefined;
-    if (req.adapter === "electron") {
+    if (req.adapter === "electron" && !resuming) {
       // H5.2: record the exact backend mode the spawned adapter will select so
       // replay/verify/regress reconstruct the SAME backend faithfully.
       const raw = process.env.INSPECTOR_ELECTRON_BACKEND;
@@ -212,6 +212,12 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
       }
       const backendMode = raw === "real" || raw === "injectable" ? raw : executableReady ? "real" : "injectable";
       electronEnvDelta = { INSPECTOR_ELECTRON_BACKEND: backendMode };
+    }
+    let windowsEnvDelta: NodeJS.ProcessEnv | undefined;
+    if (req.adapter === "windows" && !resuming) {
+      // H5.3: durable Windows backend provenance, resolved through the SAME
+      // single-source decision the native reproduction driver uses.
+      windowsEnvDelta = { INSPECTOR_WINDOWS_BACKEND: await resolveWindowsBackendKind() };
     }
     const spawnSpec = resuming
       ? storedSpawn!
@@ -235,6 +241,9 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
           ...(req.target !== undefined ? { INSPECTOR_CLI_PROGRAM: req.target } : {}),
           INSPECTOR_CLI_CWD: join(base, "pty-cwd"),
         };
+      }
+      if (windowsEnvDelta !== undefined && req.adapter === "windows") {
+        spawnEnvDelta = { ...(spawnEnvDelta ?? {}), ...windowsEnvDelta };
       }
     }
     try {
@@ -264,7 +273,9 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
           ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
       ...(createOptions ? { createOptions } : {}),
       ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
-      ...(electronEnvDelta ? { spawnEnvDelta: { ...(spawnEnvDelta ?? {}), ...electronEnvDelta } } : {}),
+      ...(electronEnvDelta && req.adapter === "electron"
+        ? { spawnEnvDelta: { ...(spawnEnvDelta ?? {}), ...electronEnvDelta } }
+        : {}),
           // Real-device adapters need headroom on observe (uiautomator dumps).
           ...(isNative ? { observeTimeoutMs: 30000 } : {}),
         });

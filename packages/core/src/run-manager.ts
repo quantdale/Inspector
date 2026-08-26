@@ -411,6 +411,12 @@ export class RunManager {
         env: opts.adapterEnv,
       });
       const caps = (await adapter.request("initialize", {}, opts.initializeTimeoutMs ?? 30000)) as CapabilityDoc;
+      // Honest identity: the adapter's own initialize answer replaces the
+      // command-derived provisional label in the durable records. Recorded
+      // BEFORE lifecycle create so an environment that fails to start still
+      // carries its true adapter family, never the runner's executable name
+      // (HARDENING_5 H5-D2).
+      this.store.recordAdapterIdentity(runId, envId, caps.adapter);
       await adapter.request(
         "lifecycle",
         opts.createOptions
@@ -418,9 +424,6 @@ export class RunManager {
           : { op: "create" },
         30000,
       );
-      // Honest identity: the adapter's own initialize answer replaces the
-      // command-derived provisional label in the durable records.
-      this.store.recordAdapterIdentity(runId, envId, caps.adapter);
       this.store.setRunStatus(runId, "running");
       return new RunController(this.store, this.artifactStore, this.engine, {
         runId,

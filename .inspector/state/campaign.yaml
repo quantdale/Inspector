@@ -546,9 +546,9 @@ hardening5:
     - {id: H5.0, name: activate-rehydrate-everyfile-census, state: ACTIVE}
     - {id: H5.1, name: electron-fleet-false-execution-regression, state: DONE}
     - {id: H5.2, name: real-electron-campaign-lane, state: ACTIVE}
-    - {id: H5.3, name: windows-uia-campaign-truth, state: PENDING}
-    - {id: H5.4, name: electron-replay-verify-regress-resume, state: ACTIVE_NEAR_DONE}
-    - {id: H5.5, name: exhaustive-adapter-family-contract, state: ACTIVE}
+    - {id: H5.3, name: windows-uia-campaign-truth, state: DONE}
+    - {id: H5.4, name: electron-replay-verify-regress-resume, state: DONE}
+    - {id: H5.5, name: exhaustive-adapter-family-contract, state: DONE}
     - {id: H5.6, name: cross-platform-atomic-write-durability, state: PENDING}
     - {id: H5.7, name: measured-runtime-efficiency, state: PENDING}
     - {id: H5.8, name: negative-space-soak-installed-artifact, state: PENDING}
@@ -556,14 +556,29 @@ hardening5:
   defects:
     - >-
       H5-D0 CONFIRMED HIGH (CLOSED 2026-08-26) electron-family-routed-through-
-      workflow-fake-fallback: deterministic reproduction proved an accepted
-      electron campaign item executed a SUCCESSFUL fake run (durable run,
-      environment, evidence, notes all 'adapter-fake'); closed by exhaustive
-      FAMILY_CONTRACT (compile-time Record<AdapterFamily>), fail-closed
-      familyAdapter/adapterSpawn/storedAdapterSpawn/replayDriverFor, real
-      Electron fleet lane with durable electron-chromium identity,
-      ElectronReplayDriver for replay/verify/regress, and the
-      adapter-family-matrix contract suite pinning every layer per family.
+      workflow-fake-fallback (red→green proven).
+    - >-
+      H5-D1 CONFIRMED MEDIUM (CLOSED 2026-08-26) windows-mock replay driver not
+      surfacing backend app-error state — NotesOverflowCrash never reproduced →
+      rejected; fixed by parity with handler's freshError/before-after logic.
+    - >-
+      H5-D2 CONFIRMED MEDIUM (CLOSED 2026-08-26) durable run identity stuck on
+      provisional executable name when lifecycle-create fails (recordAdapterIdentity
+      ran after create); fixed by reordering before create, honored by a new
+      mock-real provenance assertion (H5.3.2 leg 2).
+    - >-
+      H5-D3 CONFIRMED HIGH (CLOSED 2026-08-26) native windows exploration replay
+      driver never matched the backend that actually ran (always real) — mock
+      findings can never confirm; fixed by single-source resolveWindowsBackendKind
+      shared by exploration and native-hunt.
+    - >-
+      H5-D4 CONFIRMED HIGH (CLOSED 2026-08-26) native-session candidate ranking
+      starved clicks: priority-before-usage let boundary fills occupy 40/40
+      actions; verified by H5.3 debug census and closed by usage-first ordering.
+    - >-
+      H5-D5 (CLOSED 2026-08-26) windows mock had no autonomously-reachable seeded
+      defect past the deny-patterned Log in wall — added login-screen notes
+      Edit with boundary crash, TRIAGED identically to the web seeded defects.
 
 hardening1_history:
   campaign: HARDENING_1

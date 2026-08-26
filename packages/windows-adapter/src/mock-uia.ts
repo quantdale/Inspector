@@ -15,10 +15,11 @@ interface MockWinApp {
   message: string;
   count: number;
   errors: string[];
+  notes: string;
 }
 
 function initial(): MockWinApp {
-  return { screen: "login", username: "", password: "", message: "", count: 0, errors: [] };
+  return { screen: "login", username: "", password: "", message: "", count: 0, errors: [], notes: "" };
 }
 
 /** Fixed mock pid so window ops have stable, testable semantics. */
@@ -51,6 +52,11 @@ export class MockUiaBackend implements UiaBackend, UiaBackendWindowOps {
         { id: "usernameLabel", type: "Text", text: "Username", enabled: true },
         { id: "username", type: "Edit", text: a.username, enabled: true },
         { id: "password", type: "Edit", text: a.password, enabled: true },
+        // HARDENING_5 H5-D5 fixture surface: an auth-free edit whose boundary
+        // input deterministically crashes validation, so autonomous
+        // exploration (whose deny patterns correctly block the Log in
+        // button) can still reach a genuine seeded defect on this target.
+        { id: "notes", type: "Edit", text: a.notes, enabled: true },
         { id: "loginBtn", type: "Button", text: "Log in", enabled: true },
         { id: "msg", type: "Text", text: a.message, enabled: true },
       ];
@@ -108,7 +114,11 @@ export class MockUiaBackend implements UiaBackend, UiaBackendWindowOps {
     if (this.app.screen !== "login") throw new Error(`element not found: ${id}`);
     if (id === "username") this.app.username = value;
     else if (id === "password") this.app.password = value;
-    else throw new Error(`element not found or not editable: ${id}`);
+    else if (id === "notes") {
+      this.app.notes = value;
+      // Hidden defect: boundary-length notes input crashes validation.
+      if (value.length >= 32) this.app.errors.push("NotesOverflowCrash");
+    } else throw new Error(`element not found or not editable: ${id}`);
   }
 
   async errors(): Promise<string[]> {

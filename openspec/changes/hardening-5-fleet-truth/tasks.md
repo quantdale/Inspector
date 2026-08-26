@@ -32,10 +32,10 @@ All boxes start unchecked. A box may be checked only after its stated evidence/g
 
 ## H5.3 — Windows/UIA campaign truth
 
-- [ ] H5.3.1 Reproduce a campaign-level Windows/UIA work item through manifest → scheduler → workflow → real UIA adapter on Windows.
-- [ ] H5.3.2 If existing plumbing is already complete, add the missing regression/field proof and leave implementation minimal; otherwise close only evidenced gaps.
-- [ ] H5.3.3 Prove Windows run/environment/evidence/replay identity and capability-unavailable behavior.
-- [ ] H5.3.4 Add a bounded hosted Windows campaign-level gate if runner environment permits; otherwise document precise environment limitation.
+- [x] H5.3.1 Reproduce a campaign-level Windows/UIA work item through manifest → scheduler → workflow → real UIA adapter on Windows.
+- [x] H5.3.2 If existing plumbing is already complete, add the missing regression/field proof and leave implementation minimal; otherwise close only evidenced gaps.
+- [x] H5.3.3 Prove Windows run/environment/evidence/replay identity and capability-unavailable behavior.
+- [x] H5.3.4 Add a bounded hosted Windows campaign-level gate if runner environment permits; otherwise document precise environment limitation.
 
 ## H5.4 — Electron replay / verify / regress / resume
 
@@ -51,7 +51,7 @@ All boxes start unchecked. A box may be checked only after its stated evidence/g
 - [x] H5.5.2 Choose a low-drift typed registry/exhaustive-switch strategy consistent with package dependency direction.
 - [x] H5.5.3 Add a matrix/property/repo-contract test enumerating all declared families across validation, capability, execution, identity, and replay/refusal.
 - [x] H5.5.4 Add a future-family negative fixture proving CI fails if one required layer omits a declared family.
-- [ ] H5.5.5 Audit all other default/fallback branches for equivalent silent semantic substitution.
+- [x] H5.5.5 Audit all other default/fallback branches for equivalent silent semantic substitution.
 
 ## H5.6 — Cross-platform atomic-write durability
 

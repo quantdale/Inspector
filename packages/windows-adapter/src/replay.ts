@@ -33,6 +33,7 @@ export interface WindowsUiaReplayOptions {
     invoke(rid: string): Promise<void>;
     setValue(rid: string, value: string): Promise<void>;
     closeWindow(): Promise<void>;
+    errors?(): Promise<string[]>;
   };
   waitForWindowTimeoutMs?: number;
 }
@@ -124,10 +125,6 @@ export class WindowsUiaReplayDriver {
         const tree = await this.backend.richTree();
         const rid = resolveRid(tree.nodes, descriptorOf(a));
         if (rid === null) {
-          // Automation failure: repo convention is target-failure status with
-          // ACTION_FAILED code - the session pipeline only promotes
-          // code==="TARGET_FAILURE" outcomes, so this can never become a
-          // product defect.
           outcomes.push({
             actionId: a.id,
             runId: a.runId,
@@ -141,6 +138,7 @@ export class WindowsUiaReplayDriver {
           });
           continue;
         }
+        const beforeErrors: string[] = this.backend.errors ? await this.backend.errors() : [];
         try {
           if (a.kind === "click") await this.backend.invoke(rid);
           else if (a.kind === "fill") await this.backend.setValue(rid, String(a.input?.value ?? ""));
@@ -157,6 +155,20 @@ export class WindowsUiaReplayDriver {
           signals.push({ kind: "PAGE_ERROR", detail: msg });
           continue;
         }
+        const afterErrors: string[] = this.backend.errors ? await this.backend.errors() : [];
+        const fresh = freshError(beforeErrors, afterErrors);
+        if (fresh !== undefined) {
+          outcomes.push({
+            actionId: a.id,
+            runId: a.runId,
+            environmentId: a.environmentId,
+            status: "target-failure",
+            observedAt: new Date().toISOString(),
+            error: { code: "TARGET_FAILURE", message: fresh },
+          });
+          signals.push({ kind: "TARGET_FAILURE", detail: fresh });
+          continue;
+        }
         outcomes.push({
           actionId: a.id,
           runId: a.runId,
@@ -166,10 +178,23 @@ export class WindowsUiaReplayDriver {
         });
       }
     } finally {
-      // Leave the environment clean; close is best-effort (packaged apps may
-      // already be gone).
       await this.backend.closeWindow().catch(() => {});
     }
     return { outcomes, signals, observations: [] };
   }
+}
+
+/**
+ * First entry of `after` whose occurrence count exceeds its count in `before`
+ * (count-based multiset diff). Matches the adapter handler's contract.
+ */
+function freshError(before: string[], after: string[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const e of before) counts.set(e, (counts.get(e) ?? 0) + 1);
+  for (const e of after) {
+    const remaining = counts.get(e) ?? 0;
+    if (remaining === 0) return e;
+    counts.set(e, remaining - 1);
+  }
+  return undefined;
 }

@@ -3,6 +3,7 @@ import { FindingEngine, OracleEngine } from "@inspector/finding";
 import { runNativeHunt, type NativeSessionDeps } from "@inspector/explore";
 import type { Store } from "@inspector/store-sqlite";
 import { nativeExploreConfig } from "./configs.js";
+import { resolveWindowsBackendKind } from "./families.js";
 import type { ExplorationControl, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
 
 /**
@@ -39,8 +40,17 @@ export async function runNativeHuntCommand(
       });
   } else if (req.adapter === "windows") {
     const { WindowsUiaReplayDriver } = await import("../../windows-adapter/src/replay.js");
+    const { MockUiaBackend } = await import("../../windows-adapter/src/mock-uia.js");
     const targetTitle = req.target;
-    replayDriverFactory = () => new WindowsUiaReplayDriver({ targetTitle });
+    // H5-D3: reproduction is platform-faithful to the SELECTED backend —
+    // a mock-backed run reproduces through the mock, a real-backed run
+    // through the real UIA bridge. Never silently substitute.
+    replayDriverFactory = async () => {
+      if ((await resolveWindowsBackendKind()) === "mock") {
+        return new WindowsUiaReplayDriver({ targetTitle, backend: new MockUiaBackend() });
+      }
+      return new WindowsUiaReplayDriver({ targetTitle });
+    };
   }
 
   const result = await runNativeHunt(

@@ -436,12 +436,17 @@ export async function runNativeHunt(
     const fresh = usable.filter(
       (c) => !triedEdges.has(`${fp}::${c.actionKey}`),
     );
+    // H5-D4 (HARDENING_5): usage/freshness dominate static priority. The
+    // previous priority-first ordering let max-priority boundary fills
+    // permanently starve every other candidate (observed: 40/40 fills, zero
+    // clicks on the seeded UIA dialog), structurally preventing windows
+    // exploration from ever reaching a defect beyond a text box.
     const ranked = (fresh.length > 0 ? fresh : usable)
       .slice()
       .sort(
         (a, b) =>
-          b.priority - a.priority ||
-          (useCount.get(a.actionKey) ?? 0) - (useCount.get(b.actionKey) ?? 0),
+          (useCount.get(a.actionKey) ?? 0) - (useCount.get(b.actionKey) ?? 0) ||
+          b.priority - a.priority,
       );
     const band = ranked.slice(0, Math.min(ranked.length, 6));
     const pick: CandidateAction = rng.pick(band);

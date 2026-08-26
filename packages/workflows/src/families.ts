@@ -1,5 +1,14 @@
 import type { AdapterFamily } from "@inspector/scale";
 
+/** Windows UIA backend kinds, resolved identically by exploration provenance
+ * recording and native reproduction-driver selection (H5-D3 single source). */
+export async function resolveWindowsBackendKind(): Promise<"real" | "mock"> {
+  const raw = process.env.INSPECTOR_WINDOWS_BACKEND;
+  if (raw === "mock" || raw === "real") return raw;
+  const { probeRealUia } = await import("../../windows-adapter/src/selection.js");
+  return (await probeRealUia()) ? "real" : "mock";
+}
+
 /**
  * HARDENING_5 H5.5: the single canonical execution contract per adapter
  * family inside the workflow layer. `Record<AdapterFamily, ...>` makes a
