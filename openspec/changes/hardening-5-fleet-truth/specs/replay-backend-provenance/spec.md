@@ -39,3 +39,33 @@ Adapter id, backend mode, target/create options, revision, and evidence bundle p
 ## Test obligations
 
 Create a family/backend matrix plus negative fixtures for missing mode, malformed mode, mode disagreement, changed host capabilities, missing executable/display/device, and stale source workspace. Include at least one real Electron/Xvfb campaign proof and one Windows campaign-level proof when hosted environments support them; otherwise record a precise environment deferral instead of substituting a mock as field proof.
+
+### Requirement: backend mode parsing is exact and family-specific
+
+For every family whose behavior changes by backend, replay construction MUST validate the durable mode against an explicit allowed-value set. Missing or unknown values MUST NOT silently map through truthy/default branches to mock, real, injectable, or auto.
+
+#### Scenario: Electron backend mode missing
+- GIVEN an Electron finding whose durable spawn provenance does not identify `real` or `injectable`
+- WHEN replay/verify/regress is requested
+- THEN the workflow MUST return a typed incompatible/indeterminate provenance result unless a historical migration proves the original backend
+- AND MUST NOT instantiate Electron replay in `auto`.
+
+#### Scenario: CLI backend mode missing
+- GIVEN a CLI/PTTY finding whose durable backend mode is absent or malformed
+- WHEN replay is requested
+- THEN the workflow MUST NOT infer mock merely because the value is not exactly `real`.
+
+#### Scenario: Android backend mode missing
+- GIVEN an Android finding whose durable backend mode is absent or malformed
+- WHEN replay is requested
+- THEN the workflow MUST NOT infer real merely because the value is not exactly `mock`.
+
+#### Scenario: Windows backend mode missing
+- GIVEN a Windows/UIA finding whose durable backend mode is absent or malformed
+- WHEN replay is requested
+- THEN the workflow MUST NOT construct a default/auto backend whose behavior depends on current-host capability.
+
+### Requirement: capability evidence strength and replay provenance agree
+
+When mock/injectable execution is intentionally selected, durable provenance and campaign evidence MUST say so. Such evidence MAY prove deterministic workflow semantics but MUST NOT satisfy a requirement for real platform field execution. Real-backend findings MUST replay only with the corresponding real backend or fail with an honest environment/provenance result.
+

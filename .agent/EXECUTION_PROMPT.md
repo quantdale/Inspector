@@ -290,3 +290,93 @@ Commit coherent verified slices, pull/reconcile if origin moved, and push to `ma
 - Push every durable checkpoint needed for another machine to resume from Git alone.
 
 If this prompt, an older H5 prompt statement, and the OpenSpec deltas differ, the stricter safety/correctness invariant wins. Update OpenSpec/tasks/state together before claiming completion.
+
+---
+
+## Planner re-audit delta — 2026-08-27 (AUTHORITATIVE latest evidence)
+
+This section is the latest planner evidence and is additive to the campaign above. Where an older baseline/status statement conflicts with this section, **this section wins**. Do not open H6; these defects are unfinished H5 truth/certification work.
+
+### Current repository/CI anchor
+
+- Current planner HEAD: `6df14d5945e057761afdde8be7d07d6b7b2ace54`.
+- Exact-HEAD Actions run: `32988428201` — **FAILURE**.
+- Linux quality job `98239998815`: install/lint/typecheck/unit/browser provisioning PASS; full integration FAIL.
+- Unit: 64 files / 676 tests PASS.
+- Integration: 50 files total, 47 passed / 2 skipped / 1 failed; 211 tests total, 205 passed / 5 skipped / 1 failed.
+- Failure: `packages/workflows/src/windows-campaign.integration.test.ts`; expected producer + verify + regress completed, received `completed=[]` while `failed=[]`.
+- Windows path/native hosted job PASS.
+- Electron Xvfb and Linux installed-artifact jobs SKIPPED downstream of Linux failure; they are not current-SHA certification.
+
+The failure is explained by source: the deterministic test explicitly sets `INSPECTOR_WINDOWS_BACKEND=mock`, while `InspectorWorkflowExecutor.capabilities()` advertises Windows only when `probeUia()` succeeds. On Linux, `probeUia()` returns unavailable before configured mock executability is considered. The scheduler therefore records routing refusals and removes all three items from the queue.
+
+### Additional stable defect IDs
+
+#### H5-D14 — every-file audit certificate is self-attesting — CONFIRMED
+
+`scripts/gen_audit_census.py` does not inspect file contents. Its path classifier unconditionally returns `R` for every tracked file category, so the reported `530 reviewed / 530 tracked` was arithmetic inventory coverage, not proof that every file was reviewed. It also says lockfile/dependency output is untracked even though `pnpm-lock.yaml` is tracked.
+
+Required correction:
+
+- keep mechanical inventory, but default authored blobs to UNREVIEWED;
+- bind every review record to the exact blob/content hash;
+- require a content-aware review basis and relevant system-map/finding notes before status becomes REVIEWED;
+- invalidate review evidence whenever the blob changes;
+- explicitly review tracked lockfiles/manifests as dependency/configuration surfaces;
+- regenerate against the final tracked tree after all implementation/state/spec changes.
+
+A balanced count generated from filename categories is **not** an acceptance gate.
+
+#### H5-D15 — configured backend and advertised capability disagree — CONFIRMED
+
+The explicit Windows mock backend is a real deterministic executable path on the Linux test host, but worker capability discovery models only real UIA host availability. This makes valid configured work disappear into `refusals` before execution and caused exact-HEAD CI run `32988428201` to fail.
+
+Required correction:
+
+- capability discovery/preflight must describe what the **configured executor/backend** can execute, not only what the strongest real backend can execute;
+- mock/injectable/test capability must be explicitly distinguishable from real field capability and must never be presented as real proof;
+- deterministic mock campaign tests must execute cross-platform when explicitly configured;
+- real Windows/UIA certification still requires a real Windows runner/target;
+- all-refused/no-work outcomes must remain operator-visible and cannot be treated as semantic success simply because `failed=[]`.
+
+Do not "fix" this by deleting the Linux test, changing it to pass-by-return, or pretending mock execution is real UIA certification.
+
+### Strengthened status of earlier findings
+
+- **H5-D11 is now source-CONFIRMED at the fallback boundary.** Electron missing backend provenance falls to `auto`; CLI missing/non-real mode falls to mock; Android missing/non-mock mode falls to real; Windows missing/non-mock mode constructs the default replay driver. Red tests still determine exact severity and migration policy.
+- **H5-D13 is partially CONFIRMED.** `FindingEngine.rehydrate` converts malformed string-array JSON to `[]` and malformed structured JSON to `null`, silently discarding durable evidence fields. Continue adversarial testing for ID/path containment and downstream semantic impact before claiming those subcases.
+
+### Mandatory H5.10 OpenSpec execution
+
+`openspec/changes/hardening-5-fleet-truth/tasks.md` now contains **H5.10** and is authoritative. Complete H5.10.1-H5.10.15 in addition to still-open H5.2.6, H5.4.5, H5.8.*, and H5.9.*. Do not merely copy checkmarks from older state.
+
+The execution order is now:
+
+1. **Restore truth first:** H5-D6 ledger history, H5.10 task/state alignment, exact current CI record.
+2. **Red tests:** H5-D7/D8/D9/D10, backend provenance, H5-D15 Linux configured-mock capability, malformed-state negative cases.
+3. **Correct semantic outcomes:** explicit replay dispositions, positive-evidence-only fixed/clean/rejected conclusions, admit-before-consume.
+4. **Correct provenance/capabilities:** exact durable backend identity across families; configured backend drives executable capability truth; real-vs-mock evidence strength is explicit.
+5. **Replace vacuous census:** content-aware exact-blob review evidence for the final tracked tree; every authored file genuinely reviewed.
+6. **Certification-path proof:** Windows real campaign, Electron Xvfb campaign, Android honest deferral/proof, installed artifact, all-family negative space.
+7. **Mutation/property/fault/soak:** specifically mutate each trust boundary and prove tests fail.
+8. **Truth reconciliation + exact-tree local gates.**
+9. **Push implementation SHA and inspect exact-SHA hosted jobs.** H5 stays ACTIVE if any required lane is red, skipped without accepted environment rationale, queued, or unexecuted.
+
+### Twelve-hour autonomous execution contract
+
+Treat this as a **roughly 12-hour productive engineering campaign**, not a one-bug patch. Continue after the first green test and after the first repaired defect. Use the full useful envelope for the ordered correctness, provenance, mutation, fault-injection, content-aware every-file review, soak, installed-artifact, and hosted-certification work above.
+
+Do not pad the clock with cosmetic refactors. If the execution harness imposes a hard runtime/session limit before the useful 12-hour envelope is exhausted, persist an exact durable checkpoint (current task, defects, tests, SHA, remaining work) and make the next invocation resume H5.10 rather than claiming completion. A harness timeout is not H5 completion.
+
+### Updated completion blockers
+
+HARDENING_5 cannot be COMPLETE unless all earlier acceptance gates **plus** the following are true:
+
+1. H5-D14 is closed: final every-file certification is content-aware, exact-blob-bound, non-self-attesting, and covers the actual final tracked tree.
+2. H5-D15 is closed: configured backend executability and advertised capability agree; deterministic mock/injectable and real field capability are explicitly distinguished.
+3. Exact current-red Windows campaign regression is fixed without weakening/removing its evidence requirement.
+4. An all-refused/no-work campaign cannot masquerade as clean semantic execution.
+5. H5-D11 has explicit fail-closed backend provenance semantics across Electron, Windows, CLI, and Android.
+6. Malformed durable-state behavior is either closed with fail-closed coverage or precisely proven unreachable/contained.
+7. Required hosted Windows campaign, Electron Xvfb campaign, Linux full integration, and installed-artifact lanes actually execute and pass on the exact pushed implementation SHA.
+

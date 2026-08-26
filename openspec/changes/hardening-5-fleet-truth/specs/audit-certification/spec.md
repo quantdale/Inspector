@@ -39,3 +39,38 @@ Current status/debt/agent/OpenSpec state MUST reflect the actual H5 result, whil
 - WHEN current status is updated
 - THEN the historical report MUST remain intact
 - AND current debt/status MUST distinguish the old host limitation from present hosted capability.
+
+### Requirement: Reviewed means content-reviewed, not path-classified
+A repository-wide review certificate MUST distinguish path inventory from content review. Tooling MAY mechanically enumerate tracked paths and classify file kinds, but MUST NOT mark authored content `reviewed` solely from pathname, extension, directory, or file existence.
+
+#### Scenario: Census generator sees a new authored file
+- GIVEN a newly tracked source, test, specification, configuration, lockfile, or documentation blob
+- WHEN the inventory generator runs
+- THEN the file MUST enter the inventory with its exact blob/content hash
+- AND its review state MUST remain UNREVIEWED until a content-aware review operation records evidence
+- AND changing the blob MUST invalidate review evidence bound to the older blob.
+
+#### Scenario: Path-only self-attestation
+- GIVEN a generator whose classification function returns `R` without reading/reviewing file content
+- WHEN audit certification is validated
+- THEN certification MUST fail
+- AND a balanced tracked/reviewed arithmetic count alone MUST NOT satisfy the every-file requirement.
+
+### Requirement: Dependency resolution inputs are authored audit surfaces
+Tracked lockfiles and package/workspace manifests affect executable dependency resolution and MUST be inventoried and reviewed as configuration/dependency inputs; they are not silently treated as untracked build output.
+
+#### Scenario: pnpm lockfile is tracked
+- GIVEN `pnpm-lock.yaml` appears in `git ls-files`
+- WHEN the H5 audit is generated
+- THEN it MUST be accounted for explicitly
+- AND audit prose MUST NOT claim lockfiles are untracked.
+
+### Requirement: Audit evidence is reproducible on the final tree
+The final H5 report MUST permit another executor to verify which exact blobs were reviewed and which findings/system-map conclusions came from that review. At minimum each authored inventory entry MUST bind review status to its blob/content hash and a content-aware review basis; runtime-significant files MUST additionally map to the relevant behavior/system review.
+
+#### Scenario: Planner or executor changes an already-reviewed file
+- GIVEN file `X` was reviewed at blob A
+- WHEN a later commit changes `X` to blob B before certification
+- THEN blob A's review record MUST NOT certify blob B
+- AND blob B MUST be reviewed or explicitly justified before the final every-file gate can pass.
+

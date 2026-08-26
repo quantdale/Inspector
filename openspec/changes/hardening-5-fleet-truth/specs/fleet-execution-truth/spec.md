@@ -74,3 +74,32 @@ The repository MUST have a test/contract matrix derived from the declared adapte
 - WHEN typecheck/tests run
 - THEN the change MUST fail compilation or a deterministic repository-contract/matrix test
 - AND MUST NOT pass by default fallthrough.
+
+### Requirement: Capability truth follows configured backend semantics
+Capability advertisement and preflight MUST model the backend configuration the executor will actually construct. A host-level real-backend probe MUST NOT suppress an explicitly selected cross-platform mock/injectable backend that is intentionally executable on that host. Conversely, test/injectable availability MUST NOT be promoted to real field capability.
+
+#### Scenario: Windows mock selected on Linux
+- GIVEN `INSPECTOR_WINDOWS_BACKEND=mock`
+- AND the deterministic Windows mock adapter is supported on the current host
+- WHEN `InspectorWorkflowExecutor` reports capabilities and the scheduler routes a Windows item
+- THEN Windows mock execution MUST be routable
+- AND the durable capability/provenance record MUST identify mock/test strength
+- AND the item MUST NOT be refused merely because real `probeUia()` is unavailable.
+
+#### Scenario: Windows real selected on non-Windows
+- GIVEN `INSPECTOR_WINDOWS_BACKEND=real`
+- AND the host cannot execute real UIA
+- WHEN preflight runs
+- THEN the item MUST fail/refuse with a typed real-backend capability/environment outcome before target work
+- AND mock capability MUST NOT satisfy real field certification.
+
+### Requirement: Zero executed work is not semantic success
+Campaign reporting MUST preserve the distinction among completed work, execution failure, routing refusal, external block, cancellation, and an empty/no-valid-execution outcome. A report with no failures is not sufficient evidence of successful campaign execution when zero requested items completed.
+
+#### Scenario: Every item is capability-refused
+- GIVEN a non-empty campaign whose requested items are all refused during routing
+- WHEN the campaign terminates
+- THEN every refusal MUST remain durable/operator-visible
+- AND completion/certification logic MUST NOT interpret `failed=[]` as proof that the requested workflows ran successfully
+- AND tests claiming platform execution MUST assert completed/assignment/execution evidence, not only absence of failures.
+

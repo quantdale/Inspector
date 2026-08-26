@@ -62,3 +62,47 @@ Therefore:
 - Do not silently migrate backend provenance based on what happens to be installed on the current machine.
 - Preserve M13 COMPLETE and M8 DEFERRED_ENVIRONMENT; no M14, release, tag, or publication.
 - H5 remains ACTIVE until the exact implementation SHA passes the required local and hosted gates.
+
+## 2026-08-27 planner re-audit — exact current HEAD
+
+The re-audit was performed against `main@6df14d5945e057761afdde8be7d07d6b7b2ace54` after the prior planner correction landed. This section supersedes older "queued/pending" observations where they conflict with newer evidence.
+
+### Exact-HEAD hosted evidence
+
+GitHub Actions run `32988428201` for exact HEAD `6df14d5` completed **FAILURE**:
+
+- Linux quality gate job `98239998815`: install, lint, typecheck, unit, and browser provisioning passed; full `pnpm test:integration` failed.
+- Unit gate: 64 files / 676 tests passed.
+- Integration gate: 50 files total; 47 passed, 2 skipped, 1 failed. 211 tests total; 205 passed, 5 skipped, 1 failed.
+- The failing test is `packages/workflows/src/windows-campaign.integration.test.ts`, producer/verify/regress campaign truth. `report.failed` was empty but `report.completed` was also empty when three completed items were required.
+- Windows path/native job passed.
+- Electron real-runtime/Xvfb and Linux installed-artifact jobs were skipped downstream of the failed Linux quality job. They are therefore **not certification evidence for this SHA**.
+
+Source tracing explains the Linux failure: the test explicitly selects `INSPECTOR_WINDOWS_BACKEND=mock`, but `InspectorWorkflowExecutor.capabilities()` derives Windows family availability only from `probeUia()`; `probeUia()` returns unavailable on non-Windows before considering configured mock execution. The scheduler therefore records capability refusals and removes every Windows item from the queue. This is backend-selection/capability-model drift, not a random assertion flake.
+
+### Additional defects
+
+| ID | Status | Evidence | Failure mode |
+| --- | --- | --- | --- |
+| H5-D14 | CONFIRMED | `scripts/gen_audit_census.py`, `.inspector/state/HARDENING_5-AUDIT.md` | the "every-file review" generator never reads file contents and unconditionally assigns `R` from pathname/category; 530/530 was bookkeeping, not evidence of review. The generator also states lockfile/dependency output is untracked although `pnpm-lock.yaml` is tracked. |
+| H5-D15 | CONFIRMED | exact-HEAD run `32988428201`; `capabilities.ts`; `windows-campaign.integration.test.ts`; `campaign.ts` | explicit Windows mock execution is runnable but capability discovery advertises only real-UIA host availability, causing every item to be refused on Linux. The report can consequently have zero failures and zero completions while work was never executed. |
+
+Additional direct source evidence strengthens earlier findings:
+
+- **H5-D11 is CONFIRMED at the defaulting boundary:** Electron missing backend provenance falls through to replay `auto`; CLI missing/non-real provenance falls to mock; Android missing/non-mock provenance falls to real; Windows missing/non-mock provenance constructs the default driver. Durable replay semantics can therefore depend on defaults/current host unless provenance is made explicit and validated.
+- **H5-D13 is PARTIALLY CONFIRMED:** `FindingEngine.rehydrate` maps malformed JSON arrays to `[]` and malformed structured JSON to `null` rather than reporting durable corruption. Whether unvalidated IDs can also produce filesystem containment violations remains a red-test requirement; do not claim that subcase until reproduced.
+
+### Audit-certification correction
+
+The existing census may remain useful as a tracked-path inventory, but it is not a review certificate. The final H5 audit must separate:
+
+1. **inventory evidence** — exact final `git ls-files`, blob SHA/content hash, classification;
+2. **review evidence** — content-aware review status, system-map participation, findings/notes or explicit no-finding rationale;
+3. **exclusion evidence** — only genuinely generated/vendor/cache content, with a concrete reason.
+
+A generator MUST NOT mark an authored file reviewed merely because its path matches `packages/`, `docs/`, `specs/`, or another category. New/changed blobs invalidate prior review evidence for that path.
+
+### Consequence for H5 completion
+
+H5 is unequivocally ACTIVE. Exact current HEAD is red, the prior 530/530 review claim is insufficient, H5-D6..D15 remain to be resolved/classified, and required hosted Electron/installed-artifact lanes did not execute on the current SHA. The executor must complete H5.10 and all still-open H5.2/H5.4/H5.8/H5.9 tasks before any COMPLETE claim.
+

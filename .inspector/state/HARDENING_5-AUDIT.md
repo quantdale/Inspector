@@ -1,4 +1,14 @@
-# HARDENING_5 — Every-Tracked-File Audit Census
+# CERTIFICATION INVALIDATED BY 2026-08-27 PLANNER RE-AUDIT
+
+**Do not use the legacy `530/530 reviewed` arithmetic below as evidence that every file was content-reviewed.**
+
+The current pre-planner-commit Git tree at `main@6df14d5945e057761afdde8be7d07d6b7b2ace54` contains **534 tracked blobs**. The generator that produced the legacy table (`scripts/gen_audit_census.py`) classifies paths and unconditionally assigns `R`; it does not read file contents, bind review status to blob SHA, or record content-review evidence. Its statement that lockfile/dependency output is untracked is also false because `pnpm-lock.yaml` is tracked.
+
+The table below is retained as historical inventory evidence only. HARDENING_5 H5.10 requires a replacement final-tree audit in which authored files default to UNREVIEWED, review status is bound to the exact blob/content hash, and runtime-significant files carry content/system-map findings. Changing a blob invalidates older review evidence.
+
+---
+
+# HARDENING_5 â€” Every-Tracked-File Audit Census
 
 Mandatory H5.0.4-5 deliverable. Generated mechanically from `git ls-files` on the
 HARDENING_5 working tree. Every tracked file has a disposition, enumerated either
