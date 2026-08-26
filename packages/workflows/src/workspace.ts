@@ -6,6 +6,7 @@ import { ArtifactStore } from "@inspector/artifact-store";
 import { resolveAdapterBin, type AdapterBinRef } from "@inspector/adapter-sdk";
 import { cleanupOrphanTemps } from "./atomic.js";
 import { WorkflowError } from "./errors.js";
+import { familyContractFor } from "./families.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Workspace tsconfig so a dev-mode tsx subprocess can resolve @inspector/*
@@ -13,21 +14,22 @@ const here = dirname(fileURLToPath(import.meta.url));
 // outside the repository.
 const repoTsconfig = join(here, "..", "..", "..", "tsconfig.json");
 
-function adapterBin(
-  name: "web" | "fake" | "cli" | "windows" | "android",
-): AdapterBinRef {
-  switch (name) {
-    case "web":
-      return resolveAdapterBin(import.meta.url, "inspector-adapter-web.js", "..", "..", "adapter-web", "src", "bin");
-    case "fake":
-      return resolveAdapterBin(import.meta.url, "inspector-adapter-fake.js", "..", "..", "adapter-fake", "src", "bin");
-    case "cli":
-      return resolveAdapterBin(import.meta.url, "inspector-adapter-cli.js", "..", "..", "cli-adapter", "src", "bin");
-    case "windows":
-      return resolveAdapterBin(import.meta.url, "inspector-adapter-windows.js", "..", "..", "windows-adapter", "src", "bin");
-    case "android":
-      return resolveAdapterBin(import.meta.url, "inspector-adapter-android.js", "..", "..", "android", "src", "bin");
-  }
+/** Adapter binary files by family bin name (H5: exhaustive single source). */
+const ADAPTER_BIN_FILES: Record<
+  "web" | "fake" | "cli" | "windows" | "android" | "electron",
+  { bundled: string; segments: string[] }
+> = {
+  web: { bundled: "inspector-adapter-web.js", segments: ["..", "..", "adapter-web", "src", "bin"] },
+  fake: { bundled: "inspector-adapter-fake.js", segments: ["..", "..", "adapter-fake", "src", "bin"] },
+  cli: { bundled: "inspector-adapter-cli.js", segments: ["..", "..", "cli-adapter", "src", "bin"] },
+  windows: { bundled: "inspector-adapter-windows.js", segments: ["..", "..", "windows-adapter", "src", "bin"] },
+  android: { bundled: "inspector-adapter-android.js", segments: ["..", "..", "android", "src", "bin"] },
+  electron: { bundled: "inspector-adapter-electron.js", segments: ["..", "..", "electron-adapter", "src", "bin"] },
+};
+
+function adapterBin(name: keyof typeof ADAPTER_BIN_FILES): AdapterBinRef {
+  const spec = ADAPTER_BIN_FILES[name];
+  return resolveAdapterBin(import.meta.url, spec.bundled, ...spec.segments);
 }
 
 export interface Workspace {
@@ -100,11 +102,20 @@ export interface AdapterSpawnSpec {
   adapterEnv: NodeJS.ProcessEnv;
 }
 
-/** Spawn spec for a named adapter; extra env is merged over process.env. */
+/**
+ * Spawn spec for a named adapter; extra env is merged over process.env.
+ * HARDENING_5 H5-D0: resolution is EXHAUSTIVE and fail-closed — an unknown or
+ * unsupported adapter name is a typed error, never a silent fake fallback.
+ */
 export function adapterSpawn(name: string, extraEnv: NodeJS.ProcessEnv = {}): AdapterSpawnSpec {
-  const bin = adapterBin(
-    name === "cli" || name === "pty" ? "cli" : name === "windows" || name === "uia" ? "windows" : name === "android" ? "android" : name === "web" ? "web" : "fake",
-  );
+  const contract = familyContractFor(name);
+  if (contract === undefined) {
+    throw new WorkflowError(
+      "unknown-adapter",
+      `no executable adapter exists for '${name}'; refusing to substitute another adapter`,
+    );
+  }
+  const bin = adapterBin(contract.binName);
   return {
     adapterCommand: bin.command,
     adapterArgs: bin.args,

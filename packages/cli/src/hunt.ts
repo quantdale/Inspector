@@ -20,11 +20,12 @@ export function parseHuntRequest(parsed: ParsedInvocation): import("@inspector/w
     adapter !== "fake" &&
     adapter !== "cli" &&
     adapter !== "windows" &&
-    adapter !== "android"
+    adapter !== "android" &&
+    adapter !== "electron"
   ) {
     throw new CliError(
       "invalid-value",
-      `--adapter expects 'web' | 'fake' | 'cli' | 'windows' | 'android', got '${adapter}'`,
+      `--adapter expects 'web' | 'fake' | 'cli' | 'windows' | 'android' | 'electron', got '${adapter}'`,
     );
   }
   const urlRaw = parsed.flags["--url"];
@@ -32,8 +33,13 @@ export function parseHuntRequest(parsed: ParsedInvocation): import("@inspector/w
     throw new CliError("invalid-value", "--url is only valid with --adapter web");
   }
   const targetRaw = parsed.flags["--target"];
-  if (targetRaw !== undefined && adapter === "web") {
-    throw new CliError("invalid-value", "--target is not valid with --adapter web (use --url)");
+  if (targetRaw !== undefined && (adapter === "web" || adapter === "electron")) {
+    throw new CliError(
+      "invalid-value",
+      adapter === "web"
+        ? "--target is not valid with --adapter web (use --url)"
+        : "--target is not valid with --adapter electron (only the bundled seeded fixture is supported)",
+    );
   }
   const resumeRaw = parsed.flags["--resume"];
   if (resumeRaw !== undefined && typeof resumeRaw !== "string") {

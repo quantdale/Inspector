@@ -115,23 +115,32 @@ export function loadReplaySubject(
   };
 }
 
-/** Construct the platform-faithful replay driver recorded by the run. */
-export async function replayDriverFor(
-  subject: LoadedReplaySubject,
-  base: string,
-): Promise<ReplayDriver> {
-  const createOptions = parseRecord(subject.environment.create_options, "create options", subject.finding.id);
-  const spawnEnv = parseRecord(subject.environment.spawn_env, "spawn environment", subject.finding.id);
-  const adapter = subject.run.adapter;
-  if (adapter === "adapter-fake") return new FakeStateMachineDriver();
-  if (adapter === "web-playwright") {
+/**
+ * Platform-faithful replay factories keyed by DURABLE adapter identity
+ * (HARDENING_5 H5.5: exhaustive single source; the matrix contract pins this
+ * key set against the canonical family registry). An identity without an
+ * entry is an explicit preflight refusal — never a fake/web substitution.
+ */
+type ReplayDeps = {
+  subject: LoadedReplaySubject;
+  base: string;
+  createOptions: Record<string, unknown> | undefined;
+  spawnEnv: Record<string, unknown> | undefined;
+};
+
+const REPLAY_DRIVER_FACTORIES: Record<
+  string,
+  (deps: ReplayDeps) => Promise<ReplayDriver>
+> = {
+  "adapter-fake": async () => new FakeStateMachineDriver(),
+  "web-playwright": async ({ subject, base, createOptions, spawnEnv }) => {
     const targetUrl = stringValue(createOptions?.targetUrl) ?? stringValue(spawnEnv?.WEB_TARGET_URL);
     return new WebReplayDriver({
       targetUrl,
       artifactBaseDir: join(base, "replay", subject.finding.id),
     });
-  }
-  if (adapter === "cli-pty") {
+  },
+  "cli-pty": async ({ spawnEnv }) => {
     const { CliPtyReplayDriver } = await import("../../cli-adapter/src/replay.js");
     const program = stringValue(spawnEnv?.INSPECTOR_CLI_PROGRAM) ?? "seedcli";
     const real = spawnEnv?.INSPECTOR_PTY === "real";
@@ -145,8 +154,8 @@ export async function replayDriverFor(
       program,
       backend: "mock",
     });
-  }
-  if (adapter === "windows-uia") {
+  },
+  "windows-uia": async ({ createOptions, spawnEnv }) => {
     const { WindowsUiaReplayDriver } = await import("../../windows-adapter/src/replay.js");
     const title = stringValue(createOptions?.titleContains);
     if (spawnEnv?.INSPECTOR_WINDOWS_BACKEND === "mock") {
@@ -154,8 +163,8 @@ export async function replayDriverFor(
       return new WindowsUiaReplayDriver({ targetTitle: title, backend: new MockUiaBackend() });
     }
     return new WindowsUiaReplayDriver({ targetTitle: title });
-  }
-  if (adapter === "android-uiautomator") {
+  },
+  "android-uiautomator": async ({ subject, base, createOptions, spawnEnv }) => {
     const { AndroidReplayDriver } = await import("../../android/src/replay.js");
     const launchPackage = stringValue(createOptions?.launchPackage);
     if (!launchPackage) {
@@ -172,11 +181,39 @@ export async function replayDriverFor(
       resetStrategy: "force-stop",
       artifactBaseDir: join(base, "replay", subject.finding.id),
     });
+  },
+  "electron-chromium": async ({ subject, base, spawnEnv }) => {
+    const { ElectronReplayDriver } = await import("../../electron-adapter/src/replay.js");
+    const raw = spawnEnv?.INSPECTOR_ELECTRON_BACKEND;
+    const backend = raw === "injectable" || raw === "real" ? raw : undefined;
+    return new ElectronReplayDriver({
+      artifactBaseDir: join(base, "replay", subject.finding.id),
+      ...(backend !== undefined ? { backend } : {}),
+    });
+  },
+};
+
+/** Durable adapter identities with platform-faithful replay support. */
+export const REPLAY_SUPPORTED_DURABLE_ADAPTERS: readonly string[] = Object.keys(
+  REPLAY_DRIVER_FACTORIES,
+);
+
+/** Construct the platform-faithful replay driver recorded by the run. */
+export async function replayDriverFor(
+  subject: LoadedReplaySubject,
+  base: string,
+): Promise<ReplayDriver> {
+  const createOptions = parseRecord(subject.environment.create_options, "create options", subject.finding.id);
+  const spawnEnv = parseRecord(subject.environment.spawn_env, "spawn environment", subject.finding.id);
+  const adapter = subject.run.adapter;
+  const factory = adapter === null ? undefined : REPLAY_DRIVER_FACTORIES[adapter];
+  if (factory === undefined) {
+    throw new WorkflowProvenanceError(
+      `unsupported recorded adapter '${adapter ?? "unknown"}' for finding ${subject.finding.id}`, 
+      "incompatible-target",
+    );
   }
-  throw new WorkflowProvenanceError(
-    `unsupported recorded adapter '${adapter}' for finding ${subject.finding.id}`,
-    "incompatible-target",
-  );
+  return factory({ subject, base, createOptions, spawnEnv });
 }
 
 /** Stable idempotency key for one finding/adapter/revision regression scenario. */

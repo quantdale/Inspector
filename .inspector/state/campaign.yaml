@@ -544,20 +544,26 @@ hardening5:
     - {sha: 7214ae4, run_id: 32961595668, conclusion: IN_PROGRESS at activation}
   phases:
     - {id: H5.0, name: activate-rehydrate-everyfile-census, state: ACTIVE}
-    - {id: H5.1, name: electron-fleet-false-execution-regression, state: PENDING}
-    - {id: H5.2, name: real-electron-campaign-lane, state: PENDING}
+    - {id: H5.1, name: electron-fleet-false-execution-regression, state: DONE}
+    - {id: H5.2, name: real-electron-campaign-lane, state: ACTIVE}
     - {id: H5.3, name: windows-uia-campaign-truth, state: PENDING}
-    - {id: H5.4, name: electron-replay-verify-regress-resume, state: PENDING}
-    - {id: H5.5, name: exhaustive-adapter-family-contract, state: PENDING}
+    - {id: H5.4, name: electron-replay-verify-regress-resume, state: ACTIVE}
+    - {id: H5.5, name: exhaustive-adapter-family-contract, state: ACTIVE}
     - {id: H5.6, name: cross-platform-atomic-write-durability, state: PENDING}
     - {id: H5.7, name: measured-runtime-efficiency, state: PENDING}
     - {id: H5.8, name: negative-space-soak-installed-artifact, state: PENDING}
     - {id: H5.9, name: truth-reconciliation-certification, state: PENDING}
   defects:
     - >-
-      H5-D0 SUSPECTED HIGH electron-family-routed-through-workflow-fake-fallback:
-      suspicion recorded at activation from planner audit; deterministic
-      reproduction pending before severity is confirmed
+      H5-D0 CONFIRMED HIGH (CLOSED 2026-08-26) electron-family-routed-through-
+      workflow-fake-fallback: deterministic reproduction proved an accepted
+      electron campaign item executed a SUCCESSFUL fake run (durable run,
+      environment, evidence, notes all 'adapter-fake'); closed by exhaustive
+      FAMILY_CONTRACT (compile-time Record<AdapterFamily>), fail-closed
+      familyAdapter/adapterSpawn/storedAdapterSpawn/replayDriverFor, real
+      Electron fleet lane with durable electron-chromium identity,
+      ElectronReplayDriver for replay/verify/regress, and the
+      adapter-family-matrix contract suite pinning every layer per family.
 
 hardening1_history:
   campaign: HARDENING_1

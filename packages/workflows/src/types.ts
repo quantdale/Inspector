@@ -8,8 +8,10 @@ export type ProgressFn = (line: string) => void;
  */
 export type ExplorationControl = import("@inspector/explore").ExplorationControl;
 
-/** Adapter families an exploration workflow can drive. */
-export type ExplorationAdapter = "web" | "fake" | "cli" | "windows" | "android";
+/** Adapter families an exploration workflow can drive (H5: exhaustive with
+ * @inspector/scale's accepted AdapterFamily set — enforced by the matrix
+ * contract in families.ts). */
+export type ExplorationAdapter = "web" | "fake" | "cli" | "windows" | "android" | "electron";
 
 export interface HuntRequest {
   adapter: ExplorationAdapter;

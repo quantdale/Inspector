@@ -2,6 +2,7 @@ import { EXPLORER_VERSION } from "@inspector/explore";
 import { isId } from "@inspector/protocol";
 import { WorkflowError } from "./errors.js";
 import { adapterSpawn } from "./workspace.js";
+import { FAMILY_CONTRACT, familyContractFor, explorerKindOf } from "./families.js";
 import type { HuntRequest } from "./types.js";
 
 interface DurableHuntMeta {
@@ -31,18 +32,24 @@ function buildDurableHuntMeta(
     version: 1,
     workflow,
     request,
-    explorerKind: req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native",
+    // H5: exhaustive family→explorer-kind mapping (electron shares the
+    // browser-like web explorer while keeping electron durable identity).
+    explorerKind: explorerKindOf(req.adapter),
     explorerVersion: EXPLORER_VERSION,
     ...(campaign ? { campaign: { ...campaign } } : {}),
   };
 }
 
+/**
+ * Durable adapter identity → spawn spec for resume. Derived from the single
+ * FAMILY_CONTRACT source; a durable id with no contract entry refuses (null)
+ * instead of guessing.
+ */
 function storedAdapterSpawn(adapter: string | null): ReturnType<typeof adapterSpawn> | null {
-  if (adapter === "adapter-fake") return adapterSpawn("fake");
-  if (adapter === "web-playwright") return adapterSpawn("web");
-  if (adapter === "cli-pty") return adapterSpawn("cli");
-  if (adapter === "windows-uia") return adapterSpawn("windows");
-  if (adapter === "android-uiautomator") return adapterSpawn("android");
+  if (adapter === null) return null;
+  for (const contract of Object.values(FAMILY_CONTRACT)) {
+    if (contract.durableAdapterId === adapter) return adapterSpawn(contract.binName);
+  }
   return null;
 }
 
@@ -66,10 +73,11 @@ export function parseDurableHuntMeta(raw: string | null, runId: string): Durable
     throw new WorkflowError("not-resumable", `run ${runId} has an invalid autonomous workflow; refusing to guess`);
   }
   const request = value.request;
-  const adapters = new Set(["web", "fake", "cli", "windows", "android"]);
+  const adapters = new Set(Object.keys(FAMILY_CONTRACT));
+  const aliasAdapters = new Set(Object.values(FAMILY_CONTRACT).flatMap((c) => [...c.aliases]));
   if (
     typeof request.adapter !== "string" ||
-    !adapters.has(request.adapter) ||
+    !adapters.has(request.adapter) && !aliasAdapters.has(request.adapter) ||
     !Number.isSafeInteger(request.seed) ||
     !Number.isSafeInteger(request.maxActions) ||
     !Number.isSafeInteger(request.maxMinutes) ||
@@ -88,7 +96,7 @@ export function parseDurableHuntMeta(raw: string | null, runId: string): Durable
     }
   }
   const explorerKind = value.explorerKind;
-  const expectedKind = request.adapter === "web" ? "web" : request.adapter === "fake" ? "fake" : "native";
+  const expectedKind = familyContractFor(String(request.adapter))?.explorerKind;
   if (explorerKind !== expectedKind) {
     throw new WorkflowError("incompatible-run", `run ${runId} records explorer '${String(explorerKind)}' for adapter '${request.adapter}'`);
   }

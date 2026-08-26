@@ -1,20 +1,17 @@
 import { RunManager, type RunController } from "@inspector/core";
+import { storedAdapterSpawn } from "@inspector/workflows";
 import { intFlag, parseArgs, requirePositional, CliError } from "./args.js";
 import { closeRunGuarded, warnRepoRootWorkspace, workDirOf, type CommandContext } from "./hunt.js";
-import { adapterSpawn, openWorkspace, remapWorkspaceConflict, type AdapterSpawnSpec } from "./workspace.js";
+import { openWorkspace, remapWorkspaceConflict, type AdapterSpawnSpec } from "./workspace.js";
 
 /**
  * Map a stored adapter identity (self-reported at initialize) back to a spawn
- * spec. Exact matches only: when the kind is not recoverable the caller must
- * say so rather than guess.
+ * spec. Exact matches only, resolved through the single FAMILY_CONTRACT in
+ * @inspector/workflows (HARDENING_5): when the kind is not recoverable the
+ * caller must say so rather than guess.
  */
 export function spawnForStoredAdapter(adapter: string | null): AdapterSpawnSpec | null {
-  if (adapter === "adapter-fake") return adapterSpawn("fake");
-  if (adapter === "web-playwright") return adapterSpawn("web");
-  if (adapter === "cli-pty") return adapterSpawn("cli");
-  if (adapter === "windows-uia") return adapterSpawn("windows");
-  if (adapter === "android-uiautomator") return adapterSpawn("android");
-  return null;
+  return storedAdapterSpawn(adapter);
 }
 
 export async function runsCommand(

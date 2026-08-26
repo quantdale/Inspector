@@ -16,6 +16,7 @@ import {
   type WorkItemFailureClass,
 } from "@inspector/scale";
 import { runExploration, validateTargetUrl } from "./exploration.js";
+import { familyContractFor } from "./families.js";
 import { loadModelProviderModule, ProviderModuleError } from "@inspector/model-runtime";
 import type { ModelProvider } from "@inspector/model-runtime";
 import type { ModelAssistanceConfig } from "./model-support.js";
@@ -255,7 +256,32 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
 
   private async runExplorationItem(item: WorkItem, ctx: ExecutionContext): Promise<WorkItemResult> {
     if (ctx.signal.aborted) throw new ItemCancelledError();
+    const rawFamily = String(item.adapterFamily ?? item.target ?? "");
+    // HARDENING_5 H5-D0: family resolution is exhaustive and fail-closed.
+    // An accepted-but-unexecutable family is a typed configuration refusal
+    // BEFORE any workspace/run side effect — never a fake substitution.
     const adapter = familyAdapter(item);
+    if (adapter === undefined) {
+      return failedResult(
+        "target-config-invalid",
+        `work item '${item.id}' requests adapter family '${rawFamily}' which has no executable workflow mapping; refusing to substitute another adapter`,
+      );
+    }
+    if (adapter === "electron") {
+      // H5.2 documented product limit: only the bundled seeded fixture is a
+      // supported Electron target today; external app targeting must not ride
+      // web's targetUrl/target channels accidentally.
+      const externalTarget =
+        item.targetUri !== undefined ||
+        (typeof item.targetConfig?.targetUrl === "string" && item.targetConfig.targetUrl.length > 0) ||
+        (typeof item.targetConfig?.target === "string" && item.targetConfig.target.length > 0);
+      if (externalTarget) {
+        return failedResult(
+          "target-config-invalid",
+          "electron campaign items currently support only the bundled seeded fixture; external Electron app targeting is not yet a supported contract",
+        );
+      }
+    }
     const targetUri =
       item.targetUri ??
       (typeof item.targetConfig?.targetUrl === "string" ? String(item.targetConfig.targetUrl) : undefined);
@@ -606,13 +632,15 @@ function clampWallMinutes(maxWallMs: number | undefined, fallbackMinutes: number
   return Math.max(1, Math.ceil(maxWallMs / 60_000));
 }
 
-function familyAdapter(item: WorkItem): "web" | "fake" | "cli" | "windows" | "android" {
-  const raw = item.adapterFamily ?? item.target;
-  if (raw === "cli" || raw === "pty") return "cli";
-  if (raw === "windows" || raw === "uia") return "windows";
-  if (raw === "android") return "android";
-  if (raw === "web") return "web";
-  return "fake";
+/**
+ * HARDENING_5 H5-D0/H5.5: exhaustive, contract-driven family resolution.
+ * Returns undefined for unknown values — callers must fail closed with a
+ * typed refusal BEFORE any workspace/run side effect. Fake is selected ONLY
+ * for an explicit fake-family request; there is no default fallthrough.
+ */
+export function familyAdapter(item: WorkItem): "web" | "fake" | "cli" | "windows" | "android" | "electron" | undefined {
+  const raw = String(item.adapterFamily ?? item.target ?? "");
+  return familyContractFor(raw)?.binName;
 }
 
 /** Map stable workflow error kinds into the M12 failure taxonomy. */

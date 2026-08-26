@@ -348,6 +348,9 @@ importers:
       '@inspector/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@inspector/scale':
+        specifier: workspace:*
+        version: link:../scale
       '@inspector/store-sqlite':
         specifier: workspace:*
         version: link:../store-sqlite

@@ -2,6 +2,7 @@ export * from "./errors.js";
 export * from "./atomic.js";
 export * from "./types.js";
 export type { ExplorationAdapter } from "./types.js";
+export * from "./families.js";
 export * from "./configs.js";
 export * from "./workspace.js";
 export * from "./meta.js";

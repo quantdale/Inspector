@@ -1,6 +1,7 @@
 export * from "./electron-adapter.js";
 export * from "./capabilities.js";
 export * from "./real-electron.js";
+export * from "./replay.js";
 
 import { resolveAdapterBin } from "@inspector/adapter-sdk";
 

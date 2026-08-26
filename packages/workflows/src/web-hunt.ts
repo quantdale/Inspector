@@ -40,6 +40,13 @@ export async function runWebHunt(
   resume = false,
   control?: ExplorationControl,
   model?: ResolvedModelSupport,
+  /**
+   * HARDENING_5 H5.2/H5.4: reproduction replays must be platform-faithful.
+   * Electron hunts inject an ElectronReplayDriver here so confirmed findings
+   * reproduce through the SAME adapter family that discovered them — never
+   * through a plain web browser or the fake engine.
+   */
+  replayDriverFactory?: () => import("@inspector/finding").ReplayDriver,
 ): Promise<HuntRunResult> {
   const findingEngine = new FindingEngine(OracleEngine.defaults(), store);
 
@@ -81,14 +88,16 @@ export async function runWebHunt(
           },
         }
       : {}),
-    replayDriverFactory: () =>
-      new WebReplayDriver({
-        artifactBaseDir: join(base, "replay"),
-        targetUrl: req.targetUrl,
-        // M12 F9: one adapter subprocess reused across this finding's
-        // reproduce/minimize replays; the explorer disposes it per cycle.
-        persistent: true,
-      }),
+    replayDriverFactory:
+      replayDriverFactory ??
+      (() =>
+        new WebReplayDriver({
+          artifactBaseDir: join(base, "replay"),
+          targetUrl: req.targetUrl,
+          // M12 F9: one adapter subprocess reused across this finding's
+          // reproduce/minimize replays; the explorer disposes it per cycle.
+          persistent: true,
+        })),
   });
 
   const result = await controller.run_();

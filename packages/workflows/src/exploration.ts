@@ -21,7 +21,10 @@ import { closeRunGuarded, writeEvidenceBundles } from "./evidence.js";
 import { runFakeHunt } from "./fake-hunt.js";
 import { runNativeHuntCommand } from "./native-hunt.js";
 import { runWebHunt } from "./web-hunt.js";
+import { runElectronHunt } from "./electron-hunt.js";
 import { resolveModelSupport } from "./model-support.js";
+import { explorerKindOf } from "./families.js";
+import { electronExecutablePath } from "@inspector/electron-adapter";
 import type { ModelAssistanceConfig, ResolvedModelSupport } from "./model-support.js";
 import { StoreModelCallSink } from "./model-support.js";
 import type { ExplorationControl, ExplorationWorkflow, HuntRequest, HuntRunResult, ProgressFn } from "./types.js";
@@ -128,11 +131,13 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
           `cannot determine the original adapter for run ${resumeRunId} (recorded '${storedRun.adapter ?? "unknown"}'); refusing to guess`,
         );
       }
-      const explorerKind = req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native";
+      const explorerKind = explorerKindOf(req.adapter);
       if (storedCampaign.explorerKind !== explorerKind || storedCampaign.adapter !== storedRun.adapter) {
         throw new WorkflowError("incompatible-run", `run ${resumeRunId} explorer/adapter provenance is inconsistent; refusing to resume`);
       }
       if (explorerKind === "web") {
+        // Electron shares the browser-like explorer; identity stays distinct
+        // through the durable adapter field checked above.
         const cfg = webExploreConfig(req);
         loadLatestCheckpoint(store, {
           runId: resumeRunId,
@@ -186,6 +191,19 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
     const webTarget = req.adapter === "web" && req.targetUrl !== undefined;
     const isNative =
       req.adapter === "cli" || req.adapter === "windows" || req.adapter === "android";
+    let electronEnvDelta: NodeJS.ProcessEnv | undefined;
+    if (req.adapter === "electron") {
+      // H5.2: record the exact backend mode the spawned adapter will select so
+      // replay/verify/regress reconstruct the SAME backend faithfully.
+      const raw = process.env.INSPECTOR_ELECTRON_BACKEND;
+      const backendMode =
+        raw === "real" || raw === "injectable"
+          ? raw
+          : electronExecutablePath() !== undefined
+            ? "real"
+            : "injectable";
+      electronEnvDelta = { INSPECTOR_ELECTRON_BACKEND: backendMode };
+    }
     const spawnSpec = resuming
       ? storedSpawn!
       : webTarget
@@ -217,7 +235,7 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
           ...(isNative ? { observeTimeoutMs: 30000 } : {}),
         });
       } else {
-        const explorerKind = req.adapter === "web" ? "web" : req.adapter === "fake" ? "fake" : "native";
+        const explorerKind = explorerKindOf(req.adapter);
         const explorerConfig =
           explorerKind === "web"
             ? webExploreConfig(req)
@@ -235,8 +253,9 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
           },
           // Persisted so runs resume re-creates the SAME target, never the default.
           ...(webTarget ? { createOptions: { targetUrl: req.targetUrl }, spawnEnvDelta: { WEB_TARGET_URL: req.targetUrl } } : {}),
-          ...(createOptions ? { createOptions } : {}),
-          ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
+      ...(createOptions ? { createOptions } : {}),
+      ...(spawnEnvDelta ? { spawnEnvDelta } : {}),
+      ...(electronEnvDelta ? { spawnEnvDelta: { ...(spawnEnvDelta ?? {}), ...electronEnvDelta } } : {}),
           // Real-device adapters need headroom on observe (uiautomator dumps).
           ...(isNative ? { observeTimeoutMs: 30000 } : {}),
         });
@@ -266,9 +285,11 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
                 })
               : undefined,
           )
-        : isNative
-          ? await runNativeHuntCommand(run, store, req, base, progress, resuming, opts.control)
-          : await runFakeHunt(run, store, req, progress, resuming, opts.control);
+        : req.adapter === "electron"
+          ? await runElectronHunt(run, store, req, base, progress, resuming, opts.control)
+          : isNative
+            ? await runNativeHuntCommand(run, store, req, base, progress, resuming, opts.control)
+            : await runFakeHunt(run, store, req, progress, resuming, opts.control);
 
     const bundlePaths = writeEvidenceBundles(base, result.runId, result.evidenceBundles);
     const errorOutcomes = result.findingOutcomes.filter((o) => o.outcome === "error");

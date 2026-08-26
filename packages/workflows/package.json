@@ -18,6 +18,7 @@
     "@inspector/explore": "workspace:*",
     "@inspector/finding": "workspace:*",
     "@inspector/protocol": "workspace:*",
+    "@inspector/scale": "workspace:*",
     "@inspector/store-sqlite": "workspace:*",
     "@inspector/windows-adapter": "workspace:*"
   }
