@@ -4,12 +4,15 @@ This file is the operating contract for autonomous coding agents working on Insp
 
 ## Campaign mode
 
-The repository has completed the **M13 — REAL_TARGET_FLEET_CAMPAIGNS**
-implementation milestone and, separately invoked under `docs/HARDENING-CAMPAIGN.md`,
-the **HARDENING_2** and **HARDENING_3 — whole-system reliability,
-intelligence safety, clean-CI correctness, concurrency torture** campaigns
-(RC1 field validation and M9-M12 are complete; M8 iOS remains
-`DEFERRED_ENVIRONMENT`). Continue only when the next roadmap milestone or
+The repository has completed the **M13 — INTELLIGENCE_GUIDED_AUTONOMOUS_QA
+(Intelligence-Guided Autonomous QA)** implementation milestone and,
+separately invoked under `docs/HARDENING-CAMPAIGN.md`, the **HARDENING_2**
+and **HARDENING_3 — whole-system reliability, intelligence safety, clean-CI
+correctness, concurrency torture** campaigns (RC1 field validation and M9-M12
+are complete; M8 iOS remains `DEFERRED_ENVIRONMENT`).
+**HARDENING_4 — certification integrity, durable-state atomicity, and
+cross-process ownership fencing — is ACTIVE** via `.agent/EXECUTION_PROMPT.md`
+(planner commit `e030696`). Continue only when the next roadmap milestone or
 campaign is explicitly activated via `.agent/EXECUTION_PROMPT.md`; do not
 infer a release from this state.
 

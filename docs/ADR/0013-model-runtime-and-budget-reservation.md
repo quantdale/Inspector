@@ -114,3 +114,27 @@ Two additive contract clarifications, applied together with their tests:
    poison holds, fabricate refunds, create headroom, fail a ceiling open, or
    produce unloadable durable state; the state validator's finite checks were
    aligned accordingly.
+
+## Amendment (HARDENING_4, 2026-08-25): aggregate stat semantics pinned
+
+H4.6's dependent audit found the aggregate `ModelRuntimeStats.fallbacksUsed`
+counter counted every failed ATTEMPT, including terminal failures on the
+last candidate where no fallback ever occurred (a cancelled single-provider
+call reported `fallbacksUsed: 1`) — diverging from the per-attempt
+`ModelAttemptInfo.fallbacksUsed` array, which correctly lists providers
+fallen back FROM before the outcome.
+
+Resolved by pinning exact per-field contracts in `types.ts` and the runtime:
+
+- `requests` = logical invoke() calls; `attempts` = provider attempts begun
+  (pre-invocation refusals — denials, gate/store errors, no-provider — are
+  not attempts); `completed` = validated successes returned to the caller;
+  `failed` = attempts that raced a provider and lost (terminal response
+  validation failures are not here; they remain in `failuresByClass`).
+- `fallbacksUsed` counts REAL transitions to the next candidate only.
+- `denials`, `storeErrors`, `failuresByClass` unchanged in meaning but now
+  documented at the type.
+
+No counter consumer existed outside the runtime and its tests, so no call
+sites changed; regression coverage pins the transition-only fallback count,
+the zero-fallback terminal case, and exhaustion reporting.

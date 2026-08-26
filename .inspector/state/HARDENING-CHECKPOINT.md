@@ -1,11 +1,248 @@
 # Inspector hardening campaign ledger
-# Campaign #2 record below is historical (COMPLETE per campaign.yaml).
+# Campaign #2 and #3 records below are historical (COMPLETE per campaign.yaml;
+# their original "ACTIVE" headers were reconciled 2026-08-25 without touching
+# their evidence content).
+
+# HARDENING CAMPAIGN #4 — Certification Integrity, Durable-State Atomicity,
+# and Cross-Process Ownership Fencing
+
+- Campaign: HARDENING_4
+- Status: **ACTIVE**
+- Opened: 2026-08-25
+- Base commit: `e030696` (planner activation; planned-from `270b375` =
+  HARDENING_3 final). Local main == origin/main after fast-forward pull.
+- Source of scope: `.agent/EXECUTION_PROMPT.md`
+- Branch policy: main only; no force-push; no release/tag/publication.
+- HARDENING_3/2/1 records below remain untouched except status-header
+  reconciliation noted above.
+
+## H4.0 Baseline truth (recorded 2026-08-25)
+
+- Hosted CI run `32840538303` (SHA 270b375) inspected through the PUBLIC
+  GitHub REST API (no auth needed for this public repo): conclusion FAILURE.
+  - Linux quality gate job 97778814888: install/lint/typecheck/unit GREEN
+    (59 files / 643 tests); FAILED step 9 `pnpm exec playwright install
+    --with-deps chromium` → ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
+    "playwright" not found; `pnpm test:integration` skipped.
+  - Electron real-runtime proof (Xvfb) and Linux installed-artifact smoke:
+    SKIPPED (needs: quality).
+  - Windows path/native gate: SUCCESS end-to-end incl. release:smoke.
+  - Classification: clean-runner workspace-executable resolution defect
+    (CI/build defect), NOT a product regression; the H3 claim that hosted
+    clean-runner CI was closed is therefore not yet certified.
+- Truth drift confirmed by direct reads: campaign.yaml carried TWO
+  `completed_task_groups:` keys under `progress`; AGENTS.md named M13 with
+  M12's campaign name; HARDENING-CHECKPOINT.md #2/#3 section headers still
+  said ACTIVE; STATUS.md verified-gates table still says hosted results are
+  uninspectable (obsolete — public API works).
+- Negative-space review targets from the planner (lock.ts age-only takeover,
+  state-file.ts unlocked shared-tmp sweep) confirmed present by source read;
+  deterministic proof + fix under H4.3/H4.4.
+
+## Defect matrix (HARDENING_4)
+
+Lifecycle: SUSPICION → EVIDENCE → SEVERITY → REGRESSION TEST → FIX → CLOSED.
+
+### H4-D1 HIGH — root-level Playwright provisioning cannot resolve the executable on a clean runner — CLOSED
+
+- Evidence: run 32840538303 job 97778814888 step 9 failure (above);
+  root package.json has no playwright dep; @inspector/adapter-web owns it.
+- Fix: `packages/adapter-web` now declares a `provision:browser` script
+  (`playwright install --with-deps chromium`) and the Linux quality job runs
+  `pnpm --filter @inspector/adapter-web provision:browser`, guaranteeing the
+  downloaded revision matches the locked playwright version the tests import.
+  All other CI/script executable invocations audited (vitest/tsc/eslint/tsx
+  are root-owned; release/build scripts use only system git/npm/tar/zip and
+  process.execPath).
+- Regression proof: `packages/repo-contract/src/ci-workflow.test.ts` — the
+  exact historical failing step is flagged; every `pnpm exec` step must be
+  root-resolvable or --filter-scoped; provisioning must precede
+  test:integration in the quality job. Guard bites on synthetic regressions.
+
+### H4-D2 HIGH — duplicate `completed_task_groups:` mapping key could erase task-group history depending on YAML loader semantics — CLOSED
+
+- Evidence: direct read of campaign.yaml progress block (two identical keys,
+  lines 56 and 139 pre-fix).
+- Fix: lists merged into one key; second occurrence removed; no identity
+  lost. Regression guard: `packages/repo-contract/src/campaign-state.test.ts`
+  rejects duplicate sibling mapping keys across ALL .inspector/state/*.yaml,
+  duplicated identities inside durable progress lists, and cross-checks
+  EXECUTION_PROMPT/campaign.yaml active-campaign agreement plus M13 naming.
+
+### H4-D3 LOW — AGENTS.md described M13 with M12's campaign name — CLOSED
+
+- Evidence: direct read ("M13 — REAL_TARGET_FLEET_CAMPAIGNS").
+- Fix: corrected to INTELLIGENCE_GUIDED_AUTONOMOUS_QA, HARDENING_4 activation
+  recorded; regression guard asserts AGENTS/state M13 naming agreement
+  (campaign-state.test.ts) and that the drift pairing cannot return.
+
+### H4-D4 HIGH — FileLock had no ownership fencing: a stale predecessor could delete a successor's live lock — CLOSED
+
+- Evidence (proof by source read + deterministic repro): `release()` did an
+  unconditional recursive rm of the lock dir; takeover was age-only. A holder
+  outliving staleMs whose lock was taken over would delete the successor's
+  lock on release, allowing a third contender in — two simultaneous owners.
+- Root cause: ownership was inferred from directory age only; release was
+  not ownership-checked.
+- Fix (packages/scale/src/lock.ts): explicit per-acquisition random token
+  persisted into `owner` (write is MANDATORY — failure removes own dir and
+  retries); staleness = provably dead owner pid (immediate bounded recovery
+  via signal-0 liveness) OR anonymous directory older than staleMs (crash
+  between mkdir and owner write); a live owner is NEVER age-stolen (that was
+  the double-ownership hole). Takeover steals via single atomic rename;
+  release is rename-first, verifies the recorded token, deletes only its own
+  directory, and restores anything else untouched.
+- Regression proof: packages/scale/src/lock.hardening.test.ts (8 cases):
+  predecessor-release-vs-live-successor fencing incl. contender refusal;
+  dead-pid immediate recovery (<2.5s, not 30s); anonymous-aged recovery;
+  fresh-anonymous grace window; exactly-one-winner contested steal;
+  no-op foreign release; real cross-process protocol death recovery;
+  bounded takeover debris.
+- Residual documented caveat: advisory lock serializes IO but business
+  ownership authority remains lease generation fencing (H2/H3 contract);
+  single-host usage assumption for pid liveness is explicit in the docs.
+
+### H4-D5 HIGH — StateFile.load() swept a FIXED shared tmp path without the lock and could delete a live writer's temp file — CLOSED
+
+- Evidence (source read + Windows runtime proof): writers used exactly
+  `<state>.tmp`; any concurrent reader's load() unlinked it mid-write. The
+  new reader/writer race suite additionally PROVED the reverse direction:
+  on Windows, an unlocked reader holding the destination open makes the
+  writer's rename fail EPERM (reads lack FILE_SHARE_DELETE).
+- Fix (packages/scale/src/state-file.ts): unique per-save temps
+  (`<state>.<pid>.<uuid>.tmp`); sweep removes only the LEGACY fixed name
+  always and unique-named temps older than tmpStaleMs (60s default) — crash
+  debris, never live writes (live temps exist milliseconds); save() retries
+  rename over a held destination with a bounded Windows sharing-violation
+  backoff (genuine failures still throw after the bound); POSIX best-effort
+  directory fsync after rename (skipped on win32, NTFS journals metadata);
+  failed renames unlink their unique temp. update()'s mutation-only persist
+  contract is now explicitly documented (a pure-function updater loses its
+  work by design — pinned by test so it cannot silently change).
+- Regression proof: packages/scale/src/state-file.hardening.test.ts (5
+  cases) including a REAL concurrent external writer (worker thread, same
+  on-disk protocol) vs hammering unlocked readers: zero torn reads, zero
+  writer errors, writer throughput preserved under contention.
+- Transitive regression (H4.5): full scale unit lane 97/97 green (incl. all
+  H2/H3 fleet liveness/fencing/settlement suites) and scale integration
+  13/13 green first-run (SOAK-J1 160 items/33 restarts exactly-once, J3
+  fencing storms json+sqlite, J5 quarantine, fleet multi-lane chaos with
+  duplicates=0).
+
+## H4.9 Exact-tree local certification (2026-08-25) — PASS
+
+- pnpm install --frozen-lockfile: PASS (21 workspace projects; lockfile
+  gained only the repo-contract importer).
+- lint: PASS — 0 errors / 4 pre-existing adapter-web `any` warnings.
+- typecheck: PASS.
+- Unit: **666 passed / 3 skipped across 63 files**, first run. New: 8 FileLock
+  fencing, 5 StateFile atomicity (incl. real concurrent external-writer
+  race), 11 repo-contract guards, +3 model-runtime stats semantics.
+- Integration: 47 files; **202 passed / 1 skipped first-run**. The single
+  failure was the DOCUMENTED environmental class (android real-backend
+  `uiautomator dump` exit 137 under stale dual-emulator contention — same
+  signature recorded in M13 and HARDENING_2); green in isolation
+  immediately after with assertions untouched; no deterministic failure
+  reclassified as flake. Real lanes re-proven post-change: web/Playwright,
+  CLI/PTY (incl. VT viewport), Android AVD, Windows real UIA, Electron
+  production runtime, full fleet chaos (duplicates=0), SOAK-J1..J7.
+- release:smoke: PASS from a clean installed prefix — --version, doctor,
+  fake hunt/explore, findings/runs/campaign list, manifest validate+run
+  (2 workers), models summary, fixture provider hunt, invalid-provider
+  refusal exit 4.
+
+## H4.10 Hosted certification (2026-08-25)
+
+- Final commit pushed to origin/main without force-push; the exact pushed
+  SHA's Actions run is inspected through the PUBLIC GitHub REST API.
+- Result recorded in the completion report (commit message). Per the
+  anti-circular-truth rule, no documentation-only "green" commit is created
+  after the fact; future sessions query Actions for the current HEAD SHA.
+
+## H4.6 Model-runtime dependent audit (2026-08-25) — DONE
+
+Scope: every H3-changed behavior in @inspector/model-runtime plus its
+transitive consumers (scale legacy router adapter, fleet-harness, workflows,
+web-hunt observability passthrough).
+
+- CONFIRMED DEFECT (fixed as H4-D7 below): aggregate stats.fallbacksUsed
+counted failed ATTEMPTS, not fallbacks; per-attempt arrays were already
+correct; no external consumers of the numeric counter existed.
+- Audited-no-defect: health-exception containment (isHealthy catches),
+deterministic candidate ordering, partial explicit estimates passing through
+to gate defaults, sink.start fail-closed pre-invoke, sink.finish storeErrors
+truthfulness, late-completion discard with prior conservative settlement,
+denials accounting, restart reconciliation + observability parity (H3
+suites re-green post-change).
+
+## H4.7 Whole-repository negative-space sweep (2026-08-25) — DONE
+
+Same-class audit across ALL authored packages (grep-evidenced, not sampled):
+
+- Unique-temp atomic writers + age-gated bounded sweeps: workflows/atomic.ts,
+  cli/atomic.ts, artifact-store — already correct (M11.P5 contract); scale
+  StateFile was the outlier and is now aligned.
+- RESIDUAL (documented, not speculatively changed): workflows/cli/artifact
+  atomic renames lack the Windows sharing-violation retry added to
+  StateFile.save(); a concurrent reader holding an evidence file open during
+  a rewrite fails LOUD (no corruption), is unobserved in any suite, and the
+  retry was proven necessary only for hot-reread state files.
+- Stale-actor ownership release: FileLock was the only unfenced primitive;
+  JSON lease store rides StateFile fencing, SQLite leases are transactional.
+- Uncontained timer callbacks: production setInterval sites = scheduler
+  heartbeat only (contained per H3-D1); fleet-harness renew is test-only.
+- Package-local executables assumed global: none spawned bare in product src;
+  adapter-sdk resolves bins explicitly; CI surface guarded by repo-contract.
+- Durable-state schema duplication: mechanically rejected for all
+  .inspector/state/*.yaml by repo-contract validators going forward.
+- Late-promise mutation after deadline/cancel: runtime-owned race+discard in
+  model-runtime; exploration/oracle cancellation boundaries were torture-
+  tested in H2/H3 and remain green post-change (H4.5 reruns).
+
+## H4.8 Performance/resource verification (2026-08-25) — DONE
+
+- FileLock per-cycle cost grew by one owner-file write (+read on contested
+  paths only); measured indirectly via unchanged soak walls: SOAK-J1
+  160 items / 4 workers / 33 restart injections completed in 58.5s
+  (in-family with prior campaigns), J3 json fencing storm 250 rounds 28.5s,
+  fleet multi-lane chaos 154s with duplicates=0 and stable RSS growth
+  (127->158MB, same class as H2 baselines).
+- StateFile save() retry loop costs nothing off-Windows and only under
+  observed Windows reader contention (bounded 12 attempts); replaces a hard
+  failure, adds no healthy-path latency.
+- New tests leak-checked: worker threads terminated, child processes exit,
+  temp dirs removed in afterAll; no interval timers escape tests.
+
+### H4-D7 MEDIUM — aggregate stats.fallbacksUsed misreported terminal failures as fallbacks — CLOSED
+
+- Evidence: router.ts incremented the counter on EVERY failed attempt incl.
+  the final non-retriable one (a cancelled single-provider call reported 1);
+  diverged from attempt.fallbacksUsed array semantics; grep proved no
+  external consumers of the numeric counter.
+- Fix: counter now increments only on real transitions to the next
+  candidate; exact per-field contracts pinned on ModelRuntimeStats;
+  exhaustion reporting preserved byte-for-byte; ADR-0013 amended.
+- Regression proof: three new model-runtime tests (transition counting,
+  zero-fallback terminal case, retriable-but-last exhaustion wrapper);
+  model-runtime suite 22/22 green.
+
+### H4-D6 LOW — truth surfaces disagreed on campaign/hosted-CI state — CLOSED (final hosted certification pending as H4.10)
+
+- Evidence: see H4.0 baseline (ledger ACTIVE headers, obsolete uninspectable
+  claims, duplicate YAML keys, AGENTS name drift).
+- Fix: ledger headers reconciled without touching evidence; STATUS.md
+  verified-gates hosted-CI row rewritten to the public-API inspection rule
+  with exact run/job facts; repo-contract guards now mechanically enforce
+  prompt/state agreement so the next session cannot resume from prose that
+  contradicts canonical state.
 
 # HARDENING CAMPAIGN #3 — Whole-System Reliability, Intelligence Safety,
 # Clean-CI Correctness, and Concurrency Torture
 
 - Campaign: HARDENING_3
-- Status: **ACTIVE**
+- Status: **COMPLETE** (2026-08-25; all H3.0-H3.10 phases DONE, all defects
+  closed — header reconciled post-completion by HARDENING_4 H4.2; evidence
+  below unchanged)
 - Opened: 2026-08-25
 - Base commit: `b13c54f8891f02326df782a1f608658bb7f07740` (planner activation;
   planned-from `9d65d334` = M13 final). Local main == origin/main.
@@ -113,7 +350,8 @@ Lifecycle: SUSPICION → EVIDENCE → SEVERITY → REGRESSION TEST → FIX → C
 
 
 - Campaign: HARDENING_2
-- Status: **ACTIVE**
+- Status: **COMPLETE** (2026-08-24; header reconciled post-completion by
+  HARDENING_4 H4.2; evidence below unchanged)
 - Opened: 2026-08-24
 - Base commit: `702b33a4b5897cbcdec8b4b0170ca16e8043f79e` (M12 final, post-push)
 - Branch policy: main only; no force-push; no release/tag/publication.

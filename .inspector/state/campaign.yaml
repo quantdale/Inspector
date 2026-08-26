@@ -136,7 +136,6 @@ progress:
     - M12.F8
     - M12.F9
     - M12.F10
-  completed_task_groups:
     - M13.F0
     - M13.F1
     - M13.F2
@@ -356,6 +355,18 @@ debt_audit:
       0 errors / 4 pre-existing warnings; typecheck PASS; unit 568 passed /
       3 skipped (51 files); integration 175 passed / 1 skipped (41 files);
       release:smoke PASS.
+    - >-
+      HARDENING_4 BASELINE (2026-08-25, recorded via PUBLIC Actions API —
+      unauthenticated REST access works for this public repository, so the
+      earlier "results not inspectable" limitation is obsolete): run
+      32840538303 on HARDENING_3 final SHA 270b375 concluded FAILURE. Linux
+      quality job 97778814888 passed install/lint/typecheck/unit (59 files /
+      643 tests) then FAILED at `pnpm exec playwright install --with-deps
+      chromium` (Command "playwright" not found — playwright is owned by
+      @inspector/adapter-web only, not resolvable from the workspace root);
+      test:integration was skipped. Electron Xvfb job 97779011959 and Linux
+      installed-artifact smoke 97779012230 were skipped via needs:quality.
+      Windows path/native job succeeded fully including release:smoke.
   product_decision_required: []
 
 hardening:
@@ -449,6 +460,43 @@ hardening3:
     - H3-D5 HIGH modelruntime-never-throws-violations: CLOSED
     - H3-D6 HIGH budget-hostile-numerics-fail-open: CLOSED
     - H3-D3 MEDIUM status-truth-drift: CLOSED
+
+hardening4:
+  campaign: HARDENING_4
+  status: ACTIVE
+  started_at: "2026-08-25"
+  base_commit: e030696 (planner activation; planned-from 270b375 = HARDENING_3 final)
+  activated_by: .agent/EXECUTION_PROMPT.md (planner commit e030696, pulled and fast-forwarded)
+  protocol: docs/HARDENING-CAMPAIGN.md
+  ledger: .inspector/state/HARDENING-CHECKPOINT.md (campaign #4 section)
+  phases:
+    - {id: H4.0, name: exact-truth-and-durable-ledger, state: DONE}
+    - {id: H4.1, name: clean-runner-executable-resolution, state: DONE}
+    - {id: H4.2, name: state-schema-and-truth-surface-integrity, state: DONE}
+    - {id: H4.3, name: filelock-ownership-fencing, state: DONE}
+    - {id: H4.4, name: statefile-atomicity-reader-writer, state: DONE}
+    - {id: H4.5, name: fleet-transitive-regression, state: DONE}
+    - {id: H4.6, name: h3-model-runtime-dependent-audit, state: DONE}
+    - {id: H4.7, name: whole-repo-negative-space-sweep, state: DONE}
+    - {id: H4.8, name: perf-resource-verification, state: DONE}
+    - {id: H4.9, name: exact-tree-local-certification, state: DONE}
+    - {id: H4.10, name: hosted-ci-certification, state: IN_PROGRESS}
+  last_local_gate: >-
+    PASS on the exact tree before commit (2026-08-25): install
+    --frozen-lockfile OK (21 projects); lint 0 errors / 4 pre-existing
+    warnings; typecheck PASS; unit 666 passed / 3 skipped across 63 files;
+    integration 202 passed / 1 skipped first-run with the single android
+    uiautomator-dump exit-137 environmental flake green in isolation
+    immediately after (documented dual-emulator class, assertions untouched);
+    release:smoke PASS from a clean installed prefix.
+  defects:
+    - H4-D1 HIGH ci-root-playwright-executable-resolution: CLOSED
+    - H4-D2 HIGH campaign-yaml-duplicate-mapping-key-history-loss: CLOSED
+    - H4-D3 LOW agents-md-m13-milestone-name-drift: CLOSED
+    - H4-D4 HIGH filelock-age-only-takeover-unfenced-release: CLOSED
+    - H4-D5 HIGH statefile-shared-tmp-sweep-vs-live-writer: CLOSED
+    - H4-D6 LOW truth-surface-drift-hosted-ci-uninspectable-claim: CLOSED
+    - H4-D7 MEDIUM modelruntime-stats-fallbacksused-semantics: CLOSED
 
 hardening1_history:
   campaign: HARDENING_1

@@ -86,6 +86,40 @@ describe("M13 F1/F2: model runtime", () => {
     expect(result.attempt?.providerId).toBe("good");
     expect(result.attempt?.attemptNumber).toBe(2);
     expect(result.attempt?.fallbacksUsed).toEqual(["bad"]);
+    // HARDENING_4 H4.6: the aggregate counts REAL fallbacks only.
+    expect(runtime.stats.fallbacksUsed).toBe(1);
+    expect(runtime.stats.attempts).toBe(2);
+    expect(runtime.stats.completed).toBe(1);
+    expect(runtime.stats.failed).toBe(1);
+  });
+
+  it("stats.fallbacksUsed stays zero when a terminal failure ends the call (no fallback happened)", async () => {
+    const slow = new ScriptedModelProvider({ id: "only", respond: { hangMs: 5_000 } });
+    const runtime = new ModelRuntime().register(slow);
+    const result = await runtime.invoke(plannerSpec({ deadlineMs: 30 }));
+    expect(result.ok).toBe(false);
+    expect(result.failure?.classification).toBe("deadline");
+    expect(runtime.stats.fallbacksUsed).toBe(0); // No next candidate existed.
+    expect(runtime.stats.failed).toBe(1);
+    expect(runtime.stats.completed).toBe(0);
+    expect(runtime.stats.failuresByClass.deadline).toBe(1);
+  });
+
+  it("counts a fallback per real transition and stops at terminal exhaustion", async () => {
+    const a = new ScriptedModelProvider({ id: "a", priority: 30, respond: { failure: "transport-error", detail: "net down" } });
+    const b = new ScriptedModelProvider({ id: "b", priority: 20, respond: { failure: "provider-error", detail: "upstream 500" } });
+    const c = new ScriptedModelProvider({ id: "c", priority: 10, respond: { failure: "provider-error", detail: "still failing" } });
+    const runtime = new ModelRuntime().register(a).register(b).register(c);
+    const result = await runtime.invoke(plannerSpec());
+    // a->b and b->c are real fallbacks; c's failure is retriable-but-last,
+    // so it is reported truthfully WITHOUT counting a third fallback.
+    expect(result.failure?.classification).toBe("provider-error");
+    expect(result.failure?.detail).toContain("all providers for role 'planner' failed");
+    expect(runtime.stats.fallbacksUsed).toBe(2);
+    expect(runtime.stats.attempts).toBe(3);
+    expect(runtime.stats.failed).toBe(3);
+    expect(runtime.stats.requests).toBe(1);
+    expect(runtime.stats.failuresByClass["provider-error"]).toBe(2);
   });
 
   it("does NOT fall back on malformed or schema-invalid responses (no double-spend)", async () => {

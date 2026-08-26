@@ -8,6 +8,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "provision:browser": "playwright install --with-deps chromium"
+  },
   "dependencies": {
     "@inspector/adapter-sdk": "workspace:*",
     "@inspector/artifact-store": "workspace:*",

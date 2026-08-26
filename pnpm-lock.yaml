@@ -248,6 +248,8 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/repo-contract: {}
+
   packages/scale:
     dependencies:
       '@inspector/adapter-fake':

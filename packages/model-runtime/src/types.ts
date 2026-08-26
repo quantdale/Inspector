@@ -261,12 +261,37 @@ export interface ModelCallResult {
 }
 
 /** Aggregate counters exposed for observability (M13 F24; HARDENING_3 adds
- * durable-sink failure visibility). */
+ * durable-sink failure visibility; HARDENING_4 pins exact per-field
+ * semantics so operators never misread the numbers).
+ *
+ * Field contract (HARDENING_4 H4.6):
+ * - `requests`: logical invoke() calls begun (one per ModelCallResult).
+ * - `attempts`: provider attempts BEGUN (pre-invocation refusals —
+ *   budget denial, gate error, store error, no-provider — are NOT attempts;
+ *   they never reached a provider).
+ * - `completed`: attempts whose validated response was returned to caller.
+ * - `failed`: attempts that raced a provider and LOST (transport, provider
+ *   error, deadline, cancellation). Pre-invocation refusals and terminal
+ *   response-validation failures (malformed-response / schema-invalid) are
+ *   NOT counted here; every classification is still visible in
+ *   `failuresByClass`.
+ * - `fallbacksUsed`: attempts AFTER WHICH THE RUNTIME ACTUALLY FELL BACK to
+ *   the next candidate. A terminal failure on the last candidate is not a
+ *   fallback. Matches the per-attempt `ModelAttemptInfo.fallbacksUsed`
+ *   array semantics (providers fallen back FROM before the outcome).
+ * - `denials`: admission refusals by the configured budget gate.
+ * - `storeErrors`: sink persistence faults: sink.start() failures abort the
+ *   attempt fail-closed before invocation; sink.finish() failures cannot
+ *   corrupt the already-decided outcome but make durable-truth loss visible.
+ * - `failuresByClass`: every classified failure occurrence exactly once,
+ *   regardless of which counter path produced it.
+ */
 export interface ModelRuntimeStats {
   requests: number;
   attempts: number;
   completed: number;
   failed: number;
+  /** Attempts after which the runtime actually fell back to the next candidate. */
   fallbacksUsed: number;
   denials: number;
   /** sink.finish() persistence failures that could not corrupt an outcome. */

@@ -1,26 +1,53 @@
 # Project Status
 
-Last updated: HARDENING_3 COMPLETE (2026-08-25)
+Last updated: HARDENING_4 COMPLETE (2026-08-25)
 
 ## Campaign
 
-- Mode: **HARDENING_3 — whole-system reliability, intelligence safety,
-  clean-CI correctness, concurrency torture: COMPLETE** (separately invoked
-  via `.agent/EXECUTION_PROMPT.md`; ledger:
-  `.inspector/state/HARDENING-CHECKPOINT.md`). Six defects closed
-  (1 CRITICAL, 4 HIGH, 1 MEDIUM), each with regression coverage.
-- M13 — Intelligence-Guided Autonomous QA: **COMPLETE** (2026-08-25; exit
-  gate PASS on `9d65d334`). M12 — real-target fleet campaigns: COMPLETE;
-  HARDENING_2 (separately invoked): COMPLETE. M11 and all earlier milestones
-  remain COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`. Canonical state is
-  recorded in `.inspector/state/campaign.yaml`.
+- Mode: **HARDENING_4 — certification integrity, durable-state atomicity,
+  cross-process ownership fencing** (separately invoked via
+  `.agent/EXECUTION_PROMPT.md` planner commit e030696; ledger:
+  `.inspector/state/HARDENING-CHECKPOINT.md`, campaign #4).
+  Seven defects closed (2 HIGH durability primitives redesigned,
+  1 HIGH clean-CI executable resolution, 1 MEDIUM stats semantics,
+  3 truth-surface/LOW), each with deterministic regression coverage.
+- HARDENING_3, HARDENING_2: COMPLETE. M13 — Intelligence-Guided Autonomous
+  QA: **COMPLETE** (exit gate PASS on `9d65d334`). M12/M11/M10/M9 and all
+  earlier milestones COMPLETE; M8 stays `DEFERRED_ENVIRONMENT`. Canonical
+  state is recorded in `.inspector/state/campaign.yaml`.
 - RC1_FIELD_VALIDATION: **COMPLETE** — decision **GO_WITH_DOCUMENTED_DEBT**
   for candidate **0.1.0-rc.2** (tree `85011ca`). Report:
   `docs/GA-FIELD-VALIDATION-REPORT.md`.
-- Implementation campaign M0–M7 + M9: **COMPLETE**. HARDENING_1:
-  **COMPLETE**. DOGFOOD_RC1: **COMPLETE**.
+- Implementation campaign M0–M7 + M9: **COMPLETE**. DOGFOOD_RC1:
+  **COMPLETE**.
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
+
+## HARDENING_4 outcome (certification integrity + durable state)
+
+- **Clean-runner CI executable resolution fixed**: browser provisioning now
+  runs through the package that owns playwright (`pnpm --filter
+  @inspector/adapter-web provision:browser`) instead of a root `pnpm exec`
+  that cannot resolve package-local bins under pnpm's isolated layout — the
+  exact failure that red-flagged run 32840538303 and silently skipped the
+  Linux integration/Xvfb/smoke lanes. A new `@inspector/repo-contract`
+  package mechanically guards workspace-executable scoping in CI, browser-
+  provisioning order, duplicate YAML keys in durable state, prompt/canonical-
+  state campaign agreement, and M13 naming truth.
+- **FileLock ownership fencing**: acquisition persists a mandatory random
+  ownership token; release is rename-first + token-checked so a stale
+  predecessor can never delete a successor's live lock; takeover requires a
+  provably dead owner pid (immediate bounded recovery) or an anonymous aged
+  directory — live owners are never age-stolen, closing the two-simultaneous-
+  owners window.
+- **StateFile write-path atomicity**: unique per-save temps make the unlocked
+  reader sweep physically unable to delete a live writer's temp; crash debris
+  is swept by age; Windows reader/writer sharing violations are absorbed by a
+  bounded rename retry (proven real by the new race suite); POSIX dir fsync
+  best-effort after rename.
+- **Model-runtime stat truth**: aggregate fallbacksUsed now counts real
+  fallback transitions only; every counter's exact semantics pinned on the
+  type and ADR-0013 amended.
 
 ## HARDENING_3 outcome (whole-system hardening)
 
@@ -206,13 +233,13 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 
 | Gate | Result |
 | --- | --- |
-| frozen install | PASS |
+| frozen install | PASS (21 workspace projects) |
 | lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
-| test (unit) | PASS — 640 passed / 3 skipped across 59 files (HARDENING_3 final sweep; unit lane now hermetic) |
-| test:integration | PASS — 203 passed / 1 skipped across 47 files, first-run green (HARDENING_3 final sweep) |
-| installed release smoke | PASS (fresh npm prefix, incl. M13 model steps) |
-| hosted CI | Push-triggered; results not inspectable from this host (gh unauthenticated) — owner triages per SPEC-012 §15 |
+| test (unit) | PASS — 666 passed / 3 skipped across 63 files (HARDENING_4 tree; +26 tests incl. FileLock/StateFile fencing suites and repo-contract guards) |
+| test:integration | PASS — 202 passed / 1 skipped first-run + the single android `uiautomator dump exit 137` environmental flake green in isolation immediately after (documented dual-emulator class from M13/H2); 47 files total incl. real web/PTY/AVD/UIA/Electron lanes |
+| installed release smoke | PASS (fresh npm prefix, full command surface incl. M12 campaign + M13 model steps) |
+| hosted CI | Inspected via PUBLIC GitHub REST API (no auth needed): run 32840538303 on HARDENING_3 final SHA 270b375 = FAILURE at root-level Playwright provisioning → FIXED as H4-D1; the exact HARDENING_4 pushed SHA is certified by its own Actions run (see ledger/commit report) |
 
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration

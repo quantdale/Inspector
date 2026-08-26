@@ -36,9 +36,16 @@ jobs:
       - run: pnpm test
       # Explicit, reproducible browser prerequisite for the real-browser
       # proofs in the integration lane (web adapter target/conformance and
-      # exploration E2E). The unit lane stays hermetic: no browser cache is
-      # relied upon and no browser-backed test is classified as unit.
-      - run: pnpm exec playwright install --with-deps chromium
+      # exploration E2E). The provisioning command is scoped to the package
+      # that owns the locked playwright dependency (@inspector/adapter-web):
+      # pnpm's isolated node_modules layout does not expose package-local
+      # binaries at the workspace root, so a root `pnpm exec playwright`
+      # fails on clean runners (hosted run 32840538303). Running through the
+      # owning package guarantees the downloaded browser revision matches
+      # the exact playwright version the integration tests import.
+      # The unit lane stays hermetic: no browser cache is relied upon and no
+      # browser-backed test is classified as unit.
+      - run: pnpm --filter @inspector/adapter-web provision:browser
       - run: pnpm test:integration
 
   # Distribution is exercised after the required gate from a clean npm

@@ -136,7 +136,8 @@ export class ModelRuntime {
 
     const fallbacksUsed: string[] = [];
     let lastFailure: { classification: ModelFailureClass; detail: string } | null = null;
-    for (const { provider, fallbackPosition } of candidates) {
+    for (const [candidateIndex, candidate] of candidates.entries()) {
+      const { provider, fallbackPosition } = candidate;
       this.statsInternal.attempts += 1;
       const attemptNumber = fallbackPosition + 1;
       const attemptId = `${requestId}/a${attemptNumber}`;
@@ -342,7 +343,6 @@ export class ModelRuntime {
       // conservatively instead of pretending the call was free.
       settleGate(opts.gate, { requestId, attemptId, outcome: "failed" });
       this.statsInternal.failed += 1;
-      this.statsInternal.fallbacksUsed += 1;
       this.recordTo(opts.sink, spec, attemptId, requestId, attemptNumber, fallbackPosition, provider, outcome.classification === "cancelled" ? "cancelled" : "failed", outcome.classification, {
         contextSha256,
         promptBytes,
@@ -355,6 +355,11 @@ export class ModelRuntime {
         outcome.classification === "transport-error" ||
         outcome.classification === "provider-error" ||
         outcome.classification === "deadline";
+      const hasNext = candidateIndex < candidates.length - 1;
+      // HARDENING_4 H4.6: `fallbacksUsed` counts REAL fallbacks — moving to
+      // the next candidate. A terminal failure on the last candidate is a
+      // failure, not a fallback.
+      if (retriable && hasNext) this.statsInternal.fallbacksUsed += 1;
       if (!retriable) {
         return this.failure(requestId, outcome.classification, outcome.detail, {
           providerId: provider.meta.id,
@@ -363,6 +368,7 @@ export class ModelRuntime {
           fallbacksUsed,
         });
       }
+      if (!hasNext) break; // Exhausted: report via the exhaustion block below.
     }
     // Exhausted every candidate: report the LAST failure's classification
     // truthfully (deadline exhaustion stays a deadline, etc.) with full
