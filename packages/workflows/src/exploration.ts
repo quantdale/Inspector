@@ -196,12 +196,21 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
       // H5.2: record the exact backend mode the spawned adapter will select so
       // replay/verify/regress reconstruct the SAME backend faithfully.
       const raw = process.env.INSPECTOR_ELECTRON_BACKEND;
-      const backendMode =
-        raw === "real" || raw === "injectable"
-          ? raw
-          : electronExecutablePath() !== undefined
-            ? "real"
-            : "injectable";
+      const executableReady = electronExecutablePath() !== undefined;
+      const displayAvailable =
+        process.platform === "win32" ||
+        !!process.env.DISPLAY ||
+        !!process.env.WAYLAND_DISPLAY;
+      if ((raw === "real" || raw === undefined) && !displayAvailable && executableReady) {
+        // Defense-in-depth preflight: a real launch without a display can
+        // only fail — refuse honestly BEFORE any workspace/run side effect.
+        // (Injectable-mode requests stay valid: deterministic coverage.)
+        throw new WorkflowError(
+          "environment-unavailable",
+          "electron exploration requires a display for the real runtime (set DISPLAY or run under Xvfb); refusing to start",
+        );
+      }
+      const backendMode = raw === "real" || raw === "injectable" ? raw : executableReady ? "real" : "injectable";
       electronEnvDelta = { INSPECTOR_ELECTRON_BACKEND: backendMode };
     }
     const spawnSpec = resuming

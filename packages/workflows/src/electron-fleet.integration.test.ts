@@ -28,6 +28,11 @@ describe("HARDENING_5 H5-D0: electron fleet execution truth", () => {
     "executes an accepted electron hunt item with durable electron identity (never fake)",
     { timeout: 240_000 },
     async () => {
+      // Deterministic hermetic coverage: pin the INJECTABLE backend so this
+      // proof runs identically on any host with chromium (the real-runtime
+      // leg is proven by the display-gated/Xvfb lanes separately).
+      const prevBackend = process.env.INSPECTOR_ELECTRON_BACKEND;
+      process.env.INSPECTOR_ELECTRON_BACKEND = "injectable";
       const base = fresh("identity");
       const items: WorkItem[] = [
         {
@@ -113,6 +118,8 @@ describe("HARDENING_5 H5-D0: electron fleet execution truth", () => {
         expect(report.usage.actions).toBeGreaterThan(0);
       } finally {
         campaign.dispose();
+        if (prevBackend === undefined) delete process.env.INSPECTOR_ELECTRON_BACKEND;
+        else process.env.INSPECTOR_ELECTRON_BACKEND = prevBackend;
       }
     },
   );

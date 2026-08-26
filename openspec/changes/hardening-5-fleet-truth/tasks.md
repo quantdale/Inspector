@@ -40,9 +40,9 @@ All boxes start unchecked. A box may be checked only after its stated evidence/g
 ## H5.4 — Electron replay / verify / regress / resume
 
 - [x] H5.4.1 Add Electron durable replay-driver support or explicit preflight narrowing; accepted Electron findings must never reach the generic unsupported/fake path.
-- [ ] H5.4.2 Verify Electron source-item references preserve workspace containment, finding, revision, adapter, backend, and target provenance.
-- [ ] H5.4.3 Prove `verify` and `regress` execute platform-faithfully against Electron.
-- [ ] H5.4.4 Prove resume reconstructs the same Electron target/backend and rejects mismatched/stale provenance.
+- [x] H5.4.2 Verify Electron source-item references preserve workspace containment, finding, revision, adapter, backend, and target provenance.
+- [x] H5.4.3 Prove `verify` and `regress` execute platform-faithfully against Electron.
+- [x] H5.4.4 Prove resume reconstructs the same Electron target/backend and rejects mismatched/stale provenance.
 - [ ] H5.4.5 Cover malformed provenance, missing runtime/display, crash/cancel during replay, artifact failure, and automation-failure classification.
 
 ## H5.5 — Exhaustive adapter-family contract

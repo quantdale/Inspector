@@ -149,6 +149,13 @@ export async function probeUia(): Promise<BackendProbe> {
 }
 
 export async function probeElectron(): Promise<BackendProbe> {
+  // HARDENING_5 H5.2.7: capability must never exceed executability. A real
+  // Electron launch needs a display on non-Windows hosts; advertising
+  // electron on a headless runner would route items into doomed launches.
+  const displayAvailable =
+    process.platform === "win32" ||
+    !!process.env.DISPLAY ||
+    !!process.env.WAYLAND_DISPLAY;
   for (const dir of PACKAGE_CONTEXTS) {
     try {
       const req = createRequire(join(dir, "package.json"));
@@ -159,6 +166,12 @@ export async function probeElectron(): Promise<BackendProbe> {
         process.platform === "win32" ? "electron.exe" : "electron",
       );
       if (existsSync(electronExecutable)) {
+        if (!displayAvailable) {
+          return {
+            ok: false,
+            detail: "electron executable present but no display available (set DISPLAY or run under Xvfb)",
+          };
+        }
         return { ok: true, detail: "production Electron executable available" };
       }
       return { ok: false, detail: "electron package present but executable unavailable" };
