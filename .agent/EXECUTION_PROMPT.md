@@ -1,341 +1,276 @@
-# Inspector Execution Prompt — HARDENING_4
+# Inspector Execution Prompt — HARDENING_5
 
-**Status:** COMPLETE (2026-08-26 — hosted certification run 32936068493 SUCCESS on exact pushed SHA `f687ef1`; canonical truth: `.inspector/state/campaign.yaml` `hardening4:` block; ledger campaign #4). No campaign is currently ACTIVE; a new planner activation replaces this file. Historical scope below is retained verbatim.  
-**Campaign:** HARDENING_4 — Certification Integrity, Durable-State Atomicity, and Cross-Process Ownership Fencing  
+**Status:** READY_FOR_EXECUTION — planner handoff is complete. On an explicit operator instruction to pull/apply/work on this prompt, the executor MUST first reconcile `main`, then activate HARDENING_5 in canonical durable state before editing implementation code. This status is intentionally not `ACTIVE` yet because `.inspector/state/campaign.yaml` still truthfully records no active hardening campaign at planner time.  
+**Campaign:** HARDENING_5 — Fleet Execution Truth, Platform Parity, Cross-Platform Durability, and Measured Runtime Efficiency  
 **Mode:** HARDENING  
-**Target branch:** `main`  
-**Planned from:** `270b375e00babe7bdcd04bdb80fd5a96a1a9b9c6` (`HARDENING_3: whole-system reliability, intelligence safety, clean-CI correctness, concurrency torture — COMPLETE`)  
-**Planner date:** 2026-08-25  
-**Intended scale:** one substantial autonomous engineering campaign, roughly 8–12 hours when the evidence supports it. Do not inflate scope, but do not stop after repairing the first visible failure. The purpose is to make Inspector's durability and certification claims mechanically true under clean-host, restart, and multi-process conditions.
+**Target branch:** `main` only  
+**Planned from:** `217165cd4a6c39c0726b12b01edf2c6c4056a6e1` (`HARDENING_4 COMPLETE` state-synchronization HEAD)  
+**Planner date:** 2026-08-26  
+**OpenSpec change:** `openspec/changes/hardening-5-fleet-truth/`  
+**Intended scale:** one substantial autonomous campaign. Continue through the full evidence-backed scope; do not stop after the first defect. Do not invent work merely to consume time.
 
 ## 1. Why this is the next campaign
 
-The implementation roadmap currently ends at M13. M13 is `COMPLETE`; M8 remains `DEFERRED_ENVIRONMENT`; no M14 exists and no new implementation milestone is activated. HARDENING_3 is also recorded `COMPLETE` in canonical state. Do **not** invent M14, infer a release, or publish/tag anything.
+The implementation roadmap ends at M13. M13 is COMPLETE; M8 iOS remains environment-deferred; no M14 exists. `packages/repo-contract/src/campaign-state.test.ts` explicitly guards against inventing M14. Therefore this is a separately invoked hardening campaign, not a new implementation milestone.
 
-A new hardening campaign is nevertheless justified by current repository evidence, not speculative cleanup:
+The planning baseline is unusually strong: current `main` HEAD `217165c` has GitHub Actions run `32955622320` completed SUCCESS with Linux lint/typecheck/unit/full integration, Windows native/path coverage, Linux installed-artifact smoke, and real Electron/Xvfb proof. Start from that green exact-tree baseline and preserve it.
 
-1. The exact HARDENING_3 completion SHA (`270b375e00babe7bdcd04bdb80fd5a96a1a9b9c6`) has a completed **failing** GitHub Actions run: `32840538303`.
-2. The Linux quality job (`97778814888`) successfully completed install, lint, typecheck, and the entire Linux unit lane (**59 files / 643 tests passed**) and then failed before integration at:
-   `pnpm exec playwright install --with-deps chromium`
-   with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "playwright" not found`.
-3. The root `package.json` does not own a Playwright binary. `@inspector/adapter-web` owns the `playwright` dependency. HARDENING_3 added a root-scoped provisioning command without proving executable resolution in the clean hosted workspace.
-4. That failure skipped the Linux integration lane, Linux installed-artifact smoke, and Electron Xvfb real-runtime proof. Therefore the final H3 commit's claim that the hosted clean-runner problem was closed is not yet certified.
-5. Repository truth surfaces drift again after the H3 completion:
-   - `.agent/EXECUTION_PROMPT.md` still describes HARDENING_3 as `ACTIVE` even though canonical state marks it complete (this H4 planner activation replaces that stale prompt).
-   - `AGENTS.md` calls M13 `REAL_TARGET_FLEET_CAMPAIGNS`; that is the M12 name, not M13's Intelligence-Guided Autonomous QA milestone.
-   - `.inspector/state/campaign.yaml` textually contains two `completed_task_groups:` mapping keys under `progress`; verify actual parser behavior, but duplicate YAML keys are inherently ambiguous and can erase or hide historical task-group truth depending on loader semantics.
-   - verification/hosted-CI prose still describes H3 results as unavailable/pending even though the public Actions API exposes the final failed run.
-   - the hardening ledger still contains historical status text that must be reconciled without rewriting evidence.
-6. Negative-space review of unchanged durability primitives exposed high-value concurrency risks that HARDENING_3 did not close:
-   - `packages/scale/src/lock.ts` uses age-only stale takeover with no ownership token/fencing. A holder older than `staleMs` can be removed by another process; `release()` then unconditionally removes the lock directory, potentially deleting a successor's lock. Prove or disprove this with deterministic multi-process tests before changing the design.
-   - `packages/scale/src/state-file.ts` calls `sweepLeftoverTmp()` from public `load()` without the file lock, while writers use one fixed `<state>.tmp` path. A concurrent reader may remove a writer's live temporary file. Prove the exact Windows/POSIX behavior and close any real race without weakening atomicity.
-   - strict crash durability of tmp-write/fsync/rename, quarantine behavior, reader/writer interaction, and stale-lock takeover is not yet proven across the JSON fallback path.
-7. HARDENING_3 materially changed CI, model runtime, model budget accounting, scheduler heartbeat behavior, tests, ADRs, and state. Its direct patch is only part of the blast radius; unchanged consumers and persistence primitives must be audited too.
+The audit nevertheless found a concrete cross-layer fleet truth contradiction that current gates do not cover:
 
-This campaign is therefore **HARDENING_4**, focused on certification truth, durable-state atomicity, ownership/fencing, and transitive regression safety.
+1. `@inspector/scale` declares `AdapterFamily = fake | web | cli | windows | android | electron` and manifest validation accepts `electron`.
+2. `InspectorWorkflowExecutor` advertises the Electron family when `probeElectron()` succeeds, so the scheduler can legitimately route an Electron work item to it.
+3. `packages/workflows/src/types.ts` cannot represent Electron at all: `ExplorationAdapter` is only `web | fake | cli | windows | android`.
+4. `packages/workflows/src/campaign-executor.ts::familyAdapter()` does not handle Electron and falls through to `fake`.
+5. `packages/workflows/src/workspace.ts::adapterSpawn()` cannot resolve the Electron adapter binary and also falls through to `fake` for unknown names.
+6. `packages/workflows/src/exploration.ts` treats only CLI, Windows, and Android as native; there is no Electron exploration branch.
+7. `packages/workflows/src/replay-subject.ts::replayDriverFor()` has web/fake/CLI/Windows/Android replay but no Electron replay.
+8. The dedicated Electron adapter itself is real and tested; it intentionally reuses browser semantics while preserving Electron identity, and hosted Xvfb now proves the real runtime works. The defect is therefore in orchestration/product integration, not absence of an adapter.
 
-## 2. Mandatory rehydration and repository-wide audit
+Taken together, an accepted/routed Electron campaign can cross a control plane that claims Electron capability into a workflow path that silently selects the fake adapter. Treat this as a likely HIGH/CRITICAL trust defect until deterministic reproduction establishes exact externally observable behavior and severity. Never fix it by merely rejecting Electron if the intended product contract is to support the already-declared family; reconcile the contract end-to-end.
 
-Before editing implementation code:
+Additional evidence-backed debt belongs in the same campaign because it crosses the same product/runtime boundaries:
 
-1. Read `.agent/PLANNER_HANDOFF.md` and this file.
-2. Read `.inspector/state/campaign.yaml`, `.inspector/state/CHECKPOINT.md`, and `.inspector/state/HARDENING-CHECKPOINT.md` completely.
-3. Read `AGENTS.md`, `docs/HARDENING-CAMPAIGN.md`, `docs/ROADMAP.md`, and `docs/STATUS.md`.
-4. Read SPEC-012, SPEC-013, ADR-0012, ADR-0013, and only the additional architecture/security/persistence/product documents required by the evidence below.
-5. Fetch/prune `origin`; verify current branch, worktree cleanliness, `HEAD`, `origin/main`, ahead/behind state, and preserve any legitimate newer work.
-6. Inspect at least the most recent **30 meaningful commits** (more if needed), including M12, HARDENING_2, M13, HARDENING_3 activation, and HARDENING_3 completion. Understand why each changed contract exists before altering it.
-7. Enumerate the **entire authored repository**, not just recently modified files: packages, scripts, CI/build/release files, specifications, durable state schemas, agent adapters, fixtures, platform adapters, tests, and docs. Exclude generated/vendor/cache output only when clearly non-authored.
-8. For every HARDENING_3-changed behavior, trace direct callers, transitive consumers, persisted schemas, test fixtures, command surfaces, and unchanged dependents. Review what was *not* changed but relies on the changed semantics.
-9. Query current GitHub Actions through the available public API/tooling. Do not rely on a local `gh` authentication limitation when the repository/run is publicly inspectable.
-10. Confirm there are no higher-priority open issues/PRs. If newer legitimate work exists, reconcile it rather than overwriting it.
-11. Activate HARDENING_4 in the repository's **canonical durable state** and create/extend a durable H4 defect ledger. Do not create another one-off state shape if the existing schema can be normalized safely. Preserve all historical milestone and hardening evidence.
-12. Every confirmed defect must progress through: suspicion → deterministic evidence/reproduction → severity → regression proof → fix → cross-package verification → CLOSED. Do not call a design smell a defect until evidence establishes a violated contract.
+- historical fleet state says Windows/UIA and Electron campaign lanes were unwritten/deferred; Windows now has generic native workflow plumbing, but it still needs a real end-to-end campaign proof and truth reconciliation rather than assumptions;
+- Electron verify/regress replay is unsupported even if hunt/explore is made real;
+- workflows/CLI/artifact atomic rename sites still lack the bounded Windows sharing-violation retry that HARDENING_4 proved necessary for hot reread state files; audit every atomic-write implementation and close only confirmed durability gaps;
+- `FileLock` remains synchronous `Atomics.wait` based while SQLite leases are the production default; change it only if profiling shows a meaningful real bottleneck or liveness problem;
+- web exploration/replay remains expensive (historically ~4–6 minutes in full E2E); optimize from measured profiles, not intuition;
+- an interrupted H4 session preserved an unlanded 17-file speculative performance patch at `.inspector/tmp/h4-stray-perf-batch-2026-08-26.patch` (and a local stash on that machine). Treat it only as a hypothesis source: inspect any available patch, benchmark each idea independently, and never apply it wholesale;
+- durable prose still contains historical Electron-host-unavailable statements that are now stale relative to hosted real Electron/Xvfb success. Reconcile truth without rewriting historical evidence.
 
-Do not implement from chat history. Re-read the live repository.
+## 2. OpenSpec is the execution contract
 
-## 3. Required whole-system maps
+Read these first, in order:
 
-Build and use these maps during the audit. For each, cover happy path, failure, cancellation, crash/restart, corruption, concurrency, and environment-loss behavior where applicable.
+1. `openspec/changes/hardening-5-fleet-truth/proposal.md`
+2. every delta under `openspec/changes/hardening-5-fleet-truth/specs/`
+3. `openspec/changes/hardening-5-fleet-truth/design.md`
+4. `openspec/changes/hardening-5-fleet-truth/tasks.md`
+
+If OpenSpec tooling is installed, validate/show the change before implementation and use the equivalent of the apply workflow. If it is not installed, the Markdown artifacts remain authoritative; do not block the campaign merely to install tooling. Do not archive/sync this OpenSpec change until the hardening completion gate passes.
+
+## 3. Mandatory activation and rehydration
+
+Before any implementation edit:
+
+1. Fetch/prune origin and verify `main`, worktree cleanliness, HEAD, `origin/main`, ahead/behind state, and current hosted CI. Preserve any legitimate newer work; do not overwrite concurrent changes.
+2. Read `.agent/PLANNER_HANDOFF.md`, this prompt, `.inspector/state/campaign.yaml`, `.inspector/state/CHECKPOINT.md`, `.inspector/state/HARDENING-CHECKPOINT.md`, `AGENTS.md`, `docs/HARDENING-CAMPAIGN.md`, `docs/ROADMAP.md`, and `docs/STATUS.md` completely.
+3. Read SPEC-012, SPEC-013, ADR-0012, ADR-0013, platform/adapters, architecture, security, exploration, evidence, observability, product, development, and release documents as required by the touched contracts.
+4. Inspect at least the most recent 30 meaningful commits and their diffs, including M12, HARDENING_2, M13, HARDENING_3, HARDENING_4 activation/fixes/completion. Understand why existing guards exist before changing them.
+5. Recheck open issues and PRs. Planning-time open PR count was zero; do not assume it remains zero.
+6. Transition HARDENING_5 to ACTIVE in canonical durable state and append campaign #5 to `.inspector/state/HARDENING-CHECKPOINT.md`. Preserve all M0–M13 and H1–H4 history and M8 deferral. Update this prompt status to ACTIVE in the same activation checkpoint so repo-contract truth remains coherent.
+7. Establish stable H5 defect IDs. Every defect must progress: suspicion → deterministic evidence → severity → regression test/proof → fix → transitive verification → CLOSED.
+
+Do not implement from chat history. Re-read live source.
+
+## 4. Mandatory every-file audit proof
+
+The operator explicitly requested a deep audit of every file/system/logic path. Make that mechanically auditable instead of claiming it informally.
+
+Create/update `.inspector/state/HARDENING_5-AUDIT.md` from the live checkout with a tracked-file census produced from `git ls-files` (or an equivalent exact Git index inventory). Every tracked authored file must receive a disposition, either individually or through a clearly enumerated homogeneous group whose member paths are listed. At minimum classify:
+
+- runtime source and package manifests;
+- unit/property/fuzz/integration/soak tests and fixtures;
+- adapter implementations and native helpers;
+- protocol, persistence, artifact, finding/oracle/explore/repair/model/scale/workflow logic;
+- CLI and installed-artifact surfaces;
+- scripts, build/release/CI configuration, workspace config, lockfile implications;
+- docs, ADRs, specs, OpenSpec artifacts, agent instructions, durable state schemas;
+- dogfood/repro assets and intentionally committed Inspector evidence/state;
+- hidden agent/tool configuration that can affect execution.
+
+Generated/vendor/cache files may be excluded only when they are not tracked authored source; record the exclusion rule. The final H5 report MUST state the tracked-file count, reviewed count, excluded count/reasons, and prove `reviewed + justified exclusions == tracked files`. A sample or package-level skim is not sufficient.
+
+For substantive files, trace behavior rather than only reading names. For each major system map happy path, invalid input, failure, cancellation, timeout, crash/restart, concurrent ownership, corruption, platform loss, and installed-package behavior where applicable.
+
+## 5. Required system maps
+
+Build/use these maps during the audit:
 
 ```text
-GitHub Actions -> pnpm workspace -> package-local executable resolution -> browser/Electron prerequisites -> integration -> installed artifact
+manifest -> validateWorkItem/AdapterFamily -> capability probe -> scheduler/router -> InspectorWorkflowExecutor -> family mapping -> workspace adapter spawn -> RunManager -> real adapter
 ```
 
 ```text
-planner prompt -> AGENTS/goal adapter -> campaign.yaml -> checkpoint/ledger/status -> executor activation -> final truth/reporting
+Electron manifest -> electron capability -> workflow types -> spawn -> ElectronAdapterHandler -> real/injectable backend -> observation/action evidence -> finding -> replay -> verify/regress
 ```
 
 ```text
-campaign -> scheduler -> StateFile/FileLock or SQLite state -> lease/fencing -> worker -> workflow executor -> settlement -> resume
+Windows manifest -> UIA capability -> native workflow -> adapter spawn -> RealUiaBackend -> evidence -> replay -> verify/regress
 ```
 
 ```text
-StateFile load/update/save -> temporary file -> fsync/rename -> quarantine/recovery -> concurrent reader/writer -> process death
+artifact/workflow/CLI state write -> unique temp -> flush/fsync policy -> rename -> Windows sharing violation / POSIX semantics -> reader -> crash recovery / orphan cleanup
 ```
 
 ```text
-model config -> ModelRuntime -> estimate -> budget admission -> sink start -> provider -> validation -> sink finish -> settlement -> observability
+exploration action -> checkpoint -> replay/minimization -> oracle -> evidence -> verify/regress -> fleet settlement -> resume
 ```
 
 ```text
-CLI -> workflows -> exploration -> finding/oracle -> evidence/store -> operator output -> installed package
+campaign -> scheduler -> SQLite/JSON state -> leases/fencing -> worker -> budget gate -> workflow -> settlement -> restart
 ```
 
 ```text
-finding -> source intelligence -> repair context -> PatchAgent -> isolated worktree -> verification -> resolution
+source checkout -> build/release -> installed prefix -> adapter executable resolution -> platform prerequisites -> hosted CI certification
 ```
 
-Cross-check all maps against protocol/security/ADR contracts and actual tests rather than comments alone.
+## 6. Ordered workstreams
 
-## 4. Ordered workstreams
+### H5.0 — Exact baseline, every-file census, and defect ledger
 
-### H4.0 — Establish exact current truth and durable ledger
+- Reproduce exact current baseline and query Actions for current HEAD.
+- Build the complete tracked-file audit inventory described above before broad implementation.
+- Identify all adapter-family declarations, switches, default branches, string unions, manifests, replay mappings, binary resolvers, capability tags, docs, fixtures, and tests. Search for every place a new/known adapter family can be silently collapsed to fake/default behavior.
+- Search for all `rename*`, temp-file, atomic-write, cleanup, lock/wait, checkpoint, replay, and capability-fallback implementations.
+- Record initial suspected defects separately from proven defects.
 
-- Record `270b375e...` as the planning baseline unless newer legitimate work has landed.
-- Fetch Actions run `32840538303` and its jobs/logs; record the exact clean-runner failure and all jobs that were skipped because of it.
-- Re-run or reproduce the command-resolution failure in an equivalent clean workspace when practical.
-- Classify local-vs-hosted differences honestly. The Linux unit lane is proven green at 643/643 on the H3 SHA; do not conflate that with integration certification.
-- Create stable H4 defect IDs and severities.
-- Record existing known debt separately from newly confirmed defects.
+### H5.1 — Reproduce and close Electron fleet false-execution risk
 
-### H4.1 — Clean-runner dependency and CI executable-resolution correctness
+Construct a deterministic campaign manifest with an Electron work item and an Electron-capable injected/real capability snapshot. Prove the exact current path and resulting adapter/run/evidence identity before editing.
 
-Audit `.github/workflows/ci.yml`, root/workspace package manifests, lockfile, Vitest configs, adapter-web package, Electron package, scripts, release smoke, and all commands that assume package-local CLIs are visible from the root.
+Required invariants after the fix:
 
-Required outcomes:
+- a work item accepted as `adapterFamily: electron` can never execute as fake, web, or another family without an explicit, contract-defined transformation that preserves Electron target identity;
+- every accepted adapter family is representable in the workflow layer;
+- adapter resolution is exhaustive and fail-closed: an unknown/unimplemented family returns a typed configuration/capability refusal before work starts, never a fake fallback;
+- campaign result notes, durable run adapter, environment adapter, evidence bundle, finding adapter, usage, and replay provenance all agree;
+- capability advertisement never exceeds executable capability;
+- no test-only injectable backend is reported as a real Electron field proof unless the result explicitly identifies it as injectable.
 
-- Playwright browser provisioning resolves from the package that actually owns the locked Playwright version, or the workspace dependency structure is intentionally changed so the root owns it. Do not depend on accidental node_modules layout/hoisting.
-- Browser version and downloaded runtime are exactly compatible with the test package using them.
-- The Linux unit lane remains hermetic and browser-free.
-- The Linux integration lane runs rather than being skipped.
-- Linux installed-artifact smoke and Electron Xvfb proof run when quality succeeds.
-- Windows native/path gate remains green.
-- Audit every other `pnpm exec`, package-local executable, and optional runtime installation in CI/scripts for the same class of dependency-locality bug.
-- Add a regression guard that catches workspace-executable resolution mistakes before another completion commit claims clean-CI success.
-- Do not solve this by blanket skipping tests or weakening assertions.
+Prefer compile-time exhaustiveness (`never`/exhaustive maps) over default fallthroughs where practical.
 
-### H4.2 — Canonical campaign/state schema and truth-surface integrity
+### H5.2 — Platform-complete real fleet lanes: Electron and Windows/UIA
 
-Deep-audit `.inspector/state/*`, `.agent/*`, goal adapters, `AGENTS.md`, STATUS, ROADMAP, specs/tasks, and any parser/validator consuming campaign state.
+Electron:
 
-Investigate and fix confirmed issues including:
+- thread Electron through workflow types/config, adapter binary resolution, lifecycle/start/resume, exploration engine choice, target configuration, cancellation, evidence, checkpoints, and installed-artifact resolution;
+- choose the smallest semantically correct exploration model. Electron deliberately reuses browser semantics inside its adapter, but the run must retain `adapter-electron`/Electron identity; do not masquerade it as `web-playwright` or fake;
+- prove injectable deterministic campaign coverage and real Electron/Xvfb field coverage when available;
+- prove capability-unavailable behavior when the executable/display is absent.
 
-- duplicate `completed_task_groups:` mapping keys in `campaign.yaml`;
-- ambiguity between generic `hardening:` and ad hoc `hardening3:` shapes;
-- stale verification/hosted-CI records;
-- stale or impossible prompt/campaign combinations;
-- M13's incorrect name in `AGENTS.md`;
-- historical ledger sections that still read ACTIVE after completion;
-- any state validator/parser that accepts duplicate keys or silently loses history;
-- any next-session logic that can resume a completed prompt because prose and canonical state disagree.
+Windows/UIA:
 
-Prefer one versioned, validated representation for repeated hardening campaigns. If changing the durable schema is material, add an ADR or explicit schema migration and preserve backward compatibility/history intentionally.
+- determine whether current generic native plumbing already makes Windows campaigns fully real; if yes, add missing campaign-level proof and reconcile stale debt rather than rewriting working code;
+- if gaps exist, close them through the same manifest → routing → workflow → UIA → evidence → replay chain;
+- hosted Windows CI should execute a bounded campaign-level UIA proof where runner constraints permit, not merely package-level unit tests.
 
-Add machine-checkable truth validation where justified. At minimum, a fresh checkout should be able to detect duplicate keys, impossible campaign status combinations, or state that contradicts the active handoff instead of silently choosing one source.
+### H5.3 — Electron replay, verify, regress, resume, and evidence continuity
 
-Do **not** rewrite historical evidence to make it look cleaner. Correct current status and append reconciliations.
+- Add platform-faithful Electron replay support for durable findings; use durable target/backend provenance and preserve Electron identity.
+- Verify/regress items referencing Electron producer workspaces must reproduce against Electron, never fake/web by accident.
+- Resume must restore the same adapter family/backend/target and reject incompatible provenance.
+- Test missing executable/display, malformed provenance, target drift, crash during replay, cancellation, and evidence artifact failures.
+- Ensure minimization/oracle automation-failure classification stays correct; adapter/environment failures are not target defects.
 
-### H4.3 — FileLock ownership, stale takeover, and release fencing
+### H5.4 — Adapter-family contract centralization and negative-space sweep
 
-Treat `packages/scale/src/lock.ts` as a concurrency primitive, not a helper.
+Audit all duplicated adapter-family vocabularies and switches across scale, workflows, CLI args/config, metadata, workspace spawn, exploration, replay, finding, adapters, tests, release packaging, and docs.
 
-Construct deterministic multi-process or independently-instantiated tests for:
+- Remove unsafe default-to-fake behavior where the input comes from validated product configuration.
+- Centralize only when it reduces drift without creating a dependency cycle; otherwise add repo-contract tests that force all declared families to be handled by every required layer.
+- Add a matrix/property test over every declared family covering manifest acceptance, capability requirement, executable mapping, durable adapter identity, and replay support/refusal.
+- Confirm future new adapter families cannot compile/pass CI while silently skipping one layer.
 
-1. process A acquires a lock and remains alive beyond `staleMs`;
-2. process B observes the old mtime and attempts takeover;
-3. B acquires/replaces a lock while A still has code executing;
-4. A subsequently releases;
-5. C attempts acquisition while B believes it owns the lock;
-6. process death between mkdir and owner metadata write;
-7. owner death while another process is inspecting staleness;
-8. concurrent stale takeovers;
-9. clock jumps/backwards/forwards where relevant;
-10. lock directory/owner metadata corruption or permission failure.
+### H5.5 — Cross-platform atomic-write durability completion
 
-Required invariants:
+Inventory every atomic writer, rename-based commit, orphan-temp cleanup, artifact metadata write, CLI/workflow state write, and repair/worktree write.
 
-- a previous owner can never delete a successor's lock;
-- stale takeover cannot create two simultaneous critical-section owners;
-- liveness recovery from a dead owner remains bounded;
-- ownership is explicit (token/generation/identity or another rigorously proven mechanism), not inferred solely from directory age;
-- release is ownership-checked;
-- tests are deterministic enough to catch the race repeatedly without simply increasing timeouts;
-- cross-platform semantics for Windows and POSIX are documented and tested where CI permits.
+Reproduce Windows sharing-violation behavior before broad changes. Then:
 
-If the cleanest safe resolution is to stop using this JSON lock in a production-sensitive path and rely on SQLite/advisory transactional semantics, prove migration/fallback behavior and preserve intended test/development portability. Do not perform a gratuitous rewrite.
+- create/reuse a narrow bounded retry primitive only for transient sharing violations (`EPERM`/`EACCES`/platform-equivalent proven by tests); never retry semantic/path/permission errors indefinitely;
+- preserve unique temp ownership and never allow a reader/cleanup sweep to remove a live writer's temp;
+- decide and document flush/fsync/directory-sync guarantees by artifact class rather than pretending all writes have identical durability requirements;
+- keep failures loud and typed; never silently reset or truncate state;
+- prove Windows and POSIX behavior with deterministic tests and hosted runners where possible.
 
-### H4.4 — StateFile atomicity, reader/writer races, and crash durability
+Do not rewrite SQLite-backed production state into JSON or weaken H4 fencing.
 
-Deep-audit `packages/scale/src/state-file.ts` and every consumer of the JSON state fallback.
+### H5.6 — Measured performance/resource campaign
 
-Specifically prove or disprove:
+Performance changes are evidence-gated. Establish reproducible baselines first: median plus spread/p95 where feasible, warm/cold separation, CPU/wall/IO counts where useful, and exact fixture/seed.
 
-- unlocked `load()` removing a writer's live shared `.tmp` path;
-- concurrent read during tmp write and rename;
-- multiple StateFile instances sharing one path;
-- `save()` being called directly without lock ownership;
-- failure between open/write/fsync/close/rename;
-- process death after rename but before directory durability on POSIX;
-- leftover temporary-file recovery after a genuine crash versus removal of a live writer's temp;
-- quarantine rename racing another reader/writer/quarantine;
-- malformed/semantically corrupt JSON under concurrent access;
-- Windows rename/share semantics versus POSIX unlink semantics;
-- unique temp naming and cleanup behavior if adopted.
+Priority targets:
 
-Required invariants:
+1. web exploration/replay 4–6 minute E2E cost;
+2. repeated SQLite prepare/query hot paths;
+3. ledger aggregation/fingerprint recomputation;
+4. state/artifact temp sweeps;
+5. checkpoint frequency and serialization cost;
+6. CI dependency/cache opportunities that do not hide hermeticity bugs;
+7. synchronous FileLock waiting only if it appears in a real hot path.
 
-- readers cannot invalidate in-flight writes;
-- two writers cannot both believe they committed the same generation;
-- a completed mutation is either durably visible or recovery reports an honest typed failure; never silently reset;
-- crash debris cannot be mistaken for current truth;
-- quarantine preserves evidence without racing active valid state;
-- direct/public API surfaces cannot bypass required serialization accidentally;
-- tests explicitly exercise process/race boundaries rather than only single-process mocks.
+The preserved H4 speculative patch is not an implementation plan. For every idea recovered from it, create an independent benchmark/hypothesis, cherry-pick/reimplement only the minimal proven change, and discard anything that weakens crash recovery, cancellation, checkpoint continuity, evidence determinism, CI clean-runner behavior, or test isolation.
 
-If directory fsync is required for the repository's stated durability contract on POSIX, implement and test it where supported; otherwise narrow/document the contract truthfully.
+Do not delete correctness checkpoints merely for speed. If coalescing/checkpoint reduction is considered, inject crashes at every newly enlarged window and prove bounded recovery/replay equivalence.
 
-### H4.5 — Scheduler/lease/settlement transitive regression campaign
+### H5.7 — Truth surfaces, stale debt, OpenSpec, and operator semantics
 
-Any FileLock/StateFile changes can alter the H2/H3 fleet invariants. Re-audit unchanged callers and repeat deterministic torture around:
+- Reconcile `docs/STATUS.md`, `docs/ROADMAP.md`, `AGENTS.md`, `.inspector/state/*`, release/dogfood reports, comments, and task/spec claims against actual H5 results.
+- Preserve historical statements as history, but correct current debt surfaces that still say real Electron proof is unavailable when hosted Xvfb has succeeded.
+- Keep M8 iOS environment-deferred unless a genuine macOS/Xcode/simulator becomes available. Do not emulate success through mocks.
+- Do not invent M14 and do not release/tag/publish.
+- Keep the OpenSpec tasks/deltas synchronized as findings change. Archive/sync only after completion.
 
-- two controllers over one state directory;
-- heartbeat renewal under lock contention;
-- generation/fencing loss;
-- stale completion;
-- external holds;
-- pending settlement journal replay;
-- stop/SIGINT/max-wall transitions;
-- crash at claim, heartbeat, completion, and settlement boundaries;
-- JSON fallback and SQLite production-default parity where contracts are shared.
+### H5.8 — Adversarial matrix, soak, and flake classification
 
-Required invariants remain: zero duplicate execution, zero stale completion, no false success, truthful blocked/refused states, bounded recovery, and no process-level timer exception.
+Run targeted property/state-machine/multi-process campaigns for:
 
-Do not undo HARDENING_3's generation-fencing semantics to make tests pass.
-
-### H4.6 — HARDENING_3 model-runtime changed-code dependent audit
-
-Re-review the H3 changes in `packages/model-runtime`, `packages/scale` model budgets, SQLite model-call persistence, CLI/workflows, exploration/oracle/repair consumers, and unchanged observability code.
-
-Do not assume H3's targeted tests exhausted the blast radius. Check at minimum:
-
-- logical-request stats versus per-attempt stats (`requests`, `attempts`, `completed`, `failed`, `fallbacksUsed`, `denials`, `storeErrors`);
-- whether `fallbacksUsed` means a fallback actually occurred rather than merely that an attempt failed;
-- failure counters under retry, final exhaustion, cancellation, deadline, malformed response, budget denial, gate failure, and sink failure;
-- partial explicit estimates (one field present, another absent) versus provider/default conservative estimates;
-- provider health exceptions and deterministic candidate ordering;
-- late provider completion after runtime timeout/cancellation and conservative accounting;
-- sink `start`/`finish` failures and persisted truth;
-- concurrent budget admissions/settlements across global/worker/item scopes;
-- restart reconciliation and observability parity.
-
-Fix only confirmed contract violations and add regression tests. If aggregate-stat semantics are ambiguous, resolve them in types/docs/ADR and consumers together rather than guessing.
-
-### H4.7 — Whole-repository negative-space sweep
-
-After the concrete H4 defects are understood, perform a repository-wide adjacent-defect sweep. This is mandatory and must not be limited to files touched by H3/H4.
-
-Audit every authored package and major system surface for the **same classes** of failure:
-
-- ownership released by a stale actor;
-- temp/shared-file names without ownership;
-- state writes outside their serialization boundary;
-- clean-runner dependencies resolved only by local-machine layout;
-- completion/status claims not backed by exact-tree evidence;
-- duplicate schema keys/fields or last-writer-wins history loss;
-- timer/background callbacks that can throw outside normal error containment;
-- cancellation/deadline promises whose late completion mutates state;
-- package-local executables assumed globally available;
-- platform-specific filesystem semantics hidden by single-OS tests;
-- installed-artifact behavior diverging from source-workspace behavior.
-
-Trace effects through adapter-web, adapter-sdk, Android, CLI/PTTY, Electron, Windows/UIA, core, explore, finding, oracle, repair, artifact store, SQLite store, protocol, workflows, scale, scripts, and release/build configuration.
-
-This is not permission for cosmetic refactors. Prefer evidence-backed fixes with explicit blast-radius tests.
-
-### H4.8 — Performance/resource and cleanup verification
-
-Measure the touched durability/concurrency paths under contention and repeated campaigns. Check for:
-
-- event-loop stalls from synchronous lock waiting;
-- unbounded polling/spin;
-- leaked timers/handles/processes/browser instances;
-- temp/lock/quarantine artifact accumulation;
-- pathological filesystem latency amplification;
-- repeated Playwright/browser downloads or CI cache misuse;
-- regression in the already-known expensive web replay path.
-
-Optimize only where measurements show a meaningful problem or the design blocks correctness. Do not trade correctness for benchmark wins.
-
-### H4.9 — Exact-tree local certification
-
-Before the completion commit, run the strongest applicable local gates on the exact tree:
-
-- `pnpm install --frozen-lockfile`;
-- lint;
-- typecheck;
-- complete unit suite;
-- complete integration suite;
-- installed-artifact/release smoke;
-- targeted FileLock/StateFile multi-process/race/crash tests;
-- H2/H3 fleet concurrency tests repeatedly;
-- model-runtime/model-budget targeted tests and property/state-machine tests;
-- platform-real proofs available on the host, with unavailable hardware/runtime classified honestly rather than faked.
-
-No Critical/High regression may remain open. Medium/Low debt may remain only with explicit evidence, impact, and rationale.
-
-### H4.10 — Hosted CI certification and truthful completion
-
-After code/state/docs are ready:
-
-1. Commit and push to `main` without force-pushing.
-2. Query the Actions run for the **exact pushed SHA** through the public GitHub API/tooling.
-3. Verify the Linux quality job proceeds through browser provisioning and full integration.
-4. Verify Linux installed-artifact smoke runs and passes.
-5. Verify Electron Xvfb real-runtime job runs and passes or produces a newly evidenced environment-class blocker.
-6. Verify the Windows path/native gate remains green.
-7. If a required lane is red, retrieve the logs, classify the failure, repair it, rerun local gates, push the fix, and certify the new exact SHA. Do not label the campaign COMPLETE while required hosted CI is red.
-8. Avoid the circular-truth trap: repository state written *before* the final push may say hosted verification is pending for that exact commit. After the final push becomes green, do not create a documentation-only commit merely to write “green,” because that would create a new uncertified SHA. Record the green final run in the executor's completion report and make future sessions query Actions for the current SHA. A later substantive commit must earn its own certification.
-
-Hosted CI is part of the completion gate now. “gh is unauthenticated” is not an acceptable reason to skip public Actions inspection.
-
-## 5. Constraints and non-goals
-
-- Stay on `main` unless the live repository policy has legitimately changed; preserve newer work.
-- No force-push.
-- No release, tag, package publication, deployment, or external destructive action.
-- Do not invent M14.
-- Do not resume M8 without an actual macOS/Xcode/simulator environment and an explicit activation decision.
-- Do not weaken tests, add blanket skips, or raise timeouts as the primary race fix.
-- Do not replace SQLite production state with JSON state merely to simplify tests.
-- Do not erase historical hardening/milestone evidence.
-- Do not treat local green tests as proof of clean-host CI.
-- Do not treat comments/docs as authoritative when live source/state/CI contradict them.
-- Do not broaden into unrelated feature development.
-
-## 6. Acceptance and completion gates
-
-HARDENING_4 is complete only when all of the following are true:
-
-1. Exact-current-state baseline and H4 ledger are durable.
-2. The clean-runner Playwright executable-resolution defect is closed with regression coverage and the final hosted Linux integration actually runs.
-3. Campaign/state YAML is unambiguous and parser-validated; no duplicate-key history-loss path remains.
-4. Active/completed prompt, AGENTS, STATUS, checkpoint, roadmap, and canonical state agree on current campaign/milestone truth without rewriting history.
-5. FileLock stale takeover/release ownership is proven safe or redesigned so stale owners cannot delete successors; deterministic race coverage exists.
-6. StateFile temp/recovery/quarantine and reader/writer atomicity are proven safe across applicable platform semantics; confirmed races are fixed.
-7. H2/H3 fleet ownership, liveness, settlement, cancellation, and restart invariants remain green after durability changes.
-8. H3 model-runtime/budget changes have a transitive dependent audit; any confirmed counter/accounting/fallback defects are fixed and documented.
-9. Whole-repository adjacent-defect sweep is completed and evidence recorded.
-10. Full local gates and installed-artifact smoke pass on the completion tree.
-11. Required GitHub Actions jobs for the exact final pushed SHA complete green. Any true environment deferral is explicit, independently evidenced, and allowed by existing contracts.
-12. No unresolved Critical/High defect remains.
-13. H4 durable state is marked COMPLETE only after its actual gates are satisfied; M13 remains historical COMPLETE; M8 remains DEFERRED_ENVIRONMENT; no new implementation milestone/release is inferred.
-14. Final commit message is a detailed session report: baseline, defects, root causes, fixes, regression proofs, gate counts, environment classifications, remaining debt, exact final SHA/run, and next native continuation state.
-15. Push all authorized repository changes to `origin/main` and verify the remote branch points at the expected final SHA.
-
-## 7. Executor continuation behavior
-
-Proceed autonomously from this ACTIVE prompt. Do not ask for routine approval between workstreams. Update durable state at meaningful waypoints and keep the defect ledger current. If a task exposes a Critical/High regression anywhere in its transitive blast radius, fix it before moving on.
-
-If a genuinely blocking condition requires unavailable credentials, destructive external authority, a product decision not resolved by existing contracts, or hardware/OS that cannot reasonably be emulated, record the exact blocker and continue all independent work. Mark the campaign BLOCKED only when no safe unblocked work remains.
-
-At successful completion: reconcile state/docs, commit, push, verify `origin/main`, inspect hosted CI for the final SHA, and report the evidence. Do not publish a release or tag.
+- all adapter families and unknown-family refusal;
+- parallel fleet items across fake/web/CLI/Windows/Android/Electron where environments permit;
+- cancellation at start/observe/action/checkpoint/evidence/settlement boundaries;
+- lease loss and stale completion during slow platform operations;
+- crash/restart around Electron/native lifecycle and atomic renames;
+- malformed/stale replay provenance;
+- executable/display/ADB/UIA disappearance mid-item;
+- artifact/temp cleanup races;
+- model assistance remaining web-only by explicit contract unless deliberately expanded.
+
+Every flake classification needs bounded reproduction evidence. Do not solve red tests by increasing timeouts or skipping assertions without proving environment causality.
+
+### H5.9 — Exact-tree certification
+
+Local/available environment gate on the exact final tree:
+
+```text
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm --filter @inspector/adapter-web provision:browser
+pnpm test:integration
+pnpm release:smoke
+```
+
+Also run targeted Windows, Electron, fleet, replay, atomic-write, and performance suites introduced by H5.
+
+Push normal commits to `main` without force. Then query GitHub Actions for the exact pushed SHA and require all intended lanes to actually execute—not merely be skipped. A completion report that refers to an older SHA is not certification of the current one.
+
+## 7. Acceptance gates
+
+HARDENING_5 may be marked COMPLETE only when all are true:
+
+1. the every-file audit census proves every tracked authored file was reviewed or explicitly justified as non-authored/generated;
+2. the Electron accepted/routed-to-fake contradiction is deterministically reproduced and closed with regression coverage;
+3. no declared adapter family can silently fall through to fake/default execution;
+4. Electron campaign hunt/explore is real and identity-faithful, with honest environment refusal when prerequisites are absent;
+5. Electron verify/regress/replay and resume either work platform-faithfully or are rejected at preflight by an explicit narrowed product contract—never accepted then mis-executed;
+6. Windows/UIA has an end-to-end campaign proof or an evidence-backed environment deferral reflected consistently in truth surfaces;
+7. cross-platform atomic-write debt is either closed where violations are reproducible or narrowed/documented with tests showing why unaffected writers are safe;
+8. performance work has recorded before/after evidence; no speculative patch is landed wholesale and no correctness gate/checkpoint is weakened for speed;
+9. all Critical/High defects discovered during the campaign are CLOSED; lower-severity debt is explicitly recorded with rationale;
+10. installed-artifact behavior matches source-workspace behavior for changed fleet/platform paths;
+11. OpenSpec artifacts and durable campaign/checkpoint state match implementation truth;
+12. local gates pass on the exact final tree;
+13. hosted CI passes on the exact pushed final implementation SHA with expected Linux, Windows, installed-artifact, Electron, and integration steps actually executed;
+14. no release, tag, deployment, destructive external action, or force-push occurred.
+
+## 8. Git/reporting requirements
+
+- Work directly on persistent `main` per `AGENTS.md`; disposable worktrees/branches may be used only locally and must not be left as persistent campaign branches.
+- Pull/reconcile before each push if origin moved. Never force-push.
+- Commit coherent verified slices; include durable state/checkpoint updates with the slice when practical.
+- The final commit message must be a detailed session report: baseline SHA/CI, every-file census counts, confirmed defect table with severities/root causes/fixes/tests, performance before/after data, exact local gate counts, hosted run/job IDs on the certified SHA, environment deferrals, remaining debt, and explicit statement that no release/tag/publication occurred.
+- Push the completed state so the next agent can rehydrate from Git alone.
+
+When this prompt and the OpenSpec artifacts differ, the stricter safety/correctness requirement wins; update both before proceeding if a material contradiction is found.
