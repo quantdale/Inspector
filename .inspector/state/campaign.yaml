@@ -497,6 +497,7 @@ hardening4:
     - H4-D5 HIGH statefile-shared-tmp-sweep-vs-live-writer: CLOSED
     - H4-D6 LOW truth-surface-drift-hosted-ci-uninspectable-claim: CLOSED
     - H4-D7 MEDIUM modelruntime-stats-fallbacksused-semantics: CLOSED
+    - H4-D8 MEDIUM pty-spawn-nonexistent-posix-parity: CLOSED
 
 hardening1_history:
   campaign: HARDENING_1

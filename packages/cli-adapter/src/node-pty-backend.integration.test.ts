@@ -73,8 +73,11 @@ describe.skipIf(!ptyAvailable)("NodePtyBackend (real PTY)", () => {
     expect(await pollUntil(() => backend.isAlive(k.id), false, 5000)).toBe(false);
   });
 
-  it("rejects spawn of a nonexistent program with a clear error", async () => {
+  it("rejects spawn of a nonexistent program with a clear error on every platform", async () => {
     const backend = new NodePtyBackend();
+    await expect(backend.spawn("definitely-not-a-real-program-xyz")).rejects.toThrow(/pty spawn failed/i);
+    // HARDENING_4 H4-D8 regression: the failure is decided BEFORE a session
+    // id exists — the POSIX fork/exec async-ENOENT gap must not leak through.
     await expect(backend.spawn("definitely-not-a-real-program-xyz")).rejects.toThrow(/pty spawn failed/i);
   });
 });

@@ -159,6 +159,23 @@ Lifecycle: SUSPICION → EVIDENCE → SEVERITY → REGRESSION TEST → FIX → C
   anti-circular-truth rule, no documentation-only "green" commit is created
   after the fact; future sessions query Actions for the current HEAD SHA.
 
+### H4-D8 MEDIUM — NodePtyBackend.spawn resolved a doomed session on POSIX for nonexistent programs (platform-semantics parity) — CLOSED
+
+- Evidence: hosted run 32934944139, job 98074279721 — the FIRST Linux
+  integration execution ever to run (H3's runs died at unit/provisioning)
+  failed `node-pty-backend.integration.test.ts > rejects spawn of a
+  nonexistent program`: promise RESOLVED {id:'pty-0'} instead of rejecting.
+  Windows CreateProcess fails synchronously; POSIX fork/exec discovers
+  ENOENT only inside the child. Single-OS test hid the divergence.
+- Fix: resolveExecutablePath() performs the shell-equivalent PATH lookup
+  before pty.spawn and fails fast with the same typed 'pty spawn failed'
+  error on every platform; no session id is minted for a doomed spawn; no
+  assertion weakened.
+- Regression proof: test asserts rejection twice (idempotent typed failure);
+  full cli-adapter integration suite 9/9 green locally incl. real PTY
+  round-trip, VT viewport, conformance, exit-wedge; cli.hardening unit
+  10/10; typecheck PASS.
+
 ## H4.6 Model-runtime dependent audit (2026-08-25) — DONE
 
 Scope: every H3-changed behavior in @inspector/model-runtime plus its

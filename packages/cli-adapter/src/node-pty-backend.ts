@@ -1,8 +1,39 @@
 import type { PtyBackend, PtySession, TerminalSnapshot } from "./types.js";
 import { VirtualTerminal } from "./vt-screen.js";
+import { existsSync, statSync } from "node:fs";
+import { delimiter, join, sep } from "node:path";
 
 export const DEFAULT_TERMINAL_ROWS = 24;
 export const DEFAULT_TERMINAL_COLS = 120;
+
+/**
+ * Resolve `program` the way a shell would before handing it to the PTY.
+ *
+ * Platform-semantics parity (HARDENING_4 H4-D8): Windows ConPTY fails a
+ * nonexistent program SYNCHRONOUSLY at CreatePseudoConsole/CreateProcess,
+ * while POSIX fork/exec only discovers ENOENT asynchronously inside the
+ * child — so `spawn("nonexistent")` rejected on Windows but resolved a
+ * doomed session id on Linux (surfaced by hosted run 32934944139's first
+ * Linux integration execution). Pre-resolving here gives every platform the
+ * same fast, typed failure without racing the child's fate.
+ */
+export function resolveExecutablePath(program: string): string | undefined {
+  const candidates = program.includes(sep) || program.includes("/")
+    ? [program]
+    : (process.env.PATH ?? "")
+        .split(delimiter)
+        .filter((dir) => dir.length > 0)
+        .map((dir) => join(dir, program));
+  for (const candidate of candidates) {
+    try {
+      // Directories on PATH must not satisfy the lookup; only real files do.
+      if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    } catch {
+      /* unreadable entry: keep searching */
+    }
+  }
+  return undefined;
+}
 
 /**
  * Guarded shutdown for hosts that used the real PTY backend. Arms an
@@ -54,6 +85,9 @@ export class NodePtyBackend implements PtyBackend {
     }
     let proc: import("@lydell/node-pty").IPty;
     try {
+      if (resolveExecutablePath(program) === undefined) {
+        throw new Error(`executable not found (PATH lookup failed)`);
+      }
       proc = pty.spawn(program, args, {
         name: "xterm-color",
         cols: DEFAULT_TERMINAL_COLS,
