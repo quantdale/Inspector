@@ -16,7 +16,7 @@ Generated, vendored (node_modules/dist/etc.), and cache artifacts are excluded b
 | agent-tool-config | 8 | R (reviewed) |
 | docs | 28 | R (reviewed) |
 | dogfood | 8 | R (reviewed) |
-| inspector-docs | 10 | R (reviewed) |
+| inspector-docs | 11 | R (reviewed) |
 | inspector-evidence-logs | 64 | R (reviewed) |
 | inspector-other | 40 | R (reviewed) |
 | inspector-state-schemas | 5 | R (reviewed) |
@@ -27,11 +27,11 @@ Generated, vendored (node_modules/dist/etc.), and cache artifacts are excluded b
 | package-tests | 114 | R (reviewed) |
 | root-config | 9 | R (reviewed) |
 | root-docs | 2 | R (reviewed) |
-| scripts | 2 | R (reviewed) |
+| scripts | 4 | R (reviewed) |
 | specs | 27 | R (reviewed) |
-| **TOTAL** | **527** | R=527 E=0 |
+| **TOTAL** | **530** | R=530 E=0 |
 
-Invariant check: tracked=527 == reviewed(527) + excluded(0) -> True.
+Invariant check: tracked=530 == reviewed(530) + excluded(0) -> True.
 
 ## Enumerated dispositions
 
@@ -160,6 +160,7 @@ Each line: `path | category | code | note`.
 | .inspector/state/DOGFOOD-RC1.yaml | inspector-state-schemas | R | durable state schema/ledger |
 | .inspector/state/GA-READINESS.yaml | inspector-state-schemas | R | durable state schema/ledger |
 | .inspector/state/HARDENING-CHECKPOINT.md | inspector-docs | R | campaign checkpoint/ledger doc |
+| .inspector/state/HARDENING_5-AUDIT.md | inspector-docs | R | campaign checkpoint/ledger doc |
 | .inspector/state/RC1-RELEASE-MANIFEST.md | inspector-docs | R | campaign checkpoint/ledger doc |
 | .inspector/state/README.md | inspector-docs | R | campaign checkpoint/ledger doc |
 | .inspector/state/RELEASE-CHECKPOINT.md | inspector-docs | R | campaign checkpoint/ledger doc |
@@ -535,6 +536,8 @@ Each line: `path | category | code | note`.
 | pnpm-lock.yaml | root-config | R | root config/manifest |
 | pnpm-workspace.yaml | root-config | R | root config/manifest |
 | scripts/build-release.mjs | scripts | R | build/release script |
+| scripts/gen_audit_census.py | scripts | R | build/release script |
+| scripts/perf-bench.ts | scripts | R | build/release script |
 | scripts/release-smoke.mjs | scripts | R | build/release script |
 | specs/000-foundation/SPEC.md | specs | R | spec artifact |
 | specs/000-foundation/TASKS.md | specs | R | spec artifact |
@@ -569,10 +572,10 @@ Each line: `path | category | code | note`.
 
 ## Reconciliation
 
-- tracked (git ls-files): 527
-- reviewed (R): 527
+- tracked (git ls-files): 530
+- reviewed (R): 530
 - excluded (E): 0
-- R + E = 527 == tracked 527: True
+- R + E = 530 == tracked 530: True
 
 ## System maps (referenced)
 
