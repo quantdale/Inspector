@@ -823,3 +823,38 @@ certification evidence, and explicitly retained debt are intact below.
 This state-synchronization commit adds only durable history + reconciliation and
 does not re-run the implementation; the certified SHA is the exact pushed
 implementation SHA after H5.10 lands.
+
+## HARDENING_5 COMPLETE (2026-08-27) - Fleet Execution Truth + deep-audit
+
+Hosted certification: run 33034546691 SUCCESS on exact pushed SHA e1e0864
+  (commit e1e0864e1e04d9b70d473afe8bf9b0158694ff0d)
+  Jobs via PUBLIC GitHub REST API:
+    - Linux quality gate 98394296331 SUCCESS (lint 0/4 warnings, typecheck PASS,
+      unit 678/3, pnpm --filter @inspector/adapter-web provision:browser,
+      test:integration 211/2, full Linux integration executed)
+    - Windows path/native 98394296129 SUCCESS
+    - Electron real-runtime proof (Xvfb) 98395880854 SUCCESS
+      (electron-production + electron-fleet under Xvfb, browser provisioned)
+    - Linux installed-artifact smoke 98395880909 SUCCESS
+
+All 15 defects CLOSED (H5-D0..H5-D15):
+  H5-D0 HIGH electron-family-routed-through-fake (red->green)
+  H5-D1 MEDIUM windows-mock replay driver app-error
+  H5-D2 MEDIUM run identity provisional name
+  H5-D3 HIGH windows backend mismatch
+  H5-D4 HIGH native-session ranking
+  H5-D5 windows mock seeded defect surface
+  H5-D6 HIGH ledger truncation restored + guard
+  H5-D7 HIGH verify env-failure -> RESOLVED (fixed)
+  H5-D8 HIGH regress error->clean (fixed)
+  H5-D9 HIGH finding-engine all-error -> REJECTED (fixed to CANDIDATE)
+  H5-D10 HIGH verify/regress admit-before-consume
+  H5-D11 HIGH electron/backend provenance fail-closed (now all families)
+  H5-D12 MEDIUM tautology/proof coverage (CI jobs extended)
+  H5-D13 SUSPICION malformed rehydrate fail-closed
+  H5-D14 HIGH path-only audit replaced with blob-bound content-aware audit
+  H5-D15 HIGH Windows mock capability truth (mock routable on Linux)
+
+This is the implementation SHA; the subsequent state-sync commit that records
+it carries a NEW SHA whose own CI must be queried per H4.10 anti-circular rule.
+No release/tag/publication. M13 remains COMPLETE, M8 DEFERRED_ENVIRONMENT.

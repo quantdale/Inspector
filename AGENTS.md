@@ -14,7 +14,8 @@ campaigns (RC1 field validation and M9-M12 are complete; M8 iOS remains
 `DEFERRED_ENVIRONMENT`). No implementation milestone campaign is currently
 ACTIVE. **HARDENING_5** (Fleet Execution Truth, extended through deep-audit
 verification-outcome-truth, replay-backend-provenance, and durable-history-
-integrity correction — defects H5-D0..H5-D13) is ACTIVE per
+integrity correction — defects H5-D0..H5-D15) is **COMPLETE (2026-08-27;
+hosted certification run 33034546691 SUCCESS on exact pushed SHA `e1e0864`)** per
 `.agent/EXECUTION_PROMPT.md` and `.inspector/state/campaign.yaml`; its
 completion gate (all Critical/High defects CLOSED, hosted CI verified on the
 exact pushed SHA) must pass before any COMPLETE claim. Continue only when the

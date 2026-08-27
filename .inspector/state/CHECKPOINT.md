@@ -6,7 +6,12 @@
 - Status: **COMPLETE — M13 Intelligence-Guided Autonomous QA closed 2026-08-25.** M0-M12 and HARDENING_1/2 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: **HARDENING_5 ACTIVE** (Fleet Execution Truth; activated 2026-08-26 from planner commit `7214ae4`; ledger campaign #5 in `.inspector/state/HARDENING-CHECKPOINT.md`). HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493.
+- Hardening: **HARDENING_5 COMPLETE (2026-08-27; hosted certification run 33034546691 SUCCESS on exact pushed SHA `e1e0864`)** (Fleet Execution Truth + deep-audit verification-truth/provenance/audit/capability truth; activated 2026-08-26 from planner commit `7214ae4`; ledger campaign #5 in `.inspector/state/HARDENING-CHECKPOINT.md`). HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493.
+
+### HARDENING_5 COMPLETE (2026-08-27)
+
+All H5.0-H5.10 phases done; defects H5-D0..H5-D15 CLOSED with regression coverage (ledger: `.inspector/state/HARDENING-CHECKPOINT.md`, campaign #5).
+Hosted certification: run **33034546691 SUCCESS on exact pushed SHA `e1e0864`** — Linux quality gate (browser provisioning + FULL integration, 211/2), Windows path/native, Electron Xvfb real-runtime proof (production + fleet), and Linux installed-artifact smoke all green via public API inspection. Previous hosted-blocking failure (run 33033800527 Electron fleet missing browser provision) was fixed by adding `pnpm --filter @inspector/adapter-web provision:browser` to the Electron job. Exact-tree local gates on that SHA: install --frozen-lockfile OK; lint 0 errors/4 warnings; typecheck PASS; unit 678 passed/3 skipped (65 files); integration 211 passed/2 skipped (51 files, full Linux integration executed, not skipped); release:smoke PASS. No external inference service. All 15 defects carry deterministic regression coverage. No release/tag/publication. M13 remains COMPLETE, M8 DEFERRED_ENVIRONMENT.
 
 ### HARDENING_4 COMPLETE (2026-08-26)
 

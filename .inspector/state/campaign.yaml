@@ -521,8 +521,9 @@ hardening4:
 
 hardening5:
   campaign: HARDENING_5
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-26"
+  completed_at: "2026-08-27"
   base_commit: 217165cd4a6c39c0726b12b01edf2c6c4056a6e1
   base_note: HARDENING_4 COMPLETE state-synchronization HEAD (planning baseline)
   activated_by: .agent/EXECUTION_PROMPT.md (planner commit 7214ae4, pulled fast-forward from 217165c)
@@ -553,7 +554,35 @@ hardening5:
     - {id: H5.7, name: measured-runtime-efficiency, state: DONE}
     - {id: H5.8, name: negative-space-soak-installed-artifact, state: DONE}
     - {id: H5.9, name: truth-reconciliation-certification, state: DONE}
-    - {id: H5.10, name: deep-audit-verification-truth-provenance, state: IN_PROGRESS}
+    - {id: H5.10, name: deep-audit-verification-truth-provenance, state: DONE}
+  hosted_certification:
+    exact_pushed_sha: e1e0864e1e04d9b70d473afe8bf9b0158694ff0d
+    run_id: 33034546691
+    run_attempt: 1
+    conclusion: SUCCESS
+    inspected_at: "2026-08-27"
+    method: PUBLIC GitHub REST API (unauthenticated)
+    jobs:
+      - {id: 98394296331, name: Linux quality gate, conclusion: SUCCESS,
+        proof: "lint 0 errors/4 warnings, typecheck PASS, unit 678 passed/3 skipped (65 files), pnpm --filter @inspector/adapter-web provision:browser success, test:integration 211 passed/2 skipped (51 files, full Linux integration executed)"}
+      - {id: 98394296129, name: Windows path/native gate, conclusion: SUCCESS,
+        proof: "typecheck PASS, hardening suites, CLI UIA/PTY integration, windows-campaign campaign proof, electron-production, release:smoke SUCCESS"}
+      - {id: 98395880854, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS,
+        proof: "xvfb-run electron-production.integration.test.ts PASS + electron-fleet.integration.test.ts PASS (INJECTABLE backend, browser provisioned)"}
+      - {id: 98395880909, name: Linux installed-artifact smoke, conclusion: SUCCESS,
+        proof: "clean installed prefix: --version, doctor, fake hunt/explore, findings/runs/campaign list/validate/run/show, models summary, invalid-provider refusal"}
+    anti_circular_truth_note: >-
+      The state-synchronization commit that records this certification has a
+      NEW SHA whose own Actions result is not certified by itself; future
+      sessions must query Actions for the current HEAD SHA per the H4.10
+      rule. No documentation-only 'green' commit was created between the
+      certified SHA and this record beyond the required durable-state truth.
+  last_local_gate: >-
+    PASS on exact tree 5961617+e1e0864: install --frozen-lockfile OK; lint
+    0 errors/4 warnings; typecheck PASS; unit 678 passed/3 skipped (65 files);
+    integration 211 passed/2 skipped (51 files, full Linux integration including
+    windows-campaign and verify-regress-truth, electron-fleet under Xvfb where
+    browser provisioned); release:smoke PASS.
   defects:
     - >-
       H5-D0 CONFIRMED HIGH (CLOSED 2026-08-26) electron-family-routed-through-

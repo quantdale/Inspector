@@ -1,17 +1,15 @@
 # Project Status
 
-Last updated: HARDENING_5 ACTIVE (2026-08-26 deep-audit verification-truth /
-provenance-integrity correction; HARDENING_4 COMPLETE hosted-certified run
-32936068493 on f687ef1)
+Last updated: HARDENING_5 COMPLETE (2026-08-27 hosted certification run 33034546691 SUCCESS on e1e0864; 15 defects H5-D0..H5-D15 CLOSED; prior HARDENING_4 run 32936068493 on f687ef1)
 
 ## Campaign
 
 - Mode: **HARDENING_5 — Fleet Execution Truth, extended through deep-audit
   verification-outcome-truth, replay-backend-provenance, and durable-history-
-  integrity correction** (ACTIVE per `.agent/EXECUTION_PROMPT.md` and
-  `.inspector/state/campaign.yaml`; ledger: `.inspector/state/HARDENING-
-  CHECKPOINT.md`, campaign #5). Prior hardening campaigns below are retained as
-  historical records.
+  integrity correction** (COMPLETE 2026-08-27 per `.agent/EXECUTION_PROMPT.md`
+  and `.inspector/state/campaign.yaml`; hosted run 33034546691 SUCCESS on e1e0864;
+  ledger: `.inspector/state/HARDENING-CHECKPOINT.md`, campaign #5). Prior hardening
+  campaigns below are retained as historical records.
 
 - Mode: **HARDENING_4 — certification integrity, durable-state atomicity,
   cross-process ownership fencing** (separately invoked via
