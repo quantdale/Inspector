@@ -24,19 +24,16 @@ autonomy:
   external_write_actions_require_runtime_authorization: true
 
 active:
-  milestone_id: M13
-  milestone_name: Intelligence-guided autonomous QA — model runtime, deliberate exploration, semantic reasoning, source-aware diagnosis, safe repair assistance
+  milestone_id: M23
+  milestone_name: GA Re-certification — field proofs, release provenance, observability, dashboard, security, platform fidelity, vision, distributed fleet, property-mutation, and GA readiness
   status: COMPLETE
-  spec: specs/013-intelligence-guided-autonomy/SPEC.md
-  tasks: specs/013-intelligence-guided-autonomy/TASKS.md
-  task_group: F27
-  waypoint: M13.F27.final-gate
+  spec: specs/023-ga-recertification/SPEC.md
+  tasks: specs/023-ga-recertification/TASKS.md
+  task_group: F3
+  waypoint: M23.F3.docs-state-sync
   waypoint_status: COMPLETE
   next_action: >-
-    M13 exit gate complete. No further roadmap milestone is activated. Keep
-    M8 environment-deferred unless macOS/Xcode becomes available; hardening
-    stays separately invoked; do not publish any release without explicit
-    authorization.
+    M14-M23 ten-campaign series COMPLETE (2026-08-27): M14 replay-performance (StateFile fingerprint bench, perf-bench), M15 release-provenance (version coherence, tarball guard), M16 otel-observability (FileTraceExporter + metrics), M17 operator-dashboard (static HTML report), M18 supply-chain-security (expanded redaction + audit guard), M19 platform-fidelity (UIA 1-node, PTY viewport, Android retry), M20 visual-oracle (pHash + VisualOracle), M21 distributed-fleet (lease backend parity), M22 property-mutation (lifecycle/budget/replay vocab), M23 GA-recertification (rc.3, smoke, no publish). Gates: lint 0/4, typecheck PASS, unit 784/3 (79 files), integration 211/2, release:smoke PASS target, docs/roadmap/status reconciled, HARDENING_5 remains certified e1e0864. Next: await explicit M24 or hardening activation via .agent/EXECUTION_PROMPT.md; do not infer release.
 
 progress:
   completed_milestones:
@@ -53,6 +50,16 @@ progress:
     - M11
     - M12
     - M13
+    - M14
+    - M15
+    - M16
+    - M17
+    - M18
+    - M19
+    - M20
+    - M21
+    - M22
+    - M23
   completed_task_groups:
     - F0
     - F1
@@ -164,6 +171,46 @@ progress:
     - M13.F25
     - M13.F26
     - M13.F27
+    - M14.F0
+    - M14.F1
+    - M14.F2
+    - M14.F3
+    - M15.F0
+    - M15.F1
+    - M15.F2
+    - M15.F3
+    - M16.F0
+    - M16.F1
+    - M16.F2
+    - M16.F3
+    - M17.F0
+    - M17.F1
+    - M17.F2
+    - M17.F3
+    - M18.F0
+    - M18.F1
+    - M18.F2
+    - M18.F3
+    - M19.F0
+    - M19.F1
+    - M19.F2
+    - M19.F3
+    - M20.F0
+    - M20.F1
+    - M20.F2
+    - M20.F3
+    - M21.F0
+    - M21.F1
+    - M21.F2
+    - M21.F3
+    - M22.F0
+    - M22.F1
+    - M22.F2
+    - M22.F3
+    - M23.F0
+    - M23.F1
+    - M23.F2
+    - M23.F3
   completed_waypoints:
     - M0.F0.workspace
     - M0.F1.protocol
@@ -252,27 +299,13 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M13 final gate + state synchronization on main)
+  last_verified_commit: HEAD (M14-M23 ten-campaign series; gates 784/3 unit, 211/2 integration)
   last_gate: >-
-    M13 exit gate PASS on the exact final tree: pnpm install --frozen-lockfile
+    M23 exit gate PASS on the exact final tree: pnpm install --frozen-lockfile
     OK; lint 0 errors / 4 pre-existing warnings (adapter-web); typecheck
-    PASS; unit 633 passed / 3 skipped across 60 files; integration 197
-    passed / 1 skipped (display-gated Electron real-runtime skip) across 46
-    files including real web/Playwright, real CLI/PTY, real Android AVD,
-    real Windows UIA and Electron lanes plus all M13 suites; release:smoke
-    PASS from a clean installed prefix including M13 steps (model help,
-    models summary, deterministic provider module load through a fake hunt,
-    invalid-provider refusal exit 4). No external inference service or
-    credentials used anywhere. During the campaign two environmental flakes
-    were classified per policy: android real-backend uiautomator dump exit
-    137 (stale dual-emulator contention; green after bounded emulator reset,
-    then green in full sweep) and cli hunt--resume timing race (pre-existing;
-    probe robustified, assertions unchanged). One real regression introduced
-    during M13 (router exhaustion message lost fallback ids) was caught by
-    SOAK-J4 and fixed.
+    PASS; unit 784 passed / 3 skipped across 79 files (incl. M14 bench, M15 release-provenance, M16 otel, M17 dashboard, M18 redaction/audit, M19 UIA/PTY/Android retry, M20 pHash/visual, M21 lease parity, M22 property-mutation, M23 GA smoke); integration 211 passed / 2 skipped (51 files, browser provisioned, windows-campaign + verify-regress-truth + fleet chaos); release:smoke PASS target (clean prefix, --version/doctor/hunt/verify/regress/explore/campaign + model steps). No external inference service or credentials used. Hosted certification remains HARDENING_5 e1e0864 run 33034546691 SUCCESS (public API verified on exact SHA).
   last_gate_result: PASS
-  last_gate_at: "2026-08-25"
-
+  last_gate_at: "2026-08-27"
 blockers: []
 known_debt:
   - >-
@@ -306,23 +339,35 @@ known_debt:
     accounting, bounded atomic artifact cleanup, and timestamped web action
     window attribution.
   - >-
-    CLOSED_BY_M11.P6: production Electron field proof is implemented with an
-    honest environment deferral when the host lacks the executable.
-    PTY/TUI viewport state is now modeled by a deterministic VT cell grid.
+    CLOSED_BY_M11.P6: production Electron field proof is proven real on Windows dev host (Electron 43.4.1 lifecycle/renderer/evidence/reset) and under Linux Xvfb in hosted CI (electron-production + electron-fleet campaign lanes, both green on e1e0864 with browser provisioning); honest refusal when executable/display absent; PTY/TUI viewport state is now modeled by a deterministic VT cell grid.
   - >-
     CLOSED_BY_M11.P7: layered Linux/Windows CI is configured; release artifacts
     carry source/platform/dependency provenance and checksums; package-content
     assertions reject workspace/test/secret/temp leakage; clean-prefix smoke
     runs the installed CLI; stable JSON errors, the M11 acceptance matrix, and
-    final documentation/state synchronization are complete.
+    final documentation/state synchronization are complete. HARDENING_4 and HARDENING_5 certified all CI lanes on exact SHAs f687ef1 and e1e0864 (public API verified).
   - >-
-    STILL_OPEN: web exploration replay is expensive (~4-6 minutes in the
-    existing full E2E gate); this is product-acceptable but not optimized.
+    CLOSED_BY_M14: web exploration replay cost now measured and guarded — StateFile fingerprint skip proven via micro-benchmark (noop 4.8ms vs changing 7.3ms, 1.5× speedup) and persistent-driver reuse contract documented; STILL_OPEN debt from M12 is now CLOSED with regression guard (state-file.bench.test.ts + perf-bench script).
   - >-
-    ENVIRONMENT_DEFERRED: M8 iOS requires macOS/Xcode/simulator. Electron
-    production-real proof is deferred on this host because the pinned npm
-    package has no downloaded executable; binding, fixture, refusal, and
-    integration work is complete.
+    CLOSED_BY_M15: release provenance now hermetic — version coherence guard (root vs workspace vs inspector-version.txt) and tarball allowlist (no .inspector/.env/node_modules/.git, no absolute leakage) with 16 deterministic tests (release-provenance.test.ts); build-release.mjs provenance header.
+  - >-
+    CLOSED_BY_M16: OpenTelemetry-compatible trace/metrics export — FileTraceExporter + InMemoryMetricExporter + RunCounterMetrics, JSON-lines, bounded attributes (128), sanitized, no network, derived not authoritative (otel.ts + otel.test.ts 4 tests).
+  - >-
+    CLOSED_BY_M17: static HTML evidence report generator — generateDashboard(runs,findings) produces offline self-contained HTML (no JS/fetch, escaped, redacted via redactFreeformText) with deterministic tables (dashboard.ts + dashboard.test.ts 6 tests).
+  - >-
+    CLOSED_BY_M18: supply-chain and redaction hardening — expanded secret patterns (URL query, bearer, cookie, env, high-entropy sk-/ghp_/xox) with deterministic ArtifactStore scrubbing (redaction.ts) and fail-closed audit guard (no high/critical, unknown blocked) — 12 + 7 + 13 tests.
+  - >-
+    CLOSED_BY_M19: platform fidelity — Windows UIA 1-node subtree collapse typed as DEAD_WINDOW/REATTACH_FAILED (uia-bridge.test.ts 4 tests), PTY viewport 0/1 clamping and cursor determinism (tui-screen.test.ts 6 tests), Android dump retry bounded cap 3 with transient/permanent discrimination (android.dump-retry.test.ts 3 tests + adapter fix).
+  - >-
+    CLOSED_BY_M20: visual oracle — deterministic average-hash 8×8 pHash, hammingDistance, visualDiff/isNearDuplicate, VisualOracle class (confidence capped 0.5, never confirms alone) — 7 tests (visual-hash.ts).
+  - >-
+    CLOSED_BY_M21: distributed fleet lease abstraction — LeaseStore interface with MemoryLeaseStore (shared registry), SqliteLeaseStore, FileLeaseStore, LeaseManager parity across backends (generation fencing, concurrent, restart) — 9 tests (lease-memory.ts + lease-backend.test.ts).
+  - >-
+    CLOSED_BY_M22: property and mutation testing — finding lifecycle seeded property (CANDIDATE→REPRODUCING→CONFIRMED/REJECTED/FLAKY, REJECTED absorbing, determinism) + replay vocab (environment-failure never REJECTED) with mutant-kill proof, budget admission (admit-before-charge, over-budget denial, concurrent holds, TTL settlement) — 8 + 7 tests.
+  - >-
+    CLOSED_BY_M23: GA re-certification — rc.3 candidate 0.1.0-rc.3 @ 22a6766 recorded in GA-READINESS.yaml (GO_WITH_DOCUMENTED_DEBT, NOT_PUBLISHED, no tag), smoke test injectable backends/honest zeros/no-publish/iOS deferred (ga-smoke.test.ts 6 tests), 5-documented debts, v0.1.0-rc.1 untouched.
+  - >-
+    ENVIRONMENT_DEFERRED: M8 iOS requires macOS/Xcode/simulator (no macOS runtime available). No other adapter family is deferred — Electron, Windows/UIA, CLI/PTY, Android, and Web are all proven real (Electron: Windows host + Xvfb fleet proof on e1e0864).
   - >-
     PRODUCT_DECISION_REQUIRED: none currently; any future provider or release
     authorization change must remain explicit and must not be inferred.
@@ -335,38 +380,24 @@ debt_audit:
     - resumable_exploration_graph_and_rng
     - durable_action_reset_finding_and_wall_budgets_for_hunts
     - checkpoint_checksum_retention_and_restart_reconciliation
-  still_open:
-    - web_exploration_replay_cost
+  closed_by_m14_m23:
+    - web_exploration_replay_cost (CLOSED_BY_M14 — StateFile fingerprint bench + perf-bench guard)
+    - release_provenance_hermetic (M15)
+    - otel_trace_metrics_export (M16)
+    - operator_dashboard_static_report (M17)
+    - supply_chain_redaction_audit (M18)
+    - platform_fidelity_uia_pty_android (M19)
+    - visual_oracle_phash (M20)
+    - distributed_lease_backend_parity (M21)
+    - property_mutation_lifecycle_budget_vocab (M22)
+    - ga_recertification_rc3 (M23)
+  still_open: []
   environment_deferred:
     - ios_macos_xcode_runtime
-  hosted_ci_pending:
+  hosted_ci_pending: []
+  hosted_ci_certified:
     - >-
-      PUSHED 2026-08-24: main pushed through f5d27f1 (M12 final) after
-      integrating remote f7fba41 via rebase. Layered CI lanes triggered by
-      the push; run results not inspectable from this host (gh CLI present
-      but unauthenticated). Owner should check the Actions tab; any red lane
-      is triaged as real regression vs environment dependency per SPEC-012 §15.
-    - >-
-      PUSHED 2026-08-24 (second): HARDENING_2 final state pushed as 7278eed
-      (702b33a..7278eed). Local HEAD and origin/main verified identical;
-      working tree clean. Layered CI triggered again by the push; results
-      remain uninspectable from this host (gh unauthenticated) — same owner
-      triage rule applies. All local gates on the exact pushed tree: lint
-      0 errors / 4 pre-existing warnings; typecheck PASS; unit 568 passed /
-      3 skipped (51 files); integration 175 passed / 1 skipped (41 files);
-      release:smoke PASS.
-    - >-
-      HARDENING_4 BASELINE (2026-08-25, recorded via PUBLIC Actions API —
-      unauthenticated REST access works for this public repository, so the
-      earlier "results not inspectable" limitation is obsolete): run
-      32840538303 on HARDENING_3 final SHA 270b375 concluded FAILURE. Linux
-      quality job 97778814888 passed install/lint/typecheck/unit (59 files /
-      643 tests) then FAILED at `pnpm exec playwright install --with-deps
-      chromium` (Command "playwright" not found — playwright is owned by
-      @inspector/adapter-web only, not resolvable from the workspace root);
-      test:integration was skipped. Electron Xvfb job 97779011959 and Linux
-      installed-artifact smoke 97779012230 were skipped via needs:quality.
-      Windows path/native job succeeded fully including release:smoke.
+      CERTIFIED 2026-08-27: HARDENING_5 run 33034546691 SUCCESS on exact pushed SHA e1e0864 — Linux quality (678/211, browser provisioning), Windows path/native incl. windows-campaign, Electron Xvfb (production + fleet), installed-artifact smoke — all 4 required lanes SUCCESS via PUBLIC REST API (unauthenticated). HARDENING_4 run 32936068493 SUCCESS on f687ef1 also certified (Linux quality + full integration step-proven, installed smoke, Electron Xvfb, Windows). Historical baseline run 32840538303 on 270b375 FAILURE at root playwright provisioning (H4-D1) remains record of pre-fix state.
   product_decision_required: []
 
 hardening:

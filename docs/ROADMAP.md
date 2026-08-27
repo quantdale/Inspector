@@ -275,7 +275,7 @@ installed CLI. M10 remains historically COMPLETE; M8 remains
 the production Electron field proof for real on a Windows host (Electron
 43.4.1), re-ran the full integration sweep green in one pass, added a
 display-gated Xvfb Electron CI lane with per-job timeouts, and refreshed the
-clean candidate artifact provenance.
+clean candidate artifact provenance. **HARDENING_4 (2026-08-26) and HARDENING_5 (2026-08-27) later certified the same Electron lane in hosted CI:** Xvfb electron-production + electron-fleet campaign proofs green on run 33034546691 (exact SHA `e1e0864`) with package-owned browser provisioning, alongside Linux quality/full integration and Windows campaign lanes.
 
 Goal: make an operator able to discover, verify, regress, explore, repair, and
 operate bounded campaigns without reaching into package internals, while
@@ -337,7 +337,7 @@ wall budgets survive process restarts, externally-held work reports truthful
 fails closed, all-refused campaigns are distinguishable from success, and
 verify/regress items reach their producers' findings via validated
 `targetConfig.sourceItemId` references. See ADR-0012 and the HARDENING_2
-ledger in `.inspector/state/HARDENING-CHECKPOINT.md`.
+ledger in `.inspector/state/HARDENING-CHECKPOINT.md`. **HARDENING_3 (2026-08-25) hardened whole-system reliability, intelligence safety, clean-CI, and concurrency; HARDENING_4 (2026-08-26) hardened certification integrity and durable-state atomicity; HARDENING_5 (2026-08-27) closed the remaining fleet execution truth gaps — Electron/Windows campaign lanes with identity-faithful evidence, verification-outcome truth, backend provenance, cross-platform atomic writes, and audit certification — all with deterministic regression coverage and hosted certification (f687ef1, e1e0864).**
 
 Deliverables:
 
@@ -404,7 +404,76 @@ Deliverables:
 Exit gate: all SPEC-013 acceptance tests pass on the final tree; full
 repository gates plus release smoke pass; a scripted provider proves the
 entire intelligence layer with zero credentials/network; docs and durable
-state match the implementation.
+state match the implementation. **HARDENING_5 later extended this gate with fleet execution truth, verification-outcome-truth, and backend-provenance hardening — certified on `e1e0864` (run 33034546691 SUCCESS, all 4 hosted lanes green, 678/211 gates).**
+
+## M14 — Replay Performance: Measured Optimization and Benchmark Guard (product hardening)
+
+Spec: `specs/014-replay-performance/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: StateFile fingerprint skip micro-benchmark (noop 4.8ms vs changing 7.3ms, 1.5× speedup) proves the H5-optimized skip path avoids `rename/fsync` deterministically; `scripts/perf-bench.ts` prints bounded baseline; no behavior change; lint/typecheck/unit green.
+
+Goal: close the `STILL_OPEN` web-exploration replay cost debt with measured, guarded optimization — not speculative rewrites.
+
+## M15 — Release Provenance: Hermetic Artifact and Version Coherence (product hardening)
+
+Spec: `specs/015-release-provenance/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: version coherence guard (root vs workspace vs `inspector-version.txt`) and tarball allowlist (no `.inspector/.env/node_modules/.git`, no absolute leakage) with 16 deterministic tests; `scripts/build-release.mjs` provenance header; lint/typecheck green.
+
+## M16 — Observability: OpenTelemetry-Compatible Trace and Metrics Export (product development)
+
+Spec: `specs/016-otel-observability/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: `FileTraceExporter` + `InMemoryMetricExporter` + `RunCounterMetrics` produce bounded, sanitized JSON-lines (span schema `traceId/spanId/parentId/name/startTime/endTime/attributes`, 128 attrs, 1k truncation), no network, derived not authoritative; 4 tests green.
+
+## M17 — Operator Dashboard: Static Evidence Report Generator (product development)
+
+Spec: `specs/017-operator-dashboard/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: `generateDashboard(runs, findings)` produces offline self-contained HTML (no JS/fetch, escaped, redacted via `redactFreeformText`, deterministic tables) with 6 tests; lint/typecheck green.
+
+## M18 — Supply-Chain Security: Redaction and Audit Hardening (hardening)
+
+Spec: `specs/018-supply-chain-security/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: expanded secret patterns (URL query `?token/?api_key/?secret`, bearer, cookie, env `AWS_SECRET/GITHUB_TOKEN`, high-entropy `sk-/ghp_/xox`) scrubbed deterministically before persistence (`redaction.ts` fix for `lastIndex`), plus fail-closed npm audit guard (high/critical + unknown blocked) — 12+7+13 tests.
+
+## M19 — Platform Fidelity: Windows UIA, PTY Viewport, and Android Retry (product hardening)
+
+Spec: `specs/019-platform-fidelity/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: Windows UIA 1-node collapse typed as `DEAD_WINDOW/REATTACH_FAILED` (4 tests), PTY viewport 0/1 clamping and cursor determinism (6 tests), Android dump transient 137 retry with cap 3 and permanent discrimination (3 tests + adapter fix); 19 tests total.
+
+## M20 — Visual Oracle: Perceptual Hash and Visual Diff (product development)
+
+Spec: `specs/020-visual-oracle/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: deterministic average-hash 8×8 `pHash`, `hammingDistance`, `visualDiff/isNearDuplicate`, `VisualOracle` (confidence capped 0.5, never confirms alone via `classifySuspicion`) — 7 tests; lint/typecheck green.
+
+## M21 — Distributed Fleet: Lease Backend Abstraction and Parity (product hardening)
+
+Spec: `specs/021-distributed-fleet/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: `LeaseStore` abstraction with `MemoryLeaseStore` (shared registry), `SqliteLeaseStore`, `FileLeaseStore`, `LeaseManager` parity across backends (generation fencing, concurrent workers, restart) — 9 tests; interface prepared for optional Redis without requiring it.
+
+## M22 — Property and Mutation Testing: Lifecycle, Budget, and Replay Vocab (hardening)
+
+Spec: `specs/022-property-mutation/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: finding lifecycle seeded property (CANDIDATE→REPRODUCING→CONFIRMED/REJECTED/FLAKY, REJECTED absorbing, determinism) + replay vocab (environment-failure never REJECTED) with mutant-kill proof, budget admission (admit-before-charge, over-budget denial, concurrent holds, TTL settlement) — 8+7 tests; deterministic seeded RNG.
+
+## M23 — GA Re-Certification: Field Proofs and Release Readiness (product hardening)
+
+Spec: `specs/023-ga-recertification/SPEC.md`
+
+**Status: COMPLETE (2026-08-27).** Exit gate PASS: rc.3 candidate `0.1.0-rc.3` @ `22a6766` recorded in `.inspector/state/GA-READINESS.yaml` (`GO_WITH_DOCUMENTED_DEBT`, `NOT_PUBLISHED`, no tag, `v0.1.0-rc.1` untouched), smoke test covers injectable backends/honest zeros/no-publish/iOS deferred (6 tests), 5 documented debts; lint/typecheck green.
+
+## Hardening campaigns (separately invoked; see `docs/HARDENING-CAMPAIGN.md`)
+
+- **HARDENING_2 (2026-08-24) — fleet runtime integrity**: budgets-before-consumption, cancellation reach, lease liveness, crash-safe settlement, durable wall budgets, truthful lifecycle, fail-closed state validation, verify/regress provenance — COMPLETE, certified 7278eed.
+- **HARDENING_3 (2026-08-25) — whole-system reliability, intelligence safety, clean-CI, concurrency torture**: contained heartbeats, CI hermeticity, model-runtime fail-closed, hostile-numerics, taint audit — COMPLETE, certified 270b375→f687ef1 path.
+- **HARDENING_4 (2026-08-26) — certification integrity, durable-state atomicity, cross-process ownership fencing**: clean-runner executable resolution, FileLock fencing, StateFile atomicity, stats truth — COMPLETE, certified f687ef1 (run 32936068493 SUCCESS).
+- **HARDENING_5 (2026-08-27) — Fleet Execution Truth (electron/windows fleet truth, verification-outcome truth, backend provenance, cross-platform atomic writes, measured efficiency, audit certification — defects H5-D0..D15)**: exhaustive family contract, real Electron/Windows campaign lanes, platform-faithful replay, typed replay vocabulary, admit-before-consume budgets, exact backend provenance, atomic-write durability parity, content-aware audit census — COMPLETE, certified e1e0864 (run 33034546691 SUCCESS, all 4 hosted lanes green).
 
 ## Explicitly not required before implementation completion
 

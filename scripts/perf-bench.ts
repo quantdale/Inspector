@@ -1,41 +1,48 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { StateFile } from "../packages/scale/src/state-file.js";
+import {
+  benchmarkFingerprintSkip,
+  StateFile,
+} from "../packages/scale/src/state-file.js";
 
 // HARDENING_5 H5.7 manual benchmark (run: pnpm exec tsx scripts/perf-bench.ts).
-// Captures the set-fingerprint no-op skip effect on StateFile.save: identical
+// Captures the fingerprint no-op skip effect on StateFile.save: identical
 // re-saves must skip fsync+rename and be far cheaper than changing saves.
+// Uses the exported benchmarkFingerprintSkip harness so the script and
+// state-file.bench.test.ts share the same deterministic measurement.
 const dir = mkdtempSync(join(tmpdir(), "inspector-perf-"));
 try {
-  const sf = new StateFile<{ n: number; note: string }>(dir, "perf", () => ({ n: 0, note: "" }));
+  const sf = new StateFile<{ n: number; note: string }>(dir, "perf", () => ({
+    n: 0,
+    note: "",
+  }));
   sf.update((c) => {
     c.n = 1;
   });
 
-  const N = 5000;
-  const t0 = Date.now();
-  for (let i = 0; i < N; i++) {
-    sf.update((c) => {
+  const iterations = 5000;
+  const result = benchmarkFingerprintSkip(
+    sf,
+    (c) => {
       c.n = 1;
-    });
-  }
-  const noopMs = Date.now() - t0;
-
-  const t1 = Date.now();
-  for (let i = 0; i < N; i++) {
-    sf.update((c) => {
+    },
+    (c, i) => {
       c.n = i;
-    });
-  }
-  const changeMs = Date.now() - t1;
+    },
+    iterations,
+  );
 
   console.log(
     JSON.stringify(
       {
-        noopPerSaveUs: Math.round((noopMs / N) * 1000),
-        changingPerSaveUs: Math.round((changeMs / N) * 1000),
-        speedup: Number((changeMs / Math.max(noopMs, 1)).toFixed(2)),
+        iterations,
+        noopPerSaveUs: Math.round(result.noopPerSaveUs),
+        changingPerSaveUs: Math.round(result.changingPerSaveUs),
+        speedup: Number(result.speedup.toFixed(2)),
+        noopMs: Math.round(result.noopMs),
+        changingMs: Math.round(result.changingMs),
+        note: "H5.7 fingerprint skip: identical re-save skips fsync+rename",
       },
       null,
       2,

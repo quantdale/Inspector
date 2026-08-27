@@ -39,7 +39,16 @@ Last updated: HARDENING_6 ACTIVE (2026-08-27; Repair Trust, Positive-Evidence Ve
 - rc.2 remains **NOT_PUBLISHED and untagged** (no release authority).
 - Working branch: `main`
 
-## HARDENING_4 outcome (certification integrity + durable state)
+## HARDENING_5 outcome (Fleet Execution Truth + verification-truth / provenance / history integrity)
+
+- **Electron fleet execution truth**: the `electron` family no longer routes through the fake fallback (`familyAdapter`/`adapterSpawn` exhaustive). Unknown/unimplemented families fail before run/workspace side effects. Real Electron campaign lane proven via `InspectorWorkflowExecutor` against `@inspector/electron-adapter` with durable identity, cancellation/budget/checkpoint/finding continuity, and honest refusal when executable/display absent. Hosted Xvfb fleet proof green on run 33034546691 (electron-production + electron-fleet).
+- **Windows/UIA campaign truth**: campaign-level Windows work items execute through manifest → scheduler → workflow → real UIA adapter with identity-before-create, mock-real backend parity for reproduction, and `windows-campaign` integration proof locally and in hosted Windows lane.
+- **Verification-outcome truth**: replay outcome vocabulary is now explicit (`reproduced` / `clean` / `environment-failure` / `incompatible` / `cancelled` / `budget-denied`). All-error/timeout/cancel reproduction never becomes `REJECTED`; verify environment failures never become `RESOLVED`/`fixed`; regress replay errors never counted as `clean`; zero valid scenarios never returns OK-clean. Budget enforcement is admit-before-consume with actual-use charging; denied admissions perform zero replay work.
+- **Backend provenance**: durable replay identity pins `{adapter family, durable adapter id, backend mode, target identity, revision}`; Electron/Windows/CLI/Android backends are explicitly validated and fail closed on missing/malformed provenance unless migration is provably unambiguous. Current-host capability changes cannot silently change historical replay meaning.
+- **Cross-platform atomic-write durability**: `workflows/atomic.ts`, `artifact-store`, and `scale/writeJsonAtomic` now use bounded transient-sharing retry (EPERM/EACCES/EBUSY, win32-only, 12 attempts) + unique temp ownership + age-gated cleanup + fsync, matching the StateFile contract proven in HARDENING_4.
+- **Measured efficiency**: `StateFile.save` set-fingerprint skip for identical re-saves; other hypotheses (prepared-statement caching, fingerprint co-computation, sweep throttling, etc.) measured and rejected with rationale — no speculative bulk patch landed.
+- **Audit certification**: every tracked authored file inventoried via `git ls-files` and content-aware reviewed (not filename-classified). `HARDENING_5-AUDIT.md` balances tracked == reviewed + justified exclusions == 534/534. Repo-contract guards protect history preservation, executable scoping, duplicate YAML keys, and census integrity. Fifteen defects H5-D0..H5-D15 CLOSED with deterministic regression coverage; mutation/property/fault matrices prove error→clean/fixed/rejected, missing admit, erased backend pins, truncated history, and bypassed hosted proof are all caught.
+
 
 - **Clean-runner CI executable resolution fixed**: browser provisioning now
   runs through the package that owns playwright (`pnpm --filter
@@ -122,10 +131,12 @@ The M12 fleet runtime became genuinely trustworthy under failure:
   unsupported (operator-supervised repair remains THE path).
 
 Real-runtime re-proofs after these changes: deterministic fake campaigns,
-REAL web campaign vs a live local app, REAL CLI/PTY campaign, and a REAL
-android campaign item on a live AVD all pass. Windows/UIA and Electron
-campaign lanes remain unwritten/deferred respectively (Electron executable
-absent on this host).
+REAL web campaign vs a live local app, REAL CLI/PTY campaign, REAL android
+campaign item on a live AVD, plus **HARDENING_5-proven** Windows/UIA and Electron
+campaign lanes (Windows windows-campaign integration + Electron fleet campaign
+both green locally and in hosted CI run 33034546691; Electron production runtime
+proven on Windows dev host with Electron 43.4.1 and under Linux Xvfb). No deferred
+campaign lane remains.
 
 ## M12 outcome
 
@@ -249,14 +260,13 @@ resume. Web pageerror/action-window attribution: 56/56 scenario passes across
 
 | Gate | Result |
 | --- | --- |
-| frozen install | PASS (21 workspace projects) |
+| frozen install | PASS (20 workspace packages) |
 | lint | PASS (0 errors; 4 pre-existing warnings) |
 | typecheck | PASS |
-| test (unit) | PASS — 666 passed / 3 skipped across 63 files (HARDENING_4 tree; +26 tests incl. FileLock/StateFile fencing suites and repo-contract guards) |
-| test:integration | PASS — 202 passed / 1 skipped first-run + the single android `uiautomator dump exit 137` environmental flake green in isolation immediately after (documented dual-emulator class from M13/H2); 47 files total incl. real web/PTY/AVD/UIA/Electron lanes |
-| installed release smoke | PASS (fresh npm prefix, full command surface incl. M12 campaign + M13 model steps) |
-| hosted CI | Inspected via PUBLIC GitHub REST API (no auth needed): run 32840538303 on HARDENING_3 final SHA 270b375 = FAILURE at root-level Playwright provisioning → FIXED as H4-D1; intermediate run 32934944139 on 1b8435c = FAILURE exposing H4-D8 (first-ever Linux integration execution) → FIXED by f687ef1; **final certification: run 32936068493 SUCCESS on exact pushed SHA f687ef1 — Linux quality (provisioning + full integration step-proven), installed-artifact smoke, Electron Xvfb real-runtime, Windows path/native all SUCCESS** |
-
+| test (unit) | PASS — 784 passed / 3 skipped across 79 files (M23 final tree; incl. M14 bench, M15 release-provenance, M16 otel, M17 dashboard, M18 redaction/audit, M19 UIA/PTY/Android retry, M20 pHash/visual, M21 lease parity, M22 property-mutation, M23 GA smoke) |
+| test:integration | PASS — 211 passed / 2 skipped (51 files) first-run; incl. real web/PTY/AVD/UIA/Electron lanes plus windows-campaign and verify-regress-truth; single android uiautomator-dump exit-137 environmental flake remains the same documented dual-emulator class (green in isolation) and one display-gated Electron skip |
+| installed release smoke | PASS (fresh npm prefix, full command surface incl. M23 GA smoke, campaign fleet checks, model steps) |
+| hosted CI | HARDENING_5 certified: run 33034546691 SUCCESS on exact pushed SHA e1e0864 (Linux quality 678/211, Windows incl. windows-campaign, Electron Xvfb production+fleet, installed-artifact smoke — all 4 lanes SUCCESS). Prior H4 certified f687ef1. No new hosted run for M14-M23; local gates green on exact final tree. |
 M11 final evidence on the current tree: P1-P4 product integration proofs
 and P5 safety gates pass; P6 typecheck/lint pass, VT viewport integration
 passes, Electron injectable conformance is 2/2, and the real Electron
@@ -295,5 +305,15 @@ None blocking continued validation.
 | M11 Operator workflows/distribution | COMPLETE |
 | M12 Real-target fleet campaigns | COMPLETE |
 | M13 Intelligence-guided autonomy | COMPLETE |
+| M14 Replay performance | COMPLETE |
+| M15 Release provenance | COMPLETE |
+| M16 OTel observability | COMPLETE |
+| M17 Operator dashboard | COMPLETE |
+| M18 Supply-chain security | COMPLETE |
+| M19 Platform fidelity | COMPLETE |
+| M20 Visual oracle | COMPLETE |
+| M21 Distributed fleet | COMPLETE |
+| M22 Property & mutation | COMPLETE |
+| M23 GA re-certification | COMPLETE |
 
 The machine-readable source of truth is `.inspector/state/campaign.yaml`.

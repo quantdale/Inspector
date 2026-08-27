@@ -1,6 +1,6 @@
 # First-run developer guide
 
-Inspector is a pnpm workspace of TypeScript packages (17 under `packages/`).
+Inspector is a pnpm workspace of TypeScript packages (20 under `packages/`).
 This guide gets a clean checkout running the real CLI end to end, against the
 fake adapter or a production backend.
 
@@ -17,7 +17,7 @@ cold-store first install will take minutes longer.
 Optional, per backend:
 
 - Playwright Chromium — used by the web adapter and its integration tests:
-  `pnpm exec playwright install chromium`
+  `pnpm --filter @inspector/adapter-web provision:browser` (package-owned Playwright binary; root-level `pnpm exec playwright` cannot resolve it under pnpm's isolated layout — see HARDENING_4 H4-D1)
 - Android SDK/emulator + `adb` on PATH (`ANDROID_HOME` set) — required only for
   the android-real backend
 - PowerShell 5.1+ (built into Windows) — required only for the windows-uia
@@ -219,6 +219,7 @@ packages/
                      # + reservation-based model budget gate (M13)
   model-runtime/   # provider-neutral model boundary (M13, zero workspace deps)
   workflows/       # shared hunt/explore/verify/regress services (CLI + fleet)
+  repo-contract/   # hardening guards: CI workflow, campaign state, audit census, executable scoping
   cli/             # inspector command
 dogfood/           # dogfood target manifests + static server helper
 specs/             # milestone specifications and task lists

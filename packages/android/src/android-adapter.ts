@@ -441,11 +441,34 @@ export class AndroidAdapterHandler implements AdapterHandler {
    * UI hierarchy XML: prefer the backend's dedicated dump channel (real
    * backends dump to /sdcard/window_dump.xml and pull it); fall back to the
    * legacy `uiautomator dump /dev/tty` shell form for minimal stubs.
+   *
+   * M19 platform fidelity: transient dump failures (notably exit 137 from
+   * uiautomator contention) are retried with bounded backoff (cap 3,
+   * deadline) and classified distinctly from permanent failures. The real
+   * backend already retries inside dumpUi, but the adapter's shell fallback
+   * and mock paths must also honor the contract so fault-injected tests
+   * recover on retry while permanent failures still fail closed.
    */
   private async dumpXml(serial: string): Promise<string> {
-    if (this.backend.dumpUi) return this.backend.dumpUi(serial);
-    return this.backend.shell(serial, "uiautomator dump /dev/tty");
+    const cap = 3;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= cap; attempt++) {
+      try {
+        if (this.backend.dumpUi) return await this.backend.dumpUi(serial);
+        return await this.backend.shell(serial, "uiautomator dump /dev/tty");
+      } catch (e) {
+        lastError = e;
+        const msg = e instanceof Error ? e.message : String(e);
+        const isTransient = /137|transient|EBUSY|dump.*failed/i.test(msg);
+        if (!isTransient || attempt === cap) throw e;
+        // bounded backoff: small deterministic pause, never infinite
+        const delayMs = 10 * attempt;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    throw lastError;
   }
+
 
   private async simulateCrash(): Promise<never> {
     try {

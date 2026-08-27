@@ -55,22 +55,32 @@ The first proof depends heavily on Playwright and likely Appium/MCP interoperabi
   Playwright         PTY        ADB/UIA2   UIA/Appium Playwright XCUITest
 ```
 
-## Packages (implemented in M0)
+## Packages (implemented through M13 + HARDENING_5)
 
-The monorepo under `packages/` currently contains:
+The monorepo under `packages/` currently contains 20 packages:
 
 | Package | Responsibility |
 |---|---|
 | `@inspector/protocol` | Inspector Adapter Protocol v0.1: envelope, IDs, error model, ajv JSON-Schema validation, capability negotiation, observe/act/lifecycle messages, ordered adapter event envelope. |
-| `@inspector/store-sqlite` | Durable SQLite store (better-sqlite3): runs/environments/steps/actions/observations/checkpoints, transactional step commit, in-flight recovery. |
-| `@inspector/artifact-store` | Run-scoped content-addressed artifacts: SHA-256 hashing, dedup, size limits, corruption detection. |
+| `@inspector/store-sqlite` | Durable SQLite store (better-sqlite3): runs/environments/steps/actions/observations/checkpoints, transactional step commit, in-flight recovery, model_calls migration. |
+| `@inspector/artifact-store` | Run-scoped content-addressed artifacts: SHA-256 hashing, dedup, size limits, corruption detection, atomic-write durability (Windows sharing-retry). |
 | `@inspector/adapter-sdk` | Line-delimited JSON-RPC 2.0 over stdio transport, `AdapterServer`/`AdapterClient` with deadline enforcement, event notifications, subprocess spawning. |
-| `@inspector/adapter-fake` | Deterministic 5-state / 8-action fake adapter with a deterministic failure oracle, reset, artifact stubs, and fault injection (timeout, crash). |
-| `@inspector/core` | Policy/budget engine and `RunManager`/`RunController`: lifecycle, policy enforcement, durable step commit, checkpointing, crash recovery. |
-| `@inspector/cli` | Installed operator CLI: `hunt`, `verify`, `regress`, `explore`, `repair`, bounded `campaign`, findings/runs inspection, model-call accounting (`models summary`), doctor, and stable JSON contracts. |
-| `@inspector/model-runtime` | Provider-neutral model boundary (M13, ADR-0013): roles, typed invocation with attribution/deadlines/cancellation, truthful usage, stable failure taxonomy, deterministic fallback, scripted fixture provider, shared local-provider module loader. Zero workspace dependencies. |
+| `@inspector/adapter-fake` | Deterministic 5-state / 8-action fake adapter with deterministic failure oracle, reset, artifact stubs, and fault injection (timeout, crash). |
+| `@inspector/adapter-web` | Playwright/Chromium web adapter: accessibility/semantic inventory, trace/screenshot/storage/network, semantic actions, owns `provision:browser` for hosted CI. |
+| `@inspector/cli-adapter` | CLI/PTY adapter: mock + real ConPTY via `@lydell/node-pty`, VT viewport/cursor/resize model, deterministic PTY lifecycle. |
+| `@inspector/windows-adapter` | Windows UIA adapter: mock + real PowerShell UIA bridge, window liveness, reattach, `waitForWindow`, backend provenance. |
 | `@inspector/electron-adapter` | Production Playwright Electron handler plus explicit injectable contract backend, deterministic fixture, renderer/main evidence, and backend honesty probes. |
-
+| `@inspector/android` | Android ADB adapter: mock + RealAdbBackend, emulator lifecycle, UIA dump with retries, screencap/logcat, backend provenance. |
+| `@inspector/core` | Policy/budget engine and `RunManager`/`RunController`: lifecycle, policy enforcement, durable step commit, checkpointing, crash recovery. |
+| `@inspector/explore` | Autonomous exploration engine: state/action graph, scoring, deterministic + semantic planner seam (checkpointed, RNG-untouched), boundary/fault strategies. |
+| `@inspector/finding` | Finding lifecycle + reproduction policy: states, deterministic replay/minimization, typed replay outcome vocabulary (reproduced/clean/environment-failure/incompatible/cancelled). |
+| `@inspector/oracle` | Oracle evaluation + model-backed semantic suspicion (`SemanticSuspector` via `classifySuspicion`, NEEDS_HUMAN_ORACLE capped 0.5). |
+| `@inspector/repair` | Isolated repair loop + source intelligence + ModelPatchAgent (strict schema, path containment, caps), patch-agent contract through RepairEngine. |
+| `@inspector/scale` | Lease/concurrency primitives (FileLock with ownership fencing + SQLite lease store), scheduler, campaign/campaign-executor, budgets, `ReservationModelBudgetGate`, StateFile atomicity. |
+| `@inspector/model-runtime` | Provider-neutral model boundary (M13, ADR-0013): roles, typed invocation with attribution/deadlines/cancellation, truthful usage, stable failure taxonomy, deterministic fallback, scripted fixture provider, shared local-provider module loader. Zero workspace dependencies. |
+| `@inspector/workflows` | Shared hunt/explore/verify/regress services (CLI + fleet executors), per-item isolation, backend-provenance pinning, admit-before-consume budget enforcement. |
+| `@inspector/repo-contract` | Hardening guard package: CI workflow validation, campaign-state schema, audit census, executable scoping, history-preservation. |
+| `@inspector/cli` | Installed operator CLI: `hunt`, `verify`, `regress`, `explore`, `repair`, bounded `campaign`, findings/runs inspection, model-call accounting (`models summary`), doctor, and stable JSON contracts. |
 Runtime notes:
 
 - Adapters speak JSON-RPC 2.0 over stdio (see `docs/ADR/0002-typed-adapter-protocol.md`).

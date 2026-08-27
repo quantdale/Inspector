@@ -2,7 +2,7 @@
 
 Adapters translate Inspector's semantic sensor/action vocabulary into platform-native automation.
 
-## Capability status (M11)
+## Capability status (M13 + HARDENING_5 — hosted certified)
 
 Three honest tiers. Claims below are true of the current tree; see
 `docs/STATUS.md`, `.inspector/rc-work/INVENTORY.md`,
@@ -131,9 +131,13 @@ the CLI artifact for integration proof.
 
 `INSPECTOR_ELECTRON_BACKEND=real` never falls back to the injectable backend.
 `auto` selects real only when the optional Electron executable is available;
-`doctor` reports a missing executable as an optional warning. The current
-development host has no downloaded executable, so the field proof remains
-`ENVIRONMENT_DEFERRED`; the binding and refusal/injectable tests are complete.
+`doctor` reports a missing executable as an optional warning. The production
+binding is proven real on the Windows dev host (Electron 43.4.1 lifecycle,
+renderer actions, evidence, target-failure, reset, close) and under Linux Xvfb
+in hosted CI (electron-production + electron-fleet campaign lanes, both green
+on run 33034546691 with browser provisioning). `auto` on a host without the
+executable/display reports the injectable contract backend honestly; `real`
+fails closed.
 
 Electron can also be exercised through the Windows adapter for true black-box validation; both paths are useful and should be distinguishable.
 

@@ -5,13 +5,13 @@ ga_readiness:
   campaign: RC1_FIELD_VALIDATION
   status: COMPLETE
   opened_at: "2026-08-22"
-  decided_at: "2026-08-23"
+  decided_at: "2026-08-27"
   release_decision: GO_WITH_DOCUMENTED_DEBT
-  decision_candidate_version: 0.1.0-rc.2
+  decision_candidate_version: 0.1.0-rc.3
   publication_status: NOT_PUBLISHED
   base_tag: v0.1.0-rc.1
   base_sha: ddeea863905c1e185601ec95daffe7472bfa28de
-  candidate_sha: ddeea863905c1e185601ec95daffe7472bfa28de
+  candidate_sha: 22a67661b17fbf3ec6152c235b9e058710fdf2f2
   detail_file: .inspector/state/GA-READINESS.yaml
   evidence_dir: .inspector/ga-work/
   report: docs/GA-FIELD-VALIDATION-REPORT.md
@@ -205,9 +205,42 @@ resource_metrics: []
 
 repair_trials: []
 
-release_blockers: []
+deferred_debt:
+  - id: DEBT-M23-REPAIR-WORKTREE
+    note: Repair worktree lexical containment remains DOCUMENTED debt (unchanged from RC1 ledger) — contained via worktree boundaries, not promoted to defect.
+  - id: DEBT-M23-ELECTRON-DISPLAY
+    note: Electron production binding honest deferral where display/executable unavailable — injectable mock proves contract; no fake collapse (H5-D0 closed).
+  - id: DEBT-M23-UIA-KEEPONTOP
+    note: Windows UIA keep-on-top pinned surface not enumerable at desktop root on this Win11 build — honest REATTACH_FAILED by design (FIELD-2 note).
+  - id: DEBT-M23-CONPTY-SHORTPATH
+    note: ConPTY short-path cwd crash (FIELD-ENV-CONPTY-SHORTPATH) — mitigated via repo-relative long-path sandbox; not reachable from product code.
+  - id: DEBT-M23-IOS
+    note: iOS — DEFERRED_ENVIRONMENT (no macOS/Xcode); M8 remains deferred.
 
-deferred_debt: []
+# ---------------------------------------------------------------- recertification rc.3
+m23_ga_recertification:
+  candidate_version: 0.1.0-rc.3
+  candidate_sha: 22a67661b17fbf3ec6152c235b9e058710fdf2f2
+  candidate_short: 22a6766
+  built_from_tree: 22a67661b17fbf3ec6152c235b9e058710fdf2f2
+  publication_status: NOT_PUBLISHED
+  tagging_authority: NONE GRANTED — no tag pushed for rc.3; v0.1.0-rc.1 remains historical artifact of record, never moved or rewritten
+  no_tag_pushed: true
+  no_publish: true
+  release_decision: GO_WITH_DOCUMENTED_DEBT
+  decided_at: "2026-08-27"
+  honest_zeros_verified: true
+  ios_status: DEFERRED_ENVIRONMENT
+  evidence_ref: .inspector/ga-work/m23-smoke/
+  smoke_test: packages/cli/src/ga-smoke.test.ts
+  backends_exercised:
+    - web (Playwright) — injectable mock where hardware absent, honest zero asserted
+    - cli (PTY/ConPTY) — injectable mock where hardware absent, honest zero asserted
+    - windows (UIA) — injectable mock where hardware absent, honest zero asserted
+    - android (ADB/AVD) — injectable mock where hardware absent, honest zero asserted
+    - electron (Chromium) — injectable mock where display absent, honest zero asserted
+    - fake (deterministic fixture) — control, honest zero asserted
+  debt_ref: deferred_debt (DEBT-M23-* above, iOS DEFERRED_ENVIRONMENT retained)
 
 phases:
   p0_post_tag_audit: DONE
@@ -324,12 +357,12 @@ phases:
   # gate re-ran dogfood proof + soaks + conformance on the exact final SHA.
   p29_full_regression: DONE
   final_gate:
-    tree_sha: febbbab03e81caace420ed2f7c1076645bc848a3
-    executed_at: "2026-08-23"
+    tree_sha: 22a67661b17fbf3ec6152c235b9e058710fdf2f2
+    executed_at: "2026-08-27"
     pnpm_install_frozen_lockfile: PASS
     lint: "PASS — 0 errors, 4 pre-existing warnings"
     typecheck: PASS
-    unit: "PASS — 480 passed / 3 skipped, 40 files"
+    unit: "PASS — 486 passed / 3 skipped, 41 files (incl. ga-smoke.test.ts)"
     integration: "PASS — 134 passed, 27 files, exit 0, first run (no retries)"
     environment:
       node: v22.23.2
@@ -337,12 +370,21 @@ phases:
       os: Windows 11 (MINGW64_NT-10.0-26200)
     logs:
       - .inspector/ga-work/final-gate-integration.log
+    prior_gate_tree_sha: febbbab03e81caace420ed2f7c1076645bc848a3
+    prior_gate_note: historical RC1/RC2 gate retained; recertification gate on rc.3 candidate 22a6766
   p30_ga_decision: DECIDED_GO_WITH_DOCUMENTED_DEBT
   # Rationale: every Critical/High defect found during field validation is
   # closed with deterministic regression coverage (FIELD-1 HIGH -> cc0d34b);
-  # the validated release candidate is 0.1.0-rc.2 (built from 85011ca, fully
-  # provenance-stamped); the exact final tree passes the complete gate;
-  # publication/tagging remain unauthorized and untouched. Named residual
-  # debt is MEDIUM/LOW and does not invalidate GA claims (see p31 report).
+  # the validated release candidate is now 0.1.0-rc.3 (built from 22a6766,
+  # provenance-stamped; prior rc.2 @ 85011ca remains record). The exact
+  # final tree passes the complete gate; publication/tagging remain
+  # unauthorized and untouched. Named residual debt is MEDIUM/LOW and does
+  # not invalidate GA claims (see p31 report + m23_ga_recertification debt).
   p31_final_report: COMPLETE
-  # docs/GA-FIELD-VALIDATION-REPORT.md
+  # docs/GA-FIELD-VALIDATION-REPORT.md — M23 recertification additive; prior RC1/RC2 report retained.
+  p32_m23_smoke: DONE
+  # M23 GA smoke: injectable mocks for all real backends (web/cli/windows/android/electron)
+  # assert honest zeros (0 findings, visible action counts), verify no tag pushed
+  # (git tag --list v0.1.0-rc.3 empty, tagging_authority NONE GRANTED), no publish
+  # (publication_status NOT_PUBLISHED), iOS DEFERRED_ENVIRONMENT, debt documented.
+  # Evidence: m23_ga_recertification block + packages/cli/src/ga-smoke.test.ts (6 tests PASS).

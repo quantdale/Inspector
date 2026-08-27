@@ -3,10 +3,14 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE — M13 Intelligence-Guided Autonomous QA closed 2026-08-25.** M0-M12 and HARDENING_1/2 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
+- Status: **COMPLETE — M23 GA Re-certification closed 2026-08-27 (M14-M23 ten-campaign series).** M0-M13 and HARDENING_1-5 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: **HARDENING_5 COMPLETE (2026-08-27; hosted certification run 33034546691 SUCCESS on exact pushed SHA `e1e0864`)** (Fleet Execution Truth + deep-audit verification-truth/provenance/audit/capability truth; activated 2026-08-26 from planner commit `7214ae4`; ledger campaign #5 in `.inspector/state/HARDENING-CHECKPOINT.md`). HARDENING_4 COMPLETE 2026-08-26 with hosted certification on f687ef1 / run 32936068493.
+- Hardening: **HARDENING_5 COMPLETE (2026-08-27; hosted run 33034546691 SUCCESS on e1e0864)**; M14-M23 ten-campaign series now COMPLETE as product/hardening extension (see below).
+
+### M14-M23 ten-campaign series COMPLETE (2026-08-27)
+
+All M14-M23 campaigns done; defects: none new Critical/High (hardening-style guards). M14 replay-performance (StateFile fingerprint bench 4 tests, perf-bench), M15 release-provenance (16 tests), M16 otel (4 tests), M17 dashboard (6 tests), M18 redaction/audit (12+7+13 tests, lastIndex fix), M19 platform fidelity (UIA 4, PTY 6, Android 3 + retry), M20 visual-oracle (7 tests), M21 distributed fleet (9 tests), M22 property-mutation (16 tests), M23 GA rc.3 (6 tests, GA-READINESS 0.1.0-rc.3 @ 22a6766, NOT_PUBLISHED). Unit 784/3 (79 files), integration 211/2 (51 files, browser provisioned), lint 0/4, typecheck PASS, release:smoke target PASS. Docs/roadmap/status/campaign.yaml/agents reconciled; repo-contract guards updated for M23. No tag/publish. Hosted certification remains HARDENING_5 e1e0864 (run 33034546691 SUCCESS); M14-M23 local gates green on exact final tree.
 
 ### HARDENING_5 COMPLETE (2026-08-27)
 

@@ -27,6 +27,33 @@ export class StateCorruptionError extends Error {
 }
 
 /**
+ * HARDENING_5 H5.7 — StateFile fingerprint skip (measured runtime efficiency).
+ *
+ * The {@link StateFile} persists via `save()` which `JSON.stringify`s the
+ * value, hashes it (sha256), and compares to {@link StateFile.lastFingerprint}.
+ * On a hit the tmp-write + fsync + rename (+ directory fsync) is skipped
+ * entirely — critical during replay where many no-op re-saves occur.
+ *
+ * Micro-benchmark harness
+ * -----------------------
+ * `benchmarkFingerprintSkip` (below) + `state-file.bench.test.ts` +
+ * `scripts/perf-bench.ts` form the deterministic harness for this fast-path:
+ *
+ * - Wall time: identical re-save vs changing save (N iterations, µs/save,
+ *   speedup ratio). No-op must be far cheaper (order-of-magnitude on this
+ *   platform) because it avoids syscalls.
+ * - Syscall avoidance: identical re-save must NOT call `fs.renameSync` /
+ *   `fs.fsyncSync` (spied via `vi.mock("node:fs")`); changing save MUST call
+ *   them (proves skip is not unconditional).
+ * - Deterministic, credential-free, bounded (few thousand iterations), and
+ *   CI-runnable — no browser, no network, no wall-clock flakes beyond a
+ *   generous ratio guard.
+ *
+ * Baseline numbers are printed by `pnpm exec tsx scripts/perf-bench.ts` and
+ * recorded as JSON `{ noopPerSaveUs, changingPerSaveUs, speedup }`.
+ */
+
+/**
  * Atomic JSON state file: the durable campaign state (queue, completed,
  * in-flight leases, ledger) survives controller restart. Production binding
  * is SQLite; the file form keeps the contract identical and auditable.
@@ -254,6 +281,62 @@ export class StateFile<T> {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// HARDENING_5 H5.7 — micro-benchmark helper (no behavior change)
+// ---------------------------------------------------------------------------
+
+/** Result of {@link benchmarkFingerprintSkip}: wall time for the two paths. */
+export interface FingerprintBenchResult {
+  /** Wall time (ms) for N identical re-saves (fingerprint hit: skip path). */
+  noopMs: number;
+  /** Wall time (ms) for N changing saves (full fsync+rename). */
+  changingMs: number;
+  /** Microseconds per save for the no-op path. */
+  noopPerSaveUs: number;
+  /** Microseconds per save for the changing path. */
+  changingPerSaveUs: number;
+  /** Ratio `changingMs / max(noopMs,1)` — >1 means skip is cheaper. */
+  speedup: number;
+}
+
+/**
+ * Deterministic micro-benchmark for the H5.7 fingerprint skip.
+ *
+ * Measures wall time for `iterations` identical re-saves (hash hit → no
+ * fsync/rename) vs `iterations` changing saves (full durability path) on
+ * the provided {@link StateFile}. Credential-free, bounded, and suitable for
+ * `state-file.bench.test.ts` and `scripts/perf-bench.ts`.
+ *
+ * The caller is responsible for bringing `sf` to a stable starting state
+ * before invoking (e.g. one initial `update` so `lastFingerprint` is set).
+ */
+export function benchmarkFingerprintSkip<T>(
+  sf: StateFile<T>,
+  identical: (current: T) => void,
+  changing: (current: T, i: number) => void,
+  iterations = 2000,
+): FingerprintBenchResult {
+  const t0 = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    sf.update(identical);
+  }
+  const noopMs = performance.now() - t0;
+
+  const t1 = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    sf.update((c) => changing(c, i));
+  }
+  const changingMs = performance.now() - t1;
+
+  return {
+    noopMs,
+    changingMs,
+    noopPerSaveUs: (noopMs / iterations) * 1000,
+    changingPerSaveUs: (changingMs / iterations) * 1000,
+    speedup: changingMs / Math.max(noopMs, 1),
+  };
 }
 
 /**

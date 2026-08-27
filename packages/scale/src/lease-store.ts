@@ -17,6 +17,16 @@ export interface LeasesState {
  * stateDir (cross-process lock or SQLite write transaction), reload the
  * current state inside that critical section, apply `fn`, and persist — so
  * no manager ever acts on a stale snapshot.
+ *
+ * Higher-level lease operations (acquire / release / renew / list) are
+ * implemented by {@link LeaseManager} on top of this storage contract.
+ * The two-level split keeps the backend interface narrow and additive:
+ * a future `RedisLeaseStore` (or `MemoryLeaseStore`) implements the same
+ * `LeaseStore` (or equivalently `LeaseStore { acquire, release, renew, list }`
+ * at the manager layer) with Redis transactions/Lua scripts for TTL and
+ * generation fencing. No Redis or external service is required for the
+ * current `memory` / `sqlite` / `file` backends — the interface is prepared
+ * for it as an optional additive implementation.
  */
 export interface LeaseStore {
   load(): LeasesState;
@@ -25,14 +35,13 @@ export interface LeaseStore {
   close(): void;
 }
 
+
 /** JSON-file backend: the original StateFile-backed store (default). */
 export class JsonLeaseStore implements LeaseStore {
   private readonly file: StateFile<LeasesState>;
 
   constructor(stateDir: string) {
-    this.file = new StateFile(stateDir, "leases", () => ({ leases: {}, done: [] }), (raw) =>
-      validateLeasesState(raw),
-    );
+    this.file = new StateFile<LeasesState>(stateDir, "leases", () => ({ leases: {}, done: [] }), validateLeasesState);
   }
 
   load(): LeasesState {
@@ -47,6 +56,15 @@ export class JsonLeaseStore implements LeaseStore {
     // Nothing to release; the file handle lifetime is per-operation.
   }
 }
+
+/**
+ * File-backed lease store — alias for {@link JsonLeaseStore}.
+ * Exposed as `FileLeaseStore` for the `memory | sqlite | file` selection
+ * surface; behavior is identical to the JSON file backend (single-host
+ * multi-process via {@link StateFile} + {@link FileLock}).
+ */
+export class FileLeaseStore extends JsonLeaseStore {}
+
 
 const LEASES_SCHEMA = `
   CREATE TABLE IF NOT EXISTS leases (

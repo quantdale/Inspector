@@ -1,3 +1,7 @@
+// M15 release provenance: version coherence guard — root package.json version,
+// dist-release/package.json, bundle/inspector-version.txt, and build-manifest.json
+// must be coherent; tarball assertions enforce no .inspector/no secrets/no
+// absolute path leakage. See packages/repo-contract/src/release-provenance.test.ts.
 import { createHash } from "node:crypto";
 import {
   existsSync,

@@ -77,7 +77,10 @@ export function redactUrl(url: string): string {
 }
 
 function rewriteUrls(text: string, fn: (url: string) => string): string {
-  return text.replace(URL_RE, (match) => fn(match));
+  URL_RE.lastIndex = 0;
+  const out = text.replace(URL_RE, (match) => fn(match));
+  URL_RE.lastIndex = 0;
+  return out;
 }
 
 /** Full redaction of URLs embedded in freeform text (console/pageerror). */

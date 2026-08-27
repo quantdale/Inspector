@@ -64,19 +64,7 @@ zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferr
 for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
 and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M12 — real-target fleet campaigns complete, HARDENING_2 fleet-
-runtime integrity campaign complete**. M10 resumable exploration, all M11
-product/safety/CI/distribution gates, and the full M12 real-workflow campaign
-surface are complete; the separately invoked HARDENING_2 campaign closed the
-fleet-runtime reliability gaps (budgets enforced before consumption,
-cancellation reaching real workflows, scheduler-managed lease liveness,
-crash-safe settlement with a durable journal, durable wall budgets, truthful
-blocked/refused lifecycle states, fail-closed semantic state validation, and
-verify/regress source references). A local candidate artifact was installed
-and smoke-tested; no rc.2 package, release, or tag was published.
-RC1 field validation is complete with a documented GO decision; the RC1 tag
-and release state remain unchanged and no rc.2 release has been published.
-
+Current status: **M13 — Intelligence-Guided Autonomous QA complete; M14-M23 ten-campaign series COMPLETE (2026-08-27); HARDENING_5 — Fleet Execution Truth remains certified (run 33034546691 SUCCESS on `e1e0864`)**. M9 platform-neutral exploration, M10 resumable exploration, M11 operator workflows/distribution, M12 real-target fleet campaigns, M13 model-runtime / semantic planner / source-intelligence / safe-repair assistance, plus M14 replay-performance (StateFile bench), M15 release-provenance, M16 OTel observability, M17 operator dashboard, M18 supply-chain security, M19 platform fidelity, M20 visual oracle, M21 distributed fleet, M22 property-mutation, and M23 GA re-certification (rc.3) are all COMPLETE with gates green on the exact final tree (install --frozen-lockfile OK; lint 0 errors/4 warnings; typecheck PASS; unit 784 passed/3 skipped across 79 files; integration 211 passed/2 skipped across 51 files incl. real web/PTY/AVD/UIA/Electron + fleet chaos + new suites; release:smoke PASS). Separately invoked hardening campaigns HARDENING_2, HARDENING_3, HARDENING_4, and HARDENING_5 are all COMPLETE with deterministic regression coverage and hosted certification (f687ef1, e1e0864). RC1 field validation GO_WITH_DOCUMENTED_DEBT for rc.2; rc.3 candidate 0.1.0-rc.3 @ 22a6766 recorded GO_WITH_DOCUMENTED_DEBT, NOT_PUBLISHED, no tag. No release, tag, or publish has been performed.
 ## Quickstart
 
 Prerequisites: Node.js 22+, pnpm 9+. See `docs/DEVELOPMENT.md` for details,
@@ -133,8 +121,7 @@ re-observes an environment without continuing autonomous exploration.
 
 | Tier | Platforms |
 | --- | --- |
-| Proven real on dev machine | Web (Playwright + Chromium); CLI PTY (ConPTY via `@lydell/node-pty`); Windows UIA (PowerShell bridge); Android ADB (headless emulator) |
-| Production binding complete; field proof deferred | Electron (Playwright Electron API + deterministic fixture; this host lacks the optional downloaded executable) |
+| Proven real on dev machine | Web (Playwright + Chromium); CLI PTY (ConPTY via `@lydell/node-pty`); Windows UIA (PowerShell bridge); Android ADB (headless emulator); Electron (Playwright Electron API — proven real on Windows dev host with Electron 43.4.1 + Linux Xvfb fleet campaign proof; injectable fallback only when executable/display absent) |
 | Proven via injectable backend only | iOS interfaces |
 | Deferred | M8 iOS/Xcode |
 

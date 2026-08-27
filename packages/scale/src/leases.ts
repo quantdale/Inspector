@@ -1,14 +1,16 @@
 import type { LeaseRecord } from "./types.js";
-import { JsonLeaseStore, SqliteLeaseStore, type LeaseStore } from "./lease-store.js";
+import { FileLeaseStore, JsonLeaseStore, SqliteLeaseStore, type LeaseStore } from "./lease-store.js";
+import { MemoryLeaseStore } from "./lease-memory.js";
 
 export type AcquireResult =
   | { ok: true; lease: LeaseRecord }
   | { ok: false; reason: "held" | "done" };
 
-/** Backend selection; `"json"` (the original StateFile store) is the default. */
+/** Backend selection; `"json"` / `"file"` (StateFile) is the default. `"memory"` is ephemeral. */
 export interface LeaseManagerOptions {
-  backend?: "json" | "sqlite";
+  backend?: "json" | "sqlite" | "file" | "memory";
 }
+
 
 /**
  * Exclusive target leases (M7 S0). Leases are durable: after a controller
@@ -34,13 +36,15 @@ export class LeaseManager {
     private readonly ttlMs: number = 60_000,
     options: LeaseManagerOptions = {},
   ) {
-    this.store =
-      options.backend === "sqlite"
-        ? new SqliteLeaseStore(stateDir)
-        : new JsonLeaseStore(stateDir);
+    const backend = options.backend ?? "json";
+    if (backend === "sqlite") this.store = new SqliteLeaseStore(stateDir);
+    else if (backend === "memory") this.store = new MemoryLeaseStore(stateDir);
+    else if (backend === "file" || backend === "json") this.store = new FileLeaseStore(stateDir);
+    else this.store = new JsonLeaseStore(stateDir);
     // Fail loud at construction if durable state is corrupt.
     this.store.load();
   }
+
 
   /** Release backend resources; safe to call for either backend. */
   close(): void {
@@ -96,6 +100,11 @@ export class LeaseManager {
         delete state.leases[itemId];
       }
     });
+  }
+
+  /** List all live leases — part of the `LeaseStore { acquire, release, renew, list }` surface. */
+  list(): LeaseRecord[] {
+    return Object.values(this.store.load().leases);
   }
 
   /** In-flight items at restart time; expired ones are safe to requeue. */

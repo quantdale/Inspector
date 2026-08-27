@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./lock.js";
 export * from "./state-file.js";
 export * from "./lease-store.js";
+export * from "./lease-memory.js";
 export * from "./leases.js";
 export * from "./ledger.js";
 export * from "./model-budget.js";
