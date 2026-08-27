@@ -1,10 +1,10 @@
 # Project Status
 
-Last updated: HARDENING_6 ACTIVE (2026-08-27; Repair Trust, Positive-Evidence Verification, and Audit Integrity; planner baseline 038550172866001ce8bfe44054b8146b3391af32; baseline exact-HEAD CI run 33038479136 SUCCESS). HARDENING_5 remains historical COMPLETE on e1e0864.
+Last updated: HARDENING_6 ACTIVE (2026-08-28 planning rebase; Repair Trust, Positive-Evidence Verification, and Audit Integrity). Current execution baseline `8e6bdb0e7951505972fd59bce550d3ad330d0c22`; exact-HEAD CI run `33092343085` SUCCESS. M14-M23 remain historical COMPLETE; HARDENING_5 remains historical COMPLETE on `e1e0864`.
 
 ## Campaign
 
-- Mode: **HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity** (ACTIVE 2026-08-27 per `.agent/EXECUTION_PROMPT.md` and `.inspector/state/campaign.yaml`; OpenSpec: `openspec/changes/hardening-6-repair-trust/`). Planner audit confirmed a 536-file exact baseline tree vs 534-row H5 audit ledger plus new repair/core/protocol trust-boundary defects. Baseline exact-HEAD Actions run 33038479136 is SUCCESS; H6 requires fresh final-tree semantic review and certification. No release/tag/publication.
+- Mode: **HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity** (ACTIVE; OpenSpec: `openspec/changes/hardening-6-repair-trust/`). The 2026-08-28 rebase audited current `main@8e6bdb0`: 584 tracked blobs and exact-HEAD Actions run `33092343085` SUCCESS. Direct current-code review reconfirmed the H6 repair/core/protocol trust-boundary defects; M14-M23 did not modify those critical paths. Current audit: `.inspector/state/HARDENING_6-AUDIT.md`. H6 requires positive repair evidence, atomic application, exact identity/artifact integrity, final exact-blob semantic review, and fresh final-tree certification. No M24/release/tag/publication.
 
 - Mode: **HARDENING_5 — Fleet Execution Truth, extended through deep-audit
   verification-outcome-truth, replay-backend-provenance, and durable-history-

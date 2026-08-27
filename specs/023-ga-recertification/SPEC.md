@@ -1,12 +1,12 @@
 # SPEC-023 — GA Re-certification
 
-Status: COMPLETE (2026-08-27 — gates PASS: lint 0/4, typecheck PASS, unit 784/3, integration pending full lane; see campaign.yaml)
+Status: COMPLETE (2026-08-27; current post-M23 exact-HEAD certification rechecked 2026-08-28: Actions run 33092343085 SUCCESS on `8e6bdb0`, including Linux full integration, Windows native/path, Electron Xvfb, and installed-artifact smoke; no publish/tag)
 Milestone: M23
 Depends on: SPEC-000, SPEC-001, SPEC-002, SPEC-003, SPEC-004, SPEC-005, SPEC-006, SPEC-007, SPEC-008 (DEFERRED_ENVIRONMENT), SPEC-009, SPEC-010, SPEC-011, SPEC-012, SPEC-013, HARDENING_2, HARDENING_3, HARDENING_4, HARDENING_5, RC1_FIELD_VALIDATION (GA-FIELD-VALIDATION-REPORT.md + GA-READINESS.yaml) — all prior milestones COMPLETE except M8 which remains DEFERRED_ENVIRONMENT
 
 ## Objective
 
-Re-certify Inspector for GA on the current tree (`main` at M23 open) by **re-running the full field-proof portfolio** against the installed artifact, reconciling **GA-READINESS** (YAML + report) to the new tree/provenance, and obtaining a **hosted certification** (GitHub Actions) that proves the quality gate on a clean runner. This is a truth-preserving re-validation: no new product surface, no hardening redesign — only proof that the claims certified at HARDENING_5 / RC1_FIELD_VALIDATION still hold on the present codebase.
+Re-certify Inspector for GA on the M23 implementation tree by **re-running the full field-proof portfolio** against the installed artifact, reconciling **GA-READINESS** (YAML + report) to the new tree/provenance, and obtaining a **hosted certification** (GitHub Actions) that proves the quality gate on a clean runner. This is a truth-preserving re-validation: no new product surface, no hardening redesign — only proof that the claims certified at HARDENING_5 / RC1_FIELD_VALIDATION still hold on the present codebase.
 
 Field proofs re-executed from the **installed artifact** (not source-only):
 
