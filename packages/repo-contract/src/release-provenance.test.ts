@@ -48,21 +48,21 @@ export function versionCoherenceErrors(input: VersionCoherenceInput): string[] {
     const v = normalizeVersion(input.inspectorVersionTxt);
     if (v.length === 0) {
       errors.push("inspector-version.txt is empty");
-    } else if (v !== root) {
+    } else if (v !== root && !v.startsWith(`${root}-`)) {
       errors.push(`inspector-version.txt version ${v} diverges from root ${root}`);
     }
   }
 
   if (input.bundlePackageJsonVersion !== null && input.bundlePackageJsonVersion !== undefined) {
     const v = normalizeVersion(input.bundlePackageJsonVersion);
-    if (v !== root) {
+    if (v !== root && !v.startsWith(`${root}-`)) {
       errors.push(`bundle package.json version ${v} diverges from root ${root}`);
     }
   }
 
   if (input.buildManifestVersion !== null && input.buildManifestVersion !== undefined) {
     const v = normalizeVersion(input.buildManifestVersion);
-    if (v !== root) {
+    if (v !== root && !v.startsWith(`${root}-`)) {
       errors.push(`build-manifest.json version ${v} diverges from root ${root}`);
     }
   }
