@@ -1,14 +1,38 @@
-# Planner → Executor Handoff
+# Planner Handoff — HARDENING_6
 
-Additive; stricter repository rules win. The planner writes `.agent/EXECUTION_PROMPT.md` only after auditing actual code, tests, docs, recent commits/diffs, useful issues/PRs, and native state. It must contain Status, Planned-From, target branch, one high-impact campaign, scope, ordered workstreams, constraints, validation, acceptance/completion gates, and Git/reporting requirements; then commit/push and stop without implementing.
+## Active campaign
+HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity.
 
-For `/goal continue`: read repository instructions, this file, the execution prompt if present, and native campaign/state files; reconcile against current Git/implementation; resume the first genuinely incomplete requirement of an ACTIVE prompt, without redoing landed work; validate, fix introduced Critical/High regressions, update state, and commit/push per local policy. Otherwise fall back to native continuation semantics; if none exists, report that planning is required.
+Canonical OpenSpec: `openspec/changes/hardening-6-repair-trust/`.
 
-## Active planner handoff — HARDENING_5 re-audit (2026-08-27)
+Planner baseline: `038550172866001ce8bfe44054b8146b3391af32`.
 
-Current planner baseline is `main@6df14d5945e057761afdde8be7d07d6b7b2ace54`, whose exact Actions run `32988428201` is red in full integration. The active execution contract remains `.agent/EXECUTION_PROMPT.md` + `openspec/changes/hardening-5-fleet-truth/`; its latest 2026-08-27 delta and H5.10 tasks are authoritative.
+## Planner findings
 
-Two additional confirmed defects must not be lost during rehydration: **H5-D14** (path-only self-attesting every-file audit) and **H5-D15** (configured Windows mock backend is executable but capability discovery suppresses the Windows family on Linux). Resume H5, do not invent H6/M14, and do not call the campaign complete until exact-blob content review and exact-SHA hosted certification are real.
+No production implementation was changed by this planning pass.
 
-The intended executor envelope is approximately **12 productive hours**. If the harness enforces a shorter hard session cap, checkpoint and resume the same H5.10 campaign on the next invocation; never convert a session timeout into completion.
+Current baseline exact-SHA Actions run `33038479136` is SUCCESS across Linux quality/full integration, Windows path/native, Electron Xvfb real-runtime/fleet, and Linux installed-artifact smoke. Runtime source is unchanged since H5's certified `e1e0864`.
 
+The critical new discovery is that H5's every-file certificate is incomplete and still self-attesting:
+- exact tree has 536 tracked blobs;
+- H5 ledger has 534 rows;
+- missing `packages/workflows/src/replay-subject.hardening.test.ts`;
+- missing `packages/workflows/src/verify-regress-truth.integration.test.ts`;
+- `scripts/gen_audit_census.py` computes hashes but assigns REVIEWED from pathname/category, not semantic review evidence.
+
+Do not regenerate the same mechanism and call it fixed.
+
+## First implementation target
+
+Start with H6-D1/H6-D2 red tests:
+1. post-patch replay returns adapter-crash/cancelled/deadline-exceeded/unknown/empty;
+2. masking probe receives the same;
+3. assert no path can transition the finding to RESOLVED without positive successful execution evidence.
+
+Then execute H6-D3..D6 repair durability/application/isolation/provenance, H6-D7..D9 core correlation/artifacts, H6-D10 protocol boundary, and H6-D11 durable corruption.
+
+## Operating rule
+
+Use the OpenSpec tasks as the work queue and continue autonomously until completion gates are proved or every remaining item is genuinely environment/authority blocked.
+
+No release/tag/publication. No force-push. Preserve all historical campaign records.
