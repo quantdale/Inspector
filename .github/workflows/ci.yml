@@ -114,6 +114,7 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @inspector/adapter-web provision:browser
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libnss3 libgtk-3-0t64 libgbm1 libasound2t64 libatk-bridge2.0-0t64
       - run: xvfb-run --auto-servernum pnpm exec vitest run --config vitest.integration.config.ts packages/electron-adapter/src/electron-production.integration.test.ts
       # H5-D12: the Electron Xvfb lane must prove the H5 fleet/campaign
