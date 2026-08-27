@@ -1,8 +1,10 @@
 # Project Status
 
-Last updated: HARDENING_5 COMPLETE (2026-08-27 hosted certification run 33034546691 SUCCESS on e1e0864; 15 defects H5-D0..H5-D15 CLOSED; prior HARDENING_4 run 32936068493 on f687ef1)
+Last updated: HARDENING_6 ACTIVE (2026-08-27; Repair Trust, Positive-Evidence Verification, and Audit Integrity; planner baseline 038550172866001ce8bfe44054b8146b3391af32; baseline exact-HEAD CI run 33038479136 SUCCESS). HARDENING_5 remains historical COMPLETE on e1e0864.
 
 ## Campaign
+
+- Mode: **HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity** (ACTIVE 2026-08-27 per `.agent/EXECUTION_PROMPT.md` and `.inspector/state/campaign.yaml`; OpenSpec: `openspec/changes/hardening-6-repair-trust/`). Planner audit confirmed a 536-file exact baseline tree vs 534-row H5 audit ledger plus new repair/core/protocol trust-boundary defects. Baseline exact-HEAD Actions run 33038479136 is SUCCESS; H6 requires fresh final-tree semantic review and certification. No release/tag/publication.
 
 - Mode: **HARDENING_5 — Fleet Execution Truth, extended through deep-audit
   verification-outcome-truth, replay-backend-provenance, and durable-history-
