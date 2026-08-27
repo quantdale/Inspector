@@ -269,7 +269,19 @@ export class FindingEngine {
         finding.severity = successes === policy.attempts ? "high" : "medium";
         this.transition(finding, "CONFIRMED");
       } else if (successes === 0) {
-        this.transition(finding, "REJECTED");
+        if (errors > 0) {
+          // H5-D9: all attempts errored/timed out/cancelled, so there is NO
+          // positive non-reproduction evidence. The finding must stay in a
+          // non-terminal/indeterminate state, never become REJECTED (which
+          // would conflate "could not execute" with "cleanly did not
+          // reproduce").
+          this.transition(finding, "CANDIDATE", {
+            reason: "all replay attempts errored/timed out; cannot conclude non-reproduction",
+            actor: "finding-engine",
+          });
+        } else {
+          this.transition(finding, "REJECTED");
+        }
       } else {
         this.transition(finding, "FLAKY");
       }
@@ -575,21 +587,25 @@ export class FindingEngine {
 
 function parseStringArray(raw: string | null): string[] {
   if (!raw) return [];
+  let value: unknown;
   try {
-    const value: unknown = JSON.parse(raw);
-    return Array.isArray(value) && value.every((item) => typeof item === "string")
-      ? value
-      : [];
-  } catch {
-    return [];
+    value = JSON.parse(raw);
+  } catch (e) {
+    // H5-D13: malformed durable JSON must not silently degrade to [] and hide evidence corruption.
+    throw new Error(`malformed durable string-array JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`malformed durable string-array JSON: expected string[] but got ${typeof value}`);
+  }
+  return value;
 }
 
 function parseJson<T>(raw: string | null): T | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as T;
-  } catch {
-    return null;
+  } catch (e) {
+    // H5-D13: malformed durable structured JSON must not silently degrade to null.
+    throw new Error(`malformed durable JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
 }

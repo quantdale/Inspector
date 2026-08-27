@@ -116,15 +116,44 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     } else {
       details.push(`pty unavailable (${pty.detail})`);
     }
+    // H5-D15: configured mock backend is executable even when real probe fails.
+    // Mock/injectable execution must be advertised as a distinct capability so
+    // routing can succeed on hosts without the real backend while evidence
+    // still distinguishes mock vs real field proof.
+    const windowsMock = process.env.INSPECTOR_WINDOWS_BACKEND === "mock";
     if (uia.ok) {
       families.push("windows");
       capabilities.push("uia");
       details.push("uia ok");
+      if (windowsMock) {
+        capabilities.push("uia-mock");
+        details.push("uia mock configured");
+      }
+    } else if (windowsMock) {
+      families.push("windows");
+      capabilities.push("uia");
+      capabilities.push("uia-mock");
+      details.push("uia mock (INSPECTOR_WINDOWS_BACKEND=mock) — real probe: " + uia.detail);
+    } else {
+      details.push(`uia unavailable (${uia.detail})`);
     }
+    // Android mock is similarly configurable (CLI/PTTY mock is always deterministic-fixture).
+    const androidMock = process.env.INSPECTOR_ANDROID_BACKEND === "mock";
     if (adb.ok) {
       families.push("android");
       capabilities.push("adb");
       details.push(`adb ok`);
+      if (androidMock) {
+        capabilities.push("adb-mock");
+        details.push("adb mock configured");
+      }
+    } else if (androidMock) {
+      families.push("android");
+      capabilities.push("adb");
+      capabilities.push("adb-mock");
+      details.push("adb mock (INSPECTOR_ANDROID_BACKEND=mock) — real probe: " + adb.detail);
+    } else {
+      details.push(`adb unavailable (${adb.detail})`);
     }
     if (electron.ok) {
       families.push("electron");
@@ -438,45 +467,82 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         );
       }
       const attempts = clampInt(numOption(item.targetConfig?.attempts), 2, 1, 8);
+      const unitSteps = Math.max(1, subject.bundle.minimizedSteps.length);
       const driver = await this.replayDriverForWorkspace(store, base, subject.finding.id, ctx);
-      let successes = 0;
-      let errors = 0;
+      let reproducedCount = 0;
+      let errorCount = 0;
+      let cleanCount = 0;
       for (let index = 1; index <= attempts; index++) {
         if (ctx.signal.aborted) throw new ItemCancelledError();
-        if (!ctx.charge({ actions: Math.max(1, subject.bundle.minimizedSteps.length) })) {
-          return failedResult("budget-exhausted", "verification budget exhausted mid-attempt");
+        // H5-D10: admit BEFORE consuming the replay unit. A denied admission
+        // invokes no replay driver (no fabricated work, no budget charge).
+        if (!ctx.admit({ actions: unitSteps })) {
+          return failedResult("budget-exhausted", "verification replay not admitted by budget gate");
         }
         try {
           const result: import("@inspector/finding").ReplayResult = await driver.replay(subject.bundle.minimizedSteps);
           const evaluation = OracleEngine.defaults().evaluate(result);
-          if (evaluation.reproduced) successes += 1;
+          if (evaluation.reproduced) reproducedCount += 1;
+          else cleanCount += 1; // executed cleanly and did not reproduce
         } catch {
-          errors += 1;
+          errorCount += 1; // adapter/environment failure: NOT clean evidence
+        } finally {
+          ctx.charge({ actions: unitSteps });
         }
       }
-      const classification =
-        successes >= 1 ? "reproduced" : errors > 0 ? "environment-failure" : "fixed";
-      if (classification !== "reproduced") {
-        const engine = new FindingEngine(OracleEngine.defaults(), store);
-        const current = engine.rehydrate(subject.record);
-        if (current.status === "CONFIRMED") {
-          engine.transition(current, "RESOLVED", {
-            reason: "campaign verify replayed the minimized reproducer clean",
-            actor: "inspector-workflow-executor",
-          });
-        }
+      // H5-D7 positive-evidence rule: a CONFIRMED finding transitions to
+      // RESOLVED only when verification produced sufficient successful,
+      // environment-valid, clean replay evidence. Any environment/adapter/
+      // provenance failure leaves it unresolved and returns a typed
+      // indeterminate result (never "fixed").
+      let classification: "reproduced" | "fixed" | "environment-failure";
+      if (reproducedCount >= 1) classification = "reproduced";
+      else if (errorCount > 0) classification = "environment-failure";
+      else classification = "fixed";
+      const engine = new FindingEngine(OracleEngine.defaults(), store);
+      const current = engine.rehydrate(subject.record);
+      if (classification === "fixed" && current.status === "CONFIRMED") {
+        engine.transition(current, "RESOLVED", {
+          reason: "campaign verify replayed the minimized reproducer clean across all attempts",
+          actor: "inspector-workflow-executor",
+        });
+      }
+      if (classification === "environment-failure") {
+        return failedResult(
+          "environment-unavailable",
+          `verify obtained no valid replay evidence in ${attempts} attempt(s) (${errorCount} errored); finding '${findingId}' remains ${current.status}`,
+          {
+            findings: [],
+            evidencePaths: [],
+            runIds: [],
+            usage: { actions: attempts * unitSteps },
+            notes: {
+              verify: {
+                findingId,
+                attempts,
+                reproducedCount,
+                errorCount,
+                cleanCount,
+                classification,
+                bundlePath: subject.bundlePath,
+                ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
+              },
+            },
+          },
+        );
       }
       return okResult({
         findings: [],
         evidencePaths: [],
         runIds: [],
-        usage: { actions: attempts * Math.max(1, subject.bundle.minimizedSteps.length) },
+        usage: { actions: attempts * unitSteps },
         notes: {
           verify: {
             findingId,
             attempts,
-            successes,
-            errors,
+            reproducedCount,
+            errorCount,
+            cleanCount,
             classification,
             bundlePath: subject.bundlePath,
             ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
@@ -507,41 +573,70 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
       }
       const limit = clampInt(item.budgets?.maxActions ?? numOption(item.targetConfig?.limit), 4, 1, 50);
       const base = source.base;
-      const results: Array<{ findingId: string; reproduced: boolean }> = [];
+      const results: Array<{ findingId: string; reproduced: boolean; error: boolean }> = [];
+      let chargedActions = 0;
       for (const record of records.slice(0, limit)) {
         if (ctx.signal.aborted) throw new ItemCancelledError();
         let driver: ReplayDriver;
         try {
           driver = await this.replayDriverForWorkspace(store, base, record.id, ctx);
         } catch (err) {
-          if (err instanceof WorkflowProvenanceError || err instanceof WorkflowError) continue;
+          // Incompatible/missing provenance is not a clean scenario: record it
+          // as an error so it can never be counted clean (H5-D8).
+          if (err instanceof WorkflowProvenanceError || err instanceof WorkflowError) {
+            results.push({ findingId: record.id, reproduced: false, error: true });
+            continue;
+          }
           throw err;
         }
         const subject = loadReplaySubject(store, base, record.id);
-        if (!ctx.charge({ actions: Math.max(1, subject.bundle.minimizedSteps.length) })) {
-          return failedResult("budget-exhausted", "regression budget exhausted mid-scenario");
+        const steps = Math.max(1, subject.bundle.minimizedSteps.length);
+        // H5-D10: admit BEFORE consuming the replay unit.
+        if (!ctx.admit({ actions: steps })) {
+          return failedResult("budget-exhausted", "regression replay not admitted by budget gate");
         }
+        let reproducedThis = false;
+        let errorThis = false;
         try {
           const result = await driver.replay(subject.bundle.minimizedSteps);
-          results.push({ findingId: record.id, reproduced: OracleEngine.defaults().evaluate(result).reproduced });
+          reproducedThis = OracleEngine.defaults().evaluate(result).reproduced;
         } catch {
-          results.push({ findingId: record.id, reproduced: false });
+          errorThis = true; // adapter/environment failure: NOT clean evidence
+        } finally {
+          ctx.charge({ actions: steps });
+          chargedActions += steps;
         }
+        results.push({ findingId: record.id, reproduced: reproducedThis, error: errorThis });
       }
-      const reproduced = results.filter((r) => r.reproduced).length;
+      const reproduced = results.filter((r) => r.reproduced && !r.error).length;
+      const errors = results.filter((r) => r.error).length;
+      const clean = results.filter((r) => !r.reproduced && !r.error).length;
+      const executed = reproduced + clean;
+      const summary = {
+        scenariosReplayed: results.length,
+        executed,
+        reproduced,
+        clean,
+        errors,
+        ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
+        detail: results.slice(0, 20),
+      };
+      // H5-D8: clean regression requires a successfully executed replay whose
+      // oracle is clean. Zero valid scenarios is an indeterminate result, not
+      // an OK-clean success.
+      if (executed === 0) {
+        return failedResult(
+          "environment-unavailable",
+          `regression executed zero valid scenarios (${errors} errored/incompatible of ${results.length}); cannot certify clean`,
+          { findings: [], evidencePaths: [], runIds: [], usage: { actions: chargedActions }, notes: { regress: summary } },
+        );
+      }
       return okResult({
         findings: [],
         evidencePaths: [],
         runIds: [],
-        notes: {
-          regress: {
-            scenariosReplayed: results.length,
-            reproduced,
-            clean: results.length - reproduced,
-            ...(source.sourceItemId ? { sourceItemId: source.sourceItemId } : {}),
-            detail: results.slice(0, 20),
-          },
-        },
+        usage: { actions: chargedActions },
+        notes: { regress: summary },
       });
     } finally {
       store.close();

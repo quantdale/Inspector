@@ -552,7 +552,8 @@ hardening5:
     - {id: H5.6, name: cross-platform-atomic-write-durability, state: DONE}
     - {id: H5.7, name: measured-runtime-efficiency, state: DONE}
     - {id: H5.8, name: negative-space-soak-installed-artifact, state: DONE}
-    - {id: H5.9, name: truth-reconciliation-certification, state: PENDING}
+    - {id: H5.9, name: truth-reconciliation-certification, state: DONE}
+    - {id: H5.10, name: deep-audit-verification-truth-provenance, state: IN_PROGRESS}
   defects:
     - >-
       H5-D0 CONFIRMED HIGH (CLOSED 2026-08-26) electron-family-routed-through-
@@ -579,6 +580,56 @@ hardening5:
       H5-D5 (CLOSED 2026-08-26) windows mock had no autonomously-reachable seeded
       defect past the deny-patterned Log in wall — added login-screen notes
       Edit with boundary crash, TRIAGED identically to the web seeded defects.
+    - >-
+      H5-D6 HIGH (CLOSED 2026-08-26) state-sync commit 04d8d84 replaced the full
+      ~765-line hardening ledger with a 14-line H5.9 fragment, deleting ~751
+      historical lines; restored verbatim from parent 05254ff and protected by a
+      repo-contract history-preservation guard (H5-D6).
+    - >-
+      H5-D7 HIGH (CLOSED 2026-08-26) campaign verify could transition CONFIRMED ->
+      RESOLVED when replay attempts errored (environment failure counted as fixed);
+      now only sufficient successful environment-valid clean replay resolves; else
+      a typed indeterminate/environment result is returned.
+    - >-
+      H5-D8 HIGH (CLOSED 2026-08-26) campaign regress counted replay errors as
+      clean; clean now counts only executed-clean scenarios, errors are distinct,
+      and zero valid scenarios is a typed failure, not OK-clean.
+    - >-
+      H5-D9 HIGH (CLOSED 2026-08-26) finding-engine REJECTED a candidate when all
+      replay attempts errored/timeout; now all-error stays non-terminal/
+      indeterminate (CANDIDATE), REJECTED requires valid completed non-reproducing
+      replays.
+    - >-
+      H5-D10 HIGH (CLOSED 2026-08-26) verify/regress charged before replay without
+      admit; now admit-before-consume with actual-use charge; denied admission
+      invokes no replay driver.
+    - >-
+      H5-D11 HIGH (CLOSED 2026-08-26) electron durable replay accepted missing
+      INSPECTOR_ELECTRON_BACKEND and fell back to host-driven auto; now requires
+      explicit durable backend provenance and fails closed otherwise.
+    - >-
+      H5-D12 MEDIUM (CLOSED 2026-08-26) certification contained tautological
+      assertions and unexercised campaign lanes; tautology removed, Android
+      real-device early-return converted to an honest skip, Windows/Electron
+      hosted jobs extended to the workflow/fleet campaign path.
+    - >-
+      H5-D13 SUSPICION (RESOLVED-NOT-REPRODUCIBLE 2026-08-26) malformed durable
+      finding/provenance data might degrade silently; lower-layer rehydrate
+      validation (parseJson/parseStringArray) contains corruption; documented
+      invariant, no behavioral change required.
+    - >-
+      H5-D14 HIGH (CLOSED 2026-08-27) every-file audit generator was path-only
+      self-attesting (530/530 R without reading content, lockfile claimed
+      untracked while pnpm-lock.yaml is tracked); replaced with content-aware
+      audit bound to exact blob hash and review basis, plus explicit lockfile
+      accounting.
+    - >-
+      H5-D15 HIGH (CLOSED 2026-08-27) INSPECTOR_WINDOWS_BACKEND=mock is
+      executable but probeUia suppressed Windows family on Linux, causing exact-
+      HEAD CI 32988428201 to route-refuse all producer/verify/regress items
+      (completed=[] with failed=[]); capability discovery now reflects
+      configured mock/injectable backend and distinguishes mock vs real evidence
+      strength.
 
 hardening1_history:
   campaign: HARDENING_1

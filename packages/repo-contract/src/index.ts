@@ -268,6 +268,44 @@ export interface RunStep {
   line: number;
 }
 
+/**
+ * Semantic anchors that prove the durable hardening ledger still carries the
+ * historical H1-H5 campaign payload (defect records, certification evidence,
+ * and retained debt). A state-sync commit that replaces the ledger with a
+ * short current-state fragment erases these (H5-D6); the anchors are chosen
+ * to be absent from such a fragment so the guard fails loud instead of
+ * silently passing. They are identity-based, not a brittle total line count.
+ */
+export const REQUIRED_LEDGER_HISTORY_ANCHORS: readonly string[] = [
+  "HARDENING_1",
+  "HARDENING_2",
+  "HARDENING_3",
+  "HARDENING_4",
+  "HARDENING_5",
+  "H4-D1",
+  "H4-D2",
+  "H4-D3",
+  "H4-D4",
+  "H4-D5",
+  "H4-D6",
+  "H4-D7",
+  "H4-D8",
+  "H3-D1",
+  "H3-D2",
+  "H3-D3",
+  "H3-D4",
+  "H3-D5",
+  "H3-D6",
+];
+
+/**
+ * Returns the required historical anchors missing from a hardening-ledger
+ * text. Empty array means the ledger preserves the H1-H5 history payload.
+ */
+export function missingLedgerHistoryAnchors(ledgerText: string): string[] {
+  return REQUIRED_LEDGER_HISTORY_ANCHORS.filter((a) => !ledgerText.includes(a));
+}
+
 /** Extracts single-line `- run:` steps from a workflow file. */
 export function extractRunSteps(ciYaml: string): RunStep[] {
   const steps: RunStep[] = [];

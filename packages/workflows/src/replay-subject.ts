@@ -140,13 +140,19 @@ const REPLAY_DRIVER_FACTORIES: Record<
       artifactBaseDir: join(base, "replay", subject.finding.id),
     });
   },
-  "cli-pty": async ({ spawnEnv }) => {
+  "cli-pty": async ({ subject, spawnEnv }) => {
     const { CliPtyReplayDriver } = await import("../../cli-adapter/src/replay.js");
     const program = stringValue(spawnEnv?.INSPECTOR_CLI_PROGRAM) ?? "seedcli";
-    const real = spawnEnv?.INSPECTOR_PTY === "real";
-    // Resolve the class dynamically, while its native binding remains lazy
-    // until the first PTY spawn.
-    if (real) {
+    const raw = spawnEnv?.INSPECTOR_PTY;
+    // H5-D11: backend identity must be durably pinned. Missing/malformed
+    // values cannot be inferred from current-host capability.
+    if (raw !== "real" && raw !== "mock") {
+      throw new WorkflowProvenanceError(
+        `cli finding ${subject.finding.id} lacks durable PTY backend provenance (INSPECTOR_PTY='${String(raw)}'); refusing to infer from current host`,
+        "incompatible-target",
+      );
+    }
+    if (raw === "real") {
       const { NodePtyBackend } = await import("../../cli-adapter/src/node-pty-backend.js");
       return new CliPtyReplayDriver({ program, backend: () => new NodePtyBackend() });
     }
@@ -155,10 +161,17 @@ const REPLAY_DRIVER_FACTORIES: Record<
       backend: "mock",
     });
   },
-  "windows-uia": async ({ createOptions, spawnEnv }) => {
+  "windows-uia": async ({ subject, createOptions, spawnEnv }) => {
     const { WindowsUiaReplayDriver } = await import("../../windows-adapter/src/replay.js");
     const title = stringValue(createOptions?.titleContains);
-    if (spawnEnv?.INSPECTOR_WINDOWS_BACKEND === "mock") {
+    const raw = spawnEnv?.INSPECTOR_WINDOWS_BACKEND;
+    if (raw !== "mock" && raw !== "real") {
+      throw new WorkflowProvenanceError(
+        `windows finding ${subject.finding.id} lacks durable UIA backend provenance (INSPECTOR_WINDOWS_BACKEND='${String(raw)}'); refusing to reconstruct from current host`,
+        "incompatible-target",
+      );
+    }
+    if (raw === "mock") {
       const { MockUiaBackend } = await import("../../windows-adapter/src/mock-uia.js");
       return new WindowsUiaReplayDriver({ targetTitle: title, backend: new MockUiaBackend() });
     }
@@ -173,7 +186,14 @@ const REPLAY_DRIVER_FACTORIES: Record<
         "incompatible-target",
       );
     }
-    const backend = spawnEnv?.INSPECTOR_ANDROID_BACKEND === "mock" ? "mock" : "real";
+    const raw = spawnEnv?.INSPECTOR_ANDROID_BACKEND;
+    if (raw !== "mock" && raw !== "real") {
+      throw new WorkflowProvenanceError(
+        `android finding ${subject.finding.id} lacks durable backend provenance (INSPECTOR_ANDROID_BACKEND='${String(raw)}'); refusing to infer from current host`,
+        "incompatible-target",
+      );
+    }
+    const backend = raw as "mock" | "real";
     return new AndroidReplayDriver({
       backend,
       createOptions: { launchPackage },
@@ -185,10 +205,20 @@ const REPLAY_DRIVER_FACTORIES: Record<
   "electron-chromium": async ({ subject, base, spawnEnv }) => {
     const { ElectronReplayDriver } = await import("../../electron-adapter/src/replay.js");
     const raw = spawnEnv?.INSPECTOR_ELECTRON_BACKEND;
-    const backend = raw === "injectable" || raw === "real" ? raw : undefined;
+    // H5-D11: durable replay identity must pin the backend mode that produced
+    // the evidence. A missing/malformed backend is NOT an excuse to let the
+    // driver auto-select `real` or `injectable` from CURRENT-host availability
+    // (which would silently reclassify a real finding as injectable, or vice
+    // versa). Fail closed with a typed compatibility outcome instead.
+    if (raw !== "injectable" && raw !== "real") {
+      throw new WorkflowProvenanceError(
+        `electron finding ${subject.finding.id} lacks durable backend provenance (INSPECTOR_ELECTRON_BACKEND='${String(raw)}'); refusing to reconstruct replay from current-host capability`,
+        "incompatible-target",
+      );
+    }
     return new ElectronReplayDriver({
       artifactBaseDir: join(base, "replay", subject.finding.id),
-      ...(backend !== undefined ? { backend } : {}),
+      backend: raw,
     });
   },
 };

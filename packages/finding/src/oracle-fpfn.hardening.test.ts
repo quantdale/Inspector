@@ -412,7 +412,9 @@ describe("phase-D oracle FP/FN fixtures (hardening)", () => {
     expect(stats.successes).toBe(0);
     expect(stats.errors).toBe(3);
     expect(stats.lastError ?? "").toContain("driver exploded");
-    expect(finding.status).toBe("REJECTED");
+    // H5-D9: all-error reproduction has no positive non-reproduction evidence,
+    // so the finding stays non-terminal/indeterminate (CANDIDATE), never REJECTED.
+    expect(finding.status).toBe("CANDIDATE");
     expect(finding.status).not.toBe("REPRODUCING");
   });
 

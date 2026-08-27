@@ -219,7 +219,7 @@ describe("hardening: reproduction integrity", () => {
     }
   });
 
-  it("bounds hung drivers with perAttemptTimeoutMs and counts the attempt", async () => {
+  it("keeps a finding indeterminate (not REJECTED) when every replay attempt times out", async () => {
     const engine = new FindingEngine();
     const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
     const startedAt = Date.now();
@@ -233,6 +233,24 @@ describe("hardening: reproduction integrity", () => {
     expect(stats.successes).toBe(0);
     expect(stats.errors).toBe(2);
     expect(stats.lastError ?? "").toMatch(/timed out/i);
+    // H5-D9: all-error reproduction has no positive non-reproduction evidence,
+    // so the finding stays non-terminal/indeterminate instead of REJECTED.
+    expect(finding.status).toBe("CANDIDATE");
+  });
+
+  it("rejects a candidate only when replays execute cleanly and never reproduce", async () => {
+    const engine = new FindingEngine();
+    const f = engine.ingest({ kind: "DEFECT_SUBMIT_INVALID" });
+    // A driver that always executes cleanly and never emits a defect signal.
+    const cleanDriver: ReplayDriver = {
+      async replay() {
+        return { outcomes: [], signals: [], observations: [] };
+      },
+    };
+    const { finding } = await engine.reproduce(f, defectActions, cleanDriver, {
+      attempts: 2,
+      minSuccesses: 1,
+    });
     expect(finding.status).toBe("REJECTED");
   });
 

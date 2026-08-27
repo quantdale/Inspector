@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findDuplicateListItems, findDuplicateMappingKeys } from "./index.js";
+import { findDuplicateListItems, findDuplicateMappingKeys, missingLedgerHistoryAnchors } from "./index.js";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 
@@ -94,5 +94,24 @@ describe("durable campaign state contract (H4-D2 regression guard)", () => {
     expect(activeBlock).toMatch(/status: COMPLETE/);
     expect(activeBlock).toMatch(/milestone_id: M13\b/);
     expect(activeBlock).not.toMatch(/milestone_id: M14/);
+  });
+
+  it("durable hardening ledger preserves H1-H5 history (H5-D6 guard)", () => {
+    const ledger = readRepo(".inspector/state/HARDENING-CHECKPOINT.md");
+    expect(missingLedgerHistoryAnchors(ledger)).toEqual([]);
+  });
+
+  it("H5-D6 guard fails when prior hardening sections are truncated", () => {
+    // A state-sync fragment that keeps only a current H5.9 note must NOT pass.
+    const truncated = [
+      "## H5.9 Truth reconciliation (2026-08-26) — PENDING hosted run",
+      "",
+      "- Exact-tree local gates on pushed SHA 05254ff:",
+      "- HOSTED CERTIFICATION: queued, not executed.",
+    ].join("\n");
+    expect(missingLedgerHistoryAnchors(truncated).length).toBeGreaterThan(0);
+    // The same guard accepts the intact restored ledger.
+    const ledger = readRepo(".inspector/state/HARDENING-CHECKPOINT.md");
+    expect(missingLedgerHistoryAnchors(ledger)).toEqual([]);
   });
 });

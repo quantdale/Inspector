@@ -11,8 +11,14 @@ separately invoked under `docs/HARDENING-CAMPAIGN.md`, the **HARDENING_2**,
 atomicity, and cross-process ownership fencing — COMPLETE (2026-08-26;
 hosted certification run 32936068493 SUCCESS on exact pushed SHA `f687ef1`)**
 campaigns (RC1 field validation and M9-M12 are complete; M8 iOS remains
-`DEFERRED_ENVIRONMENT`). No campaign is currently ACTIVE. Continue only when
-the next roadmap milestone or campaign is explicitly activated via
+`DEFERRED_ENVIRONMENT`). No implementation milestone campaign is currently
+ACTIVE. **HARDENING_5** (Fleet Execution Truth, extended through deep-audit
+verification-outcome-truth, replay-backend-provenance, and durable-history-
+integrity correction — defects H5-D0..H5-D13) is ACTIVE per
+`.agent/EXECUTION_PROMPT.md` and `.inspector/state/campaign.yaml`; its
+completion gate (all Critical/High defects CLOSED, hosted CI verified on the
+exact pushed SHA) must pass before any COMPLETE claim. Continue only when the
+next roadmap milestone or campaign is explicitly activated via
 `.agent/EXECUTION_PROMPT.md`; do not infer a release from this state.
 
 The intent is unattended forward development: continue implementing the roadmap without waiting for routine human approval. Deep audits, broad refactors whose only purpose is cleanup, exhaustive fuzzing, and other hardening-only work belong to a separately invoked hardening campaign.

@@ -104,9 +104,13 @@ describe("M12 F3: inspector workflow executor over UnattendedCampaign", () => {
         // Real usage was charged from executed actions (not the fake fixture).
         expect(report.usage.actions).toBeGreaterThan(4);
         // Findings flow through the standard pipeline into durable campaign
-        // state — the crash app yields a PAGE_ERROR-class candidate/finding.
-        const webFindings = report.findings.filter((f) => f.title.includes("PAGE_ERROR") || f.oracleIds.length > 0);
-        expect(webFindings.length).toBeGreaterThanOrEqual(0); // honest: may be zero on a healthy app
+        // state — the crash app yields a PAGE_ERROR-class candidate/finding. A
+        // meaningful assertion (H5-D12): the real web lane actually executed
+        // and produced evidence, it is not a pass-by-return tautology.
+        const webFindings = report.findings.filter(
+          (f) => f.adapter === "web-playwright" || f.title.includes("PAGE_ERROR"),
+        );
+        expect(webFindings.length).toBeGreaterThanOrEqual(1);
 
         // Per-item workspaces are retained with their own SQLite stores.
         const itemsRoot = join(base, "artifacts", "items");
@@ -196,13 +200,10 @@ describe("M12 F3: inspector workflow executor over UnattendedCampaign", () => {
    * emulator with the other real-backend suites. Run explicitly:
    * `INSPECTOR_M12_ANDROID_E2E=1 pnpm test:integration ...`
    */
-  it(
-    "drives a real android target as a campaign item when the device is exclusively available",
+  it.skipIf(process.env.INSPECTOR_M12_ANDROID_E2E !== "1")(
+    "drives a real android target as a campaign item when the device is exclusively available (skipped unless the real-device env gate is set)",
     { timeout: 180_000 },
     async () => {
-      if (process.env.INSPECTOR_M12_ANDROID_E2E !== "1") {
-        return; // honest skip: real-device legs run serialized under the env gate
-      }
       const base = fresh("refusal");
       const items: WorkItem[] = [
         {

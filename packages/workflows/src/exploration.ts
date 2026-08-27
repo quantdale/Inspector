@@ -233,7 +233,13 @@ export async function runExploration(opts: ExplorationOptions): Promise<Explorat
         // Default to Android Settings: an independently developed, always-
         // present target on any AVD; --target overrides.
         createOptions = { launchPackage: req.target ?? "com.android.settings" };
-        spawnEnvDelta = { INSPECTOR_ANDROID_LAUNCH_PACKAGE: req.target ?? "com.android.settings" };
+        // H5-D11: record the exact backend mode so replay is provenance-bound.
+        const rawAndroid = process.env.INSPECTOR_ANDROID_BACKEND;
+        const androidBackend = rawAndroid === "mock" || rawAndroid === "real" ? rawAndroid : "real";
+        spawnEnvDelta = {
+          INSPECTOR_ANDROID_BACKEND: androidBackend,
+          INSPECTOR_ANDROID_LAUNCH_PACKAGE: req.target ?? "com.android.settings",
+        };
       } else if (req.adapter === "cli") {
         spawnEnvDelta = {
           // Real ConPTY is required for a genuine TUI exploration proof.

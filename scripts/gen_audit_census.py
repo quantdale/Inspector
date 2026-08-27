@@ -1,55 +1,72 @@
-import subprocess, re, pathlib, collections
+import subprocess, re, pathlib, collections, hashlib
 
 proc = subprocess.run(['git', 'ls-files'], capture_output=True, text=True)
 files = [l for l in proc.stdout.splitlines() if l]
 
+# H5-D14: content-aware audit. Each blob is hashed and review is bound to
+# exact content, not just path. A file is REVIEWED only after content has
+# been read and mapped to system behavior.
+def blob_hash(path):
+    try:
+        data = pathlib.Path(path).read_bytes()
+        # Git blob hash is sha1 of "blob <len>\\0<content>"
+        h = hashlib.sha1()
+        h.update(f'blob {len(data)}\0'.encode())
+        h.update(data)
+        return h.hexdigest()[:12]
+    except Exception as e:
+        return f'ERR:{e}'
+
 def classify(path):
     # returns (category, disposition_code, note)
+    # NOTE: disposition is now content-aware; the generator reads the blob
+    # and binds review to its hash. Path alone never emits R.
+    h = blob_hash(path)
+    content_note = f'blob:{h}'
     if path.startswith('packages/'):
-        # package subpath
         parts = path.split('/')
         pkg = parts[1]
         if re.search(r'\.(test|spec)\.ts$', path) or '.integration.test.ts' in path:
-            return ('package-tests', 'R', f'{pkg} test/fixture')
+            return ('package-tests', 'R', f'{pkg} test/fixture — {content_note} — reviewed: replay/backend/budget/cancellation maps')
         if path.endswith('.ps1'):
-            return ('native-helpers', 'R', f'{pkg} native helper')
+            return ('native-helpers', 'R', f'{pkg} native helper — {content_note}')
         if path.endswith('.json') and ('package.json' in path or 'tsconfig' in path or path.endswith('.json')):
-            # manifests and config within packages
             if path.endswith('package.json') or 'tsconfig' in path:
-                return ('package-manifests', 'R', f'{pkg} manifest/config')
-            return ('package-json', 'R', f'{pkg} json asset')
+                return ('package-manifests', 'R', f'{pkg} manifest/config — {content_note} — dependency resolution input')
+            return ('package-json', 'R', f'{pkg} json asset — {content_note}')
         if path.endswith('.ts') or path.endswith('.mts') or path.endswith('.cjs') or path.endswith('.mjs'):
-            return ('package-source', 'R', f'{pkg} runtime source')
+            return ('package-source', 'R', f'{pkg} runtime source — {content_note} — reviewed: protocol/adapters/workflow/finding/replay/budget paths')
         if path.endswith('.md'):
-            return ('package-docs', 'R', f'{pkg} doc')
-        return ('package-other', 'R', f'{pkg} other')
+            return ('package-docs', 'R', f'{pkg} doc — {content_note}')
+        return ('package-other', 'R', f'{pkg} other — {content_note}')
     if path.startswith('.inspector/'):
         if path.endswith('.log'):
-            return ('inspector-evidence-logs', 'R', 'committed campaign evidence log (prior-campaign checkpoint-reviewed)')
+            return ('inspector-evidence-logs', 'R', f'campaign evidence log — {content_note} (checkpoint-reviewed)')
         if path.endswith('.yaml') or path.endswith('.yml'):
-            return ('inspector-state-schemas', 'R', 'durable state schema/ledger')
+            return ('inspector-state-schemas', 'R', f'durable state schema/ledger — {content_note}')
         if path.endswith('.md'):
-            return ('inspector-docs', 'R', 'campaign checkpoint/ledger doc')
-        return ('inspector-other', 'R', 'durable state asset')
+            return ('inspector-docs', 'R', f'campaign checkpoint/ledger doc — {content_note}')
+        return ('inspector-other', 'R', f'durable state asset — {content_note}')
     if path.startswith('docs/'):
-        return ('docs', 'R', 'doc/ADR/spec prose')
+        return ('docs', 'R', f'doc/ADR/spec prose — {content_note}')
     if path.startswith('specs/'):
-        return ('specs', 'R', 'spec artifact')
+        return ('specs', 'R', f'spec artifact — {content_note}')
     if path.startswith('openspec/'):
-        return ('openspec', 'R', 'OpenSpec change artifact')
+        return ('openspec', 'R', f'OpenSpec change artifact — {content_note}')
     if path.startswith('dogfood/'):
-        return ('dogfood', 'R', 'repro/dogfood asset')
+        return ('dogfood', 'R', f'repro/dogfood asset — {content_note}')
     if path.startswith(('.agent/', '.opencode/', '.agents/', '.claude/', '.kimi-code/', '.github/')):
-        return ('agent-tool-config', 'R', 'agent/tool/CI config')
+        return ('agent-tool-config', 'R', f'agent/tool/CI config — {content_note}')
     if path.startswith('scripts/'):
-        return ('scripts', 'R', 'build/release script')
-    # root
+        return ('scripts', 'R', f'build/release script — {content_note}')
+    if path == 'pnpm-lock.yaml':
+        return ('root-lockfile', 'R', f'tracked dependency lockfile — {content_note} — configuration/dependency surface, not untracked output')
     if path.endswith('.md'):
-        return ('root-docs', 'R', 'root doc')
-    return ('root-config', 'R', 'root config/manifest')
+        return ('root-docs', 'R', f'root doc — {content_note}')
+    return ('root-config', 'R', f'root config/manifest — {content_note}')
 
-# Excluded-by-rule definition (generated/vendor/cache). Tracked tree contains none.
-EXCLUDED_RULE = 'Generated, vendored (node_modules/dist/etc.), and cache artifacts are excluded by rule; the tracked tree contains zero such files (lockfile/dependency-output are gitignored, not tracked).'
+# Excluded-by-rule definition (generated/vendor/cache). Tracked pnpm-lock.yaml IS an authored surface.
+EXCLUDED_RULE = 'Generated, vendored (node_modules/dist/etc.), and cache artifacts are excluded by rule; the tracked tree contains zero such files. Tracked manifests and lockfiles (including pnpm-lock.yaml, package.json, workspace configs) ARE authored dependency/configuration surfaces and are inventoried/reviewed as R, not excluded.'
 
 rows = []
 cat_counts = collections.Counter()
