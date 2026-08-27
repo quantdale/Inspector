@@ -1,7 +1,7 @@
 # Inspector Execution Prompt — HARDENING_5 Deep-Audit Completion
 
-**Status:** ACTIVE — CONTINUATION / PLANNER CORRECTION (2026-08-26)  
-**Campaign:** HARDENING_5 — Fleet Execution Truth, now extended through verification-truth and provenance-integrity closure  
+**Status:** COMPLETE (2026-08-27) — HARDENING_5 Fleet Execution Truth certified on `e1e0864` (run 33034546691 SUCCESS); final state-sync `89bd974` records completion  
+**Campaign:** HARDENING_5 — Fleet Execution Truth, now extended through verification-truth and provenance-integrity closure (COMPLETE)  
 **Mode:** HARDENING  
 **Target branch:** `main` only  
 **Audit/planning baseline:** `04d8d841d7d1db322800fa0b8439878639d2c81d`  
