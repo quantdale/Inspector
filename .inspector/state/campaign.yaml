@@ -656,6 +656,85 @@ hardening5:
       configured mock/injectable backend and distinguishes mock vs real evidence
       strength.
 
+hardening6:
+  campaign: HARDENING_6
+  status: ACTIVE
+  started_at: "2026-08-27"
+  base_commit: 038550172866001ce8bfe44054b8146b3391af32
+  base_note: post-HARDENING_5 state-synchronized baseline; exact-HEAD hosted CI run 33038479136 SUCCESS
+  activated_by: .agent/EXECUTION_PROMPT.md
+  openspec_change: openspec/changes/hardening-6-repair-trust/
+  protocol: docs/HARDENING-CAMPAIGN.md
+  ledger: .inspector/state/HARDENING-CHECKPOINT.md (campaign #6 to append during execution)
+  audit_baseline: openspec/changes/hardening-6-repair-trust/AUDIT-BASELINE.md
+  audit_census_target: .inspector/state/HARDENING_6-AUDIT.md
+  scope: >-
+    Repair positive-execution truth; repair evidence durability and crash-safe
+    resolution; exact-revision atomic accepted-patch application; per-attempt
+    filesystem isolation; truthful regression adapter provenance; core
+    action/observation identity correlation; declared-artifact integrity;
+    complete adapter-server protocol validation; durable corruption negative
+    space; replacement of self-attesting every-file audit with exact-blob
+    semantic review; mutation/fault/soak and exact-SHA certification.
+    No M14 and no release/tag/publication.
+  baseline_ci:
+    exact_head_sha: 038550172866001ce8bfe44054b8146b3391af32
+    run_id: 33038479136
+    conclusion: SUCCESS
+    jobs:
+      - {id: 98406487228, name: Linux quality gate, conclusion: SUCCESS}
+      - {id: 98406487028, name: Windows path/native gate, conclusion: SUCCESS}
+      - {id: 98408140037, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS}
+      - {id: 98408140063, name: Linux installed-artifact smoke, conclusion: SUCCESS}
+  phases:
+    - {id: H6.0, name: rehydrate-audit-truth, state: PENDING}
+    - {id: H6.1, name: repair-positive-evidence, state: PENDING}
+    - {id: H6.2, name: repair-durability-atomic-apply, state: PENDING}
+    - {id: H6.3, name: core-correlation-artifact-integrity, state: PENDING}
+    - {id: H6.4, name: adapter-protocol-boundary, state: PENDING}
+    - {id: H6.5, name: durable-corruption-negative-space, state: PENDING}
+    - {id: H6.6, name: every-file-semantic-review, state: PENDING}
+    - {id: H6.7, name: mutation-fault-soak, state: PENDING}
+    - {id: H6.8, name: reconcile-certify, state: PENDING}
+  defects:
+    - >-
+      H6-D0 CONFIRMED HIGH audit-certificate incompleteness/self-attestation:
+      exact baseline tree has 536 blobs while H5 audit has 534 rows and omits
+      two H5 workflow tests; generator hashes content but assigns REVIEWED by path.
+    - >-
+      H6-D1 CONFIRMED HIGH repair post-patch no-hard-oracle can collapse
+      operational/zero-work replay to clean.
+    - >-
+      H6-D2 CONFIRMED HIGH masking probe treats operational non-success outcomes
+      as surviving unless they are target-failure/signals.
+    - >-
+      H6-D3 CONFIRMED HIGH finding may transition RESOLVED before required repair
+      evidence persistence while finish treats required writes as best-effort.
+    - >-
+      H6-D4 CONFIRMED HIGH accepted-patch application lacks target revision/
+      cleanliness proof and all-or-nothing rollback.
+    - >-
+      H6-D5 CONFIRMED HIGH rejected-attempt rollback preserves ignored files
+      because disposable worktree cleanup uses git clean -fd.
+    - >-
+      H6-D6 CONFIRMED MEDIUM generated regression provenance hard-codes
+      adapter-web for generic repair providers.
+    - >-
+      H6-D7 CONFIRMED HIGH action outcome identity is shape-valid but not
+      correlated to submitted action/current run/environment before acceptance.
+    - >-
+      H6-D8 REPRO-REQUIRED HIGH observation identity is shape-valid but explicit
+      enclosing run/environment correlation is absent in controller code.
+    - >-
+      H6-D9 CONFIRMED MEDIUM missing declared artifact refs are silently filtered
+      and uncharged instead of becoming evidence failure.
+    - >-
+      H6-D10 CONFIRMED MEDIUM AdapterServer validates act/observe but not full
+      JSON-RPC and initialize/lifecycle/health/cancel parameter contracts.
+    - >-
+      H6-D11 REPRO-REQUIRED MEDIUM malformed durable action error_json is
+      silently omitted during outcome reconstruction; prove reachability.
+
 hardening1_history:
   campaign: HARDENING_1
   status: COMPLETE
