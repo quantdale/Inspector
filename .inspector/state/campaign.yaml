@@ -563,14 +563,10 @@ hardening5:
     inspected_at: "2026-08-27"
     method: PUBLIC GitHub REST API (unauthenticated)
     jobs:
-      - {id: 98394296331, name: Linux quality gate, conclusion: SUCCESS,
-        proof: "lint 0 errors/4 warnings, typecheck PASS, unit 678 passed/3 skipped (65 files), pnpm --filter @inspector/adapter-web provision:browser success, test:integration 211 passed/2 skipped (51 files, full Linux integration executed)"}
-      - {id: 98394296129, name: Windows path/native gate, conclusion: SUCCESS,
-        proof: "typecheck PASS, hardening suites, CLI UIA/PTY integration, windows-campaign campaign proof, electron-production, release:smoke SUCCESS"}
-      - {id: 98395880854, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS,
-        proof: "xvfb-run electron-production.integration.test.ts PASS + electron-fleet.integration.test.ts PASS (INJECTABLE backend, browser provisioned)"}
-      - {id: 98395880909, name: Linux installed-artifact smoke, conclusion: SUCCESS,
-        proof: "clean installed prefix: --version, doctor, fake hunt/explore, findings/runs/campaign list/validate/run/show, models summary, invalid-provider refusal"}
+      - {id: 98394296331, name: Linux quality gate, conclusion: SUCCESS, proof: "lint 0 errors/4 warnings, typecheck PASS, unit 678 passed/3 skipped (65 files), pnpm --filter @inspector/adapter-web provision:browser success, test:integration 211 passed/2 skipped (51 files, full Linux integration executed)"}
+      - {id: 98394296129, name: Windows path/native gate, conclusion: SUCCESS, proof: "typecheck PASS, hardening suites, CLI UIA/PTY integration, windows-campaign campaign proof, electron-production, release:smoke SUCCESS"}
+      - {id: 98395880854, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS, proof: "xvfb-run electron-production.integration.test.ts PASS + electron-fleet.integration.test.ts PASS (INJECTABLE backend, browser provisioned)"}
+      - {id: 98395880909, name: Linux installed-artifact smoke, conclusion: SUCCESS, proof: "clean installed prefix: --version, doctor, fake hunt/explore, findings/runs/campaign list/validate/run/show, models summary, invalid-provider refusal"}
     anti_circular_truth_note: >-
       The state-synchronization commit that records this certification has a
       NEW SHA whose own Actions result is not certified by itself; future
