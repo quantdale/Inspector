@@ -3,10 +3,10 @@
 ## Identity
 
 - Campaign: IMPLEMENTATION
-- Status: **COMPLETE — M23 GA Re-certification closed 2026-08-27 (M14-M23 ten-campaign series).** M0-M13 and HARDENING_1-5 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. Hardening remains a separately invoked campaign.
+- Status: **COMPLETE — M23 GA Re-certification closed 2026-08-27 (M14-M23 ten-campaign series).** M0-M13 and HARDENING_1-6 remain COMPLETE; M8 stays DEFERRED_ENVIRONMENT. No subsequent campaign is active.
 - Working branch: `main`
 - Initialized from: `main@ac74afbcc3824acee457a5cc5b26956ea5c98562`
-- Hardening: **HARDENING_5 COMPLETE (2026-08-27; hosted run 33034546691 SUCCESS on e1e0864)**; M14-M23 ten-campaign series now COMPLETE as product/hardening extension (see below).
+- Hardening: **HARDENING_6 COMPLETE (2026-08-28; hosted run 33142638356 SUCCESS on exact implementation SHA 8b00f69697596872073d490538e8722688ab41b1)**; HARDENING_5 and the M14-M23 ten-campaign series remain COMPLETE as historical product/hardening records (see below).
 
 ### M14-M23 ten-campaign series COMPLETE (2026-08-27)
 
@@ -665,3 +665,24 @@ PTY, and source-vs-installed proofs. Hosted exact-SHA certification remains
 pending; do not mark HARDENING_6 COMPLETE until the pushed candidate passes all
 required hosted lanes. M14-M23 stay COMPLETE, M8 stays DEFERRED_ENVIRONMENT,
 and no release/tag/publication action is taken.
+
+## HARDENING_6 COMPLETE (2026-08-28)
+
+HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity
+is complete. H6-D0 through H6-D11 are closed or dismissed with executable
+proof; the exact-blob semantic certificate covers 480/480 authored tracked
+files in a 590-file inventory with 0 unreviewed rows. The exact implementation
+SHA is `8b00f69697596872073d490538e8722688ab41b1`.
+
+Local H6.8 certification passed: frozen install; lint 0 errors / 4 pre-existing
+adapter-web warnings; typecheck PASS; unit 825 passed / 3 skipped across 81
+files; browser provisioning; integration 230 passed / 2 skipped across 51
+files with the bounded four-worker platform pool; release smoke; and targeted
+mutation/property/fault/soak plus available real-platform/source-vs-installed
+proofs. Hosted Actions run **33142638356 SUCCESS** on that exact pushed SHA:
+Linux quality gate, Windows path/native gate, Electron real-runtime proof
+(Xvfb), and Linux installed-artifact smoke all succeeded (jobs
+98756643623, 98756643364, 98757951167, and 98757951177). The subsequent
+state-sync commit is subject to its own anti-circular hosted check. M14-M23
+remain COMPLETE, M8 remains DEFERRED_ENVIRONMENT, and no M24/release/tag/
+publication action is taken.

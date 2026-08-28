@@ -878,3 +878,16 @@ Local evidence: repair hardening 28/28; worktree 11/11; core hardening 28/28; co
 ## HARDENING_6 LOCAL CERTIFICATION CANDIDATE (2026-08-28)
 
 Local H6.8 gates pass on the current candidate: frozen install, lint (0 errors; 4 pre-existing adapter-web warnings), typecheck, unit (81 files; 825 passed, 3 skipped), browser provisioning, integration (51 files; 230 passed, 2 skipped with the bounded four-worker platform pool), release smoke, and targeted H6 mutation/property/fault/soak plus available Windows UIA, Android, PTY, and source-vs-installed proofs. Hosted exact-SHA certification remains pending; do not mark HARDENING_6 COMPLETE until the pushed candidate passes all required hosted lanes. M14-M23 stay COMPLETE, M8 stays DEFERRED_ENVIRONMENT, and no release/tag/publication action is taken.
+
+## HARDENING_6 COMPLETE (2026-08-28)
+
+HARDENING_6 is complete on exact implementation SHA
+8b00f69697596872073d490538e8722688ab41b1. The final exact-blob semantic
+certificate covers 480/480 authored tracked files in a 590-file inventory with
+0 unreviewed rows. Local H6.8 gates passed, and hosted Actions run 33142638356
+passed on that exact pushed SHA: Linux quality gate, Windows path/native gate,
+Electron real-runtime proof (Xvfb), and Linux installed-artifact smoke all
+succeeded (jobs 98756643623, 98756643364, 98757951167, and 98757951177).
+The subsequent state-sync commit has a new SHA and must have its own hosted
+result queried per H4.10. M14-M23 remain COMPLETE, M8 remains
+DEFERRED_ENVIRONMENT, and no M24/release/tag/publication action is taken.

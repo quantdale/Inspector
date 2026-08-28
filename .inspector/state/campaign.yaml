@@ -34,10 +34,9 @@ active:
   waypoint: M23.F3.docs-state-sync
   waypoint_status: COMPLETE
   next_action: >-
-    M14-M23 implementation series remains COMPLETE. HARDENING_6 is separately
-    ACTIVE under `hardening6` and `.agent/EXECUTION_PROMPT.md`, rebased on
-    current post-M23 main by the 2026-08-28 audit. Do not infer M24, release,
-    tag, or publication. Close HARDENING_6 repair/evidence trust blockers first.
+    M14-M23 implementation series and separately invoked HARDENING_6 are
+    COMPLETE. No M24, release, tag, or publication is inferred; a future
+    campaign requires explicit activation in `.agent/EXECUTION_PROMPT.md`.
 
 progress:
   completed_milestones:
@@ -303,13 +302,18 @@ progress:
     - M8
 
 verification:
-  last_verified_commit: HEAD (M14-M23 ten-campaign series; gates 784/3 unit, 211/2 integration)
+  last_verified_commit: 8b00f69697596872073d490538e8722688ab41b1 (HARDENING_6 implementation tree; state-sync documentation follows)
   last_gate: >-
-    M23 exit gate PASS on the exact final tree: pnpm install --frozen-lockfile
-    OK; lint 0 errors / 4 pre-existing warnings (adapter-web); typecheck
-    PASS; unit 784 passed / 3 skipped across 79 files (incl. M14 bench, M15 release-provenance, M16 otel, M17 dashboard, M18 redaction/audit, M19 UIA/PTY/Android retry, M20 pHash/visual, M21 lease parity, M22 property-mutation, M23 GA smoke); integration 211 passed / 2 skipped (51 files, browser provisioned, windows-campaign + verify-regress-truth + fleet chaos); release:smoke PASS target (clean prefix, --version/doctor/hunt/verify/regress/explore/campaign + model steps). No external inference service or credentials used. Hosted certification remains HARDENING_5 e1e0864 run 33034546691 SUCCESS (public API verified on exact SHA).
+    H6.8 exit gate PASS on the exact implementation tree: frozen install,
+    lint 0 errors / 4 pre-existing adapter-web warnings, typecheck PASS, unit
+    825 passed / 3 skipped across 81 files, browser provisioning, integration
+    230 passed / 2 skipped across 51 files with the bounded four-worker pool,
+    release:smoke PASS, and H6 mutation/property/fault/soak plus available
+    real-platform/source-vs-installed proofs PASS. Hosted H6 run 33142638356
+    SUCCESS on the exact pushed SHA; M14-M23 remain COMPLETE and M8 remains
+    DEFERRED_ENVIRONMENT. No external inference service or credentials used.
   last_gate_result: PASS
-  last_gate_at: "2026-08-27"
+  last_gate_at: "2026-08-28"
 blockers: []
 known_debt:
   - >-
@@ -693,8 +697,9 @@ hardening5:
 
 hardening6:
   campaign: HARDENING_6
-  status: ACTIVE
+  status: COMPLETE
   started_at: "2026-08-27"
+  completed_at: "2026-08-28"
   base_commit: 8e6bdb0e7951505972fd59bce550d3ad330d0c22
   base_note: post-M23 planning rebase; original H6 activation baseline 038550172866001ce8bfe44054b8146b3391af32 retained historically; exact-HEAD hosted CI run 33092343085 SUCCESS
   activated_by: .agent/EXECUTION_PROMPT.md
@@ -721,11 +726,13 @@ hardening6:
       - {id: 98588294187, name: Windows path/native gate, conclusion: SUCCESS}
       - {id: 98591344212, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS}
       - {id: 98591344186, name: Linux installed-artifact smoke, conclusion: SUCCESS}
-  current_phase: H6.8
+  current_phase: COMPLETE
   candidate_note: >-
-    H6.0-H6.7 implementation and targeted evidence are complete on the
-    candidate tree; final exact-tree local gates and exact-SHA hosted lanes
-    remain pending. Do not mark COMPLETE before those gates pass.
+    H6.0-H6.8 are complete on implementation SHA
+    8b00f69697596872073d490538e8722688ab41b1. Exact-blob semantic review
+    covers every authored tracked file (480/480), local gates are green, and
+    exact-SHA hosted certification is recorded below. No M24, release, tag, or
+    publication is inferred.
   phases:
     - {id: H6.0, name: rehydrate-audit-truth, state: DONE}
     - {id: H6.1, name: repair-positive-evidence, state: DONE}
@@ -735,7 +742,46 @@ hardening6:
     - {id: H6.5, name: durable-corruption-negative-space, state: DONE}
     - {id: H6.6, name: every-file-semantic-review, state: DONE}
     - {id: H6.7, name: mutation-fault-soak, state: DONE}
-    - {id: H6.8, name: reconcile-certify, state: IN_PROGRESS}
+    - {id: H6.8, name: reconcile-certify, state: DONE}
+  hosted_certification:
+    exact_pushed_sha: 8b00f69697596872073d490538e8722688ab41b1
+    run_id: 33142638356
+    run_attempt: 1
+    conclusion: SUCCESS
+    inspected_at: "2026-08-28"
+    method: PUBLIC GitHub REST API (unauthenticated)
+    jobs:
+      - id: 98756643623
+        name: Linux quality gate
+        conclusion: SUCCESS
+        proof: >-
+          frozen install, lint, typecheck, unit, browser provisioning, full
+          integration, and release smoke passed
+      - id: 98756643364
+        name: Windows path/native gate
+        conclusion: SUCCESS
+        proof: >-
+          Windows path/native, real-platform, hardening, and campaign checks
+          passed
+      - id: 98757951167
+        name: Electron real-runtime proof (Xvfb)
+        conclusion: SUCCESS
+        proof: Xvfb Electron production and fleet real-runtime checks passed
+      - id: 98757951177
+        name: Linux installed-artifact smoke
+        conclusion: SUCCESS
+        proof: clean installed-prefix CLI command-surface smoke passed
+    anti_circular_truth_note: >-
+      This certification is for the H6 implementation SHA. The subsequent
+      state-sync commit that records this result has a new SHA and must have
+      its own Actions result queried before the final handoff, per H4.10.
+  last_local_gate: >-
+    PASS on the exact implementation tree: install --frozen-lockfile OK; lint
+    0 errors / 4 pre-existing warnings; typecheck PASS; unit 825 passed / 3
+    skipped across 81 files; integration 230 passed / 2 skipped across 51
+    files with bounded four-worker platform pool; release:smoke PASS; targeted
+    H6 mutation/property/fault/soak and available real-platform/source-vs-
+    installed proofs PASS.
   defects:
     - >-
       H6-D0 CLOSED HIGH: audit certification now separates inventory from

@@ -4,7 +4,7 @@
   "rows": [
     {
       "authored": true,
-      "blob": "03b8a7041932c54a1a8155934e63514514782af0",
+      "blob": "ab4204b948924b846834ea501d0f9fc3e1476aaf",
       "category": "tooling-and-ci-config",
       "exclusion_reason": null,
       "path": ".agent/EXECUTION_PROMPT.md",
@@ -13,7 +13,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected .agent/EXECUTION_PROMPT.md in the agent execution contract -> repository state -> guarded development workflow map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "03b8a7041932c54a1a8155934e63514514782af0",
+        "blob": "ab4204b948924b846834ea501d0f9fc3e1476aaf",
         "path": ".agent/EXECUTION_PROMPT.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -29,7 +29,7 @@
     },
     {
       "authored": true,
-      "blob": "16fee73a5eed437a9c9a9487c77ef3adb0fb7a4b",
+      "blob": "419ac9d2fe17a9ed8332687a92bccf7a9194a09d",
       "category": "tooling-and-ci-config",
       "exclusion_reason": null,
       "path": ".agent/PLANNER_HANDOFF.md",
@@ -38,7 +38,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected .agent/PLANNER_HANDOFF.md in the agent execution contract -> repository state -> guarded development workflow map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "16fee73a5eed437a9c9a9487c77ef3adb0fb7a4b",
+        "blob": "419ac9d2fe17a9ed8332687a92bccf7a9194a09d",
         "path": ".agent/PLANNER_HANDOFF.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -1445,7 +1445,7 @@
     },
     {
       "authored": true,
-      "blob": "9da78d0a60b4a3cb5760153fd7c5fc5d880bad89",
+      "blob": "bc1a2ae95334bf3f40149ba7a9cea595da45ea14",
       "category": "durable-state-or-ledger",
       "exclusion_reason": null,
       "path": ".inspector/state/CHECKPOINT.md",
@@ -1454,7 +1454,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected .inspector/state/CHECKPOINT.md in the durable campaign state -> audit/evidence ledgers -> resumable agent execution map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "9da78d0a60b4a3cb5760153fd7c5fc5d880bad89",
+        "blob": "bc1a2ae95334bf3f40149ba7a9cea595da45ea14",
         "path": ".inspector/state/CHECKPOINT.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -1520,7 +1520,7 @@
     },
     {
       "authored": true,
-      "blob": "a4c562e4a9ae8342f8b86695023051d60f02a9ea",
+      "blob": "16cb29001c237dc7b3e16eb8667a12c9b505b278",
       "category": "durable-state-or-ledger",
       "exclusion_reason": null,
       "path": ".inspector/state/HARDENING-CHECKPOINT.md",
@@ -1529,7 +1529,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected .inspector/state/HARDENING-CHECKPOINT.md in the durable campaign state -> audit/evidence ledgers -> resumable agent execution map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "a4c562e4a9ae8342f8b86695023051d60f02a9ea",
+        "blob": "16cb29001c237dc7b3e16eb8667a12c9b505b278",
         "path": ".inspector/state/HARDENING-CHECKPOINT.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -1556,7 +1556,7 @@
     },
     {
       "authored": false,
-      "blob": "a3e1fa1d142e0ee8365fb9e7126f5c5cebb86b22",
+      "blob": "7240dc57f09443e3dab977bc7ada2eb96368e961",
       "category": "audit-certification-artifact",
       "exclusion_reason": "generated inventory/certificate metadata; validated by the H6 gate itself",
       "path": ".inspector/state/HARDENING_6-AUDIT.json",
@@ -1567,7 +1567,7 @@
     },
     {
       "authored": false,
-      "blob": "2009e9029a29f5db16594f2c43e1c8e71a9a7d1c",
+      "blob": "dfb14f927a17d80026d73e0c7131ef2efff34003",
       "category": "audit-certification-artifact",
       "exclusion_reason": "generated inventory/certificate metadata; validated by the H6 gate itself",
       "path": ".inspector/state/HARDENING_6-AUDIT.md",
@@ -1578,7 +1578,7 @@
     },
     {
       "authored": false,
-      "blob": "c15357f271a0ecc1fc45dcfa8d27413e0cc53bd6",
+      "blob": "1c1a436db61fe91bebefff1014ac2cea620f22a9",
       "category": "audit-certification-artifact",
       "exclusion_reason": "generated inventory/certificate metadata; validated by the H6 gate itself",
       "path": ".inspector/state/HARDENING_6-SEMANTIC-REVIEW.json",
@@ -1689,7 +1689,7 @@
     },
     {
       "authored": true,
-      "blob": "b28ab86812b944bf49a584a87c3b95efa3d3cc79",
+      "blob": "d0f4677d2ce38080d1957aea2582a2e961b2e48b",
       "category": "durable-state-or-ledger",
       "exclusion_reason": null,
       "path": ".inspector/state/campaign.yaml",
@@ -1698,7 +1698,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected .inspector/state/campaign.yaml in the durable campaign state -> audit/evidence ledgers -> resumable agent execution map; traced declared capabilities and boundary settings and provenance, schema, and entrypoint wiring against the H6 contracts.",
-        "blob": "b28ab86812b944bf49a584a87c3b95efa3d3cc79",
+        "blob": "d0f4677d2ce38080d1957aea2582a2e961b2e48b",
         "path": ".inspector/state/campaign.yaml",
         "rationale": "Configuration preserves the declared boundary, provenance, and reproducible gate behavior.",
         "review_targets": [
@@ -1789,7 +1789,7 @@
     },
     {
       "authored": true,
-      "blob": "0bf943f5baeffb03c3a874c3f549ce7b684d9de2",
+      "blob": "f070f8774f1ea0b420708e9137e1945c8ac38cb7",
       "category": "root-documentation",
       "exclusion_reason": null,
       "path": "AGENTS.md",
@@ -1798,7 +1798,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected AGENTS.md in the agent operating contract -> campaign state/checkpoint -> implementation and certification gates map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "0bf943f5baeffb03c3a874c3f549ce7b684d9de2",
+        "blob": "f070f8774f1ea0b420708e9137e1945c8ac38cb7",
         "path": "AGENTS.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -1814,7 +1814,7 @@
     },
     {
       "authored": true,
-      "blob": "3252e5a8ee9736b082120147d7fb21a2b494386e",
+      "blob": "7872c3b8a298f1d405ee011f7ec1fbaf7009c61d",
       "category": "root-documentation",
       "exclusion_reason": null,
       "path": "README.md",
@@ -1823,7 +1823,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected README.md in the repository configuration -> package tooling and reproducible gates map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "3252e5a8ee9736b082120147d7fb21a2b494386e",
+        "blob": "7872c3b8a298f1d405ee011f7ec1fbaf7009c61d",
         "path": "README.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -2489,7 +2489,7 @@
     },
     {
       "authored": true,
-      "blob": "36626bb1b2d8bd43d4c50058fefe31054852fcd5",
+      "blob": "d12d9d54b2729af1bea8832d75c391dd6dad30aa",
       "category": "documentation",
       "exclusion_reason": null,
       "path": "docs/STATUS.md",
@@ -2498,7 +2498,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected docs/STATUS.md in the architecture/product/operations documentation -> roadmap and implementation contracts map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "36626bb1b2d8bd43d4c50058fefe31054852fcd5",
+        "blob": "d12d9d54b2729af1bea8832d75c391dd6dad30aa",
         "path": "docs/STATUS.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [
@@ -3264,7 +3264,7 @@
     },
     {
       "authored": true,
-      "blob": "1f1d7e5900b7933ac80ddfc66f85791933e888b2",
+      "blob": "bd91b9959fee84deacc67cef04ba43b0eaa37ec2",
       "category": "specification",
       "exclusion_reason": null,
       "path": "openspec/changes/hardening-6-repair-trust/tasks.md",
@@ -3273,7 +3273,7 @@
       "scope": "authored",
       "semantic_review": {
         "basis": "Inspected openspec/changes/hardening-6-repair-trust/tasks.md in the H6 proposal/design/spec/tasks -> implementation and certification gates map; traced contract statements and acceptance criteria and cross-document status and invariant references against the H6 contracts.",
-        "blob": "1f1d7e5900b7933ac80ddfc66f85791933e888b2",
+        "blob": "bd91b9959fee84deacc67cef04ba43b0eaa37ec2",
         "path": "openspec/changes/hardening-6-repair-trust/tasks.md",
         "rationale": "Contract text is consistent with implementation scope and does not promote unsupported completion.",
         "review_targets": [

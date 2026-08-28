@@ -5,7 +5,7 @@
   "reviews": [
     {
       "path": ".agent/EXECUTION_PROMPT.md",
-      "blob": "03b8a7041932c54a1a8155934e63514514782af0",
+      "blob": "ab4204b948924b846834ea501d0f9fc3e1476aaf",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -20,7 +20,7 @@
     },
     {
       "path": ".agent/PLANNER_HANDOFF.md",
-      "blob": "16fee73a5eed437a9c9a9487c77ef3adb0fb7a4b",
+      "blob": "419ac9d2fe17a9ed8332687a92bccf7a9194a09d",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -170,7 +170,7 @@
     },
     {
       "path": ".inspector/state/CHECKPOINT.md",
-      "blob": "9da78d0a60b4a3cb5760153fd7c5fc5d880bad89",
+      "blob": "bc1a2ae95334bf3f40149ba7a9cea595da45ea14",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -215,7 +215,7 @@
     },
     {
       "path": ".inspector/state/HARDENING-CHECKPOINT.md",
-      "blob": "a4c562e4a9ae8342f8b86695023051d60f02a9ea",
+      "blob": "16cb29001c237dc7b3e16eb8667a12c9b505b278",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -290,7 +290,7 @@
     },
     {
       "path": ".inspector/state/campaign.yaml",
-      "blob": "b28ab86812b944bf49a584a87c3b95efa3d3cc79",
+      "blob": "d0f4677d2ce38080d1957aea2582a2e961b2e48b",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -350,7 +350,7 @@
     },
     {
       "path": "AGENTS.md",
-      "blob": "0bf943f5baeffb03c3a874c3f549ce7b684d9de2",
+      "blob": "f070f8774f1ea0b420708e9137e1945c8ac38cb7",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -365,7 +365,7 @@
     },
     {
       "path": "README.md",
-      "blob": "3252e5a8ee9736b082120147d7fb21a2b494386e",
+      "blob": "7872c3b8a298f1d405ee011f7ec1fbaf7009c61d",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -770,7 +770,7 @@
     },
     {
       "path": "docs/STATUS.md",
-      "blob": "36626bb1b2d8bd43d4c50058fefe31054852fcd5",
+      "blob": "d12d9d54b2729af1bea8832d75c391dd6dad30aa",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",
@@ -1235,7 +1235,7 @@
     },
     {
       "path": "openspec/changes/hardening-6-repair-trust/tasks.md",
-      "blob": "1f1d7e5900b7933ac80ddfc66f85791933e888b2",
+      "blob": "bd91b9959fee84deacc67cef04ba43b0eaa37ec2",
       "reviewer": "Codex H6 whole-tree semantic reviewer",
       "system_maps": [
         "H6 whole-tree review",

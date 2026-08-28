@@ -64,13 +64,15 @@ on a headless emulator). M8 (iOS) remains deferred for lack of a macOS/Xcode
 runtime. See `docs/STATUS.md` for gates and numbers, and
 `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M14-M23 COMPLETE; HARDENING_6 ACTIVE on the post-M23 candidate
-(2026-08-28).** H6 targeted repair/core/protocol/property/fault/soak gates are
-green; final exact-tree local gates and exact-SHA hosted certification remain
-pending. H6 closes positive repair-evidence, durable-before-RESOLVED ordering,
-atomic accepted-patch application, attempt isolation, controller
-identity/artifact integrity, durable-corruption, and protocol-validation gaps.
-See `.inspector/state/HARDENING_6-AUDIT.md` and
+Current status: **M14-M23 COMPLETE; HARDENING_6 COMPLETE (2026-08-28).** The
+exact implementation SHA `8b00f69697596872073d490538e8722688ab41b1` passed
+hosted run `33142638356` across Linux quality/full integration, Windows
+path/native, Electron Xvfb, and installed-artifact smoke. The exact-blob audit
+has 590 tracked / 480 reviewed / 0 unreviewed files. H6 closes positive
+repair-evidence, durable-before-RESOLVED ordering, atomic accepted-patch
+application, attempt isolation, controller identity/artifact integrity,
+durable-corruption, and protocol-validation gaps. See
+`.inspector/state/HARDENING_6-AUDIT.md` and
 `openspec/changes/hardening-6-repair-trust/`. M8 iOS remains
 `DEFERRED_ENVIRONMENT` pending real macOS/Xcode proof. No release, tag, or
 publish has been performed.

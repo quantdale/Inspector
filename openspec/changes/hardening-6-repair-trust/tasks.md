@@ -2,10 +2,11 @@
 
 Execution baseline: planner handoff `main@8e6bdb0e7951505972fd59bce550d3ad330d0c22`, rebased onto `main@bcd2c91` before implementation. Every changed blob remains unreviewed until the final exact-blob ledger is generated.
 
-H6.0-H6.7 implementation boxes are complete on the candidate tree. Red-test
-confirmed behavioral defects preceded each fix. Continue automatically through
-the next unblocked task; the 12-hour envelope is capacity, not a time-filling
-requirement.
+H6.0-H6.8 implementation and certification boxes are complete. Red-test
+confirmed behavioral defects preceded each fix, every authored tracked blob is
+covered by the exact-blob semantic ledger (480/480), and hosted run
+33142638356 passed on implementation SHA `8b00f69697596872073d490538e8722688ab41b1`.
+The 12-hour envelope was capacity, not a time-filling requirement.
 
 ## H6.0 — Rehydrate current truth and repair audit certification (00:00–01:00)
 - [x] Fetch/prune; require clean `main`; record HEAD/origin/main and ahead/behind (`bcd2c91`, 0/0).
@@ -78,8 +79,8 @@ requirement.
 - [x] Run bounded repair loops, cancellation/crash/restart/concurrency soak; assert no leaked worktrees/processes or false resolution.
 
 ## H6.8 — Reconcile and certify (11:00–12:00)
-- [ ] Reconcile OpenSpec/tasks/campaign/checkpoints/ledger/AGENTS/STATUS/README/audit/docs.
-- [ ] Preserve M14-M23 COMPLETE, M8 `DEFERRED_ENVIRONMENT`, and no M24/release/tag/publication.
+- [x] Reconcile OpenSpec/tasks/campaign/checkpoints/ledger/AGENTS/STATUS/README/audit/docs; final audit is 590 tracked / 480 reviewed / 0 unreviewed.
+- [x] Preserve M14-M23 COMPLETE, M8 `DEFERRED_ENVIRONMENT`, and no M24/release/tag/publication.
 - [x] `pnpm install --frozen-lockfile`
 - [x] `pnpm lint`
 - [x] `pnpm typecheck`
@@ -88,9 +89,9 @@ requirement.
 - [x] `pnpm test:integration` (worker-capped platform gate: 51 files, 230 passed, 2 skipped)
 - [x] `pnpm release:smoke`
 - [x] Run H6 targeted mutation/property/fault tests and available real-platform/source-vs-installed proofs.
-- [ ] Commit verified slices, reconcile origin, push `main` without force.
-- [ ] Query Actions by exact final implementation SHA and inspect required Linux/Windows/Electron/installed-artifact jobs.
-- [ ] Mark COMPLETE only when every release-blocking defect is closed, every final authored blob is semantically reviewed, and exact-SHA hosted gates pass.
+- [x] Commit verified slices, reconcile origin, push `main` without force; implementation SHA `8b00f69697596872073d490538e8722688ab41b1` is pushed.
+- [x] Query Actions by exact final implementation SHA and inspect required Linux/Windows/Electron/installed-artifact jobs; run `33142638356` and all four required jobs are SUCCESS.
+- [x] Mark COMPLETE only when every release-blocking defect is closed, every final authored blob is semantically reviewed, and exact-SHA hosted gates pass; all conditions are satisfied.
 
 ## Stop rule
 Continue automatically through the next unblocked task. Environment-blocked real-platform work is recorded as `DEFERRED_ENVIRONMENT` with exact prerequisite; it is never converted to success. If all material H6 work is genuinely complete, stop rather than inventing M24 or low-value churn.

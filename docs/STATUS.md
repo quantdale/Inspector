@@ -1,10 +1,14 @@
 # Project Status
 
-Last updated: HARDENING_6 ACTIVE (2026-08-28 implementation candidate; Repair Trust, Positive-Evidence Verification, and Audit Integrity). Planner baseline `8e6bdb0e7951505972fd59bce550d3ad330d0c22` was rebased onto `bcd2c91`; the candidate has green targeted H6 repair/core/protocol/property/fault/soak gates, with final exact-tree and hosted certification pending. M14-M23 remain COMPLETE; HARDENING_5 remains COMPLETE on `e1e0864`.
+Last updated: HARDENING_6 COMPLETE (2026-08-28; implementation SHA
+`8b00f69697596872073d490538e8722688ab41b1`; hosted run `33142638356`
+SUCCESS). The exact-blob audit is 590 tracked / 480 reviewed / 0 unreviewed;
+local H6.8 gates and all four required hosted lanes pass. M14-M23 remain
+COMPLETE; HARDENING_5 remains COMPLETE on `e1e0864`.
 
 ## Campaign
 
-- Mode: **HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity** (ACTIVE; OpenSpec: `openspec/changes/hardening-6-repair-trust/`). The 2026-08-28 rebase audited current `main@bcd2c91`: the final candidate inventory and exact-blob semantic certificate are generated from the current tracked working tree. Targeted H6 repair/core/protocol/property/fault/soak gates are green; final exact-tree local gates and exact-SHA hosted certification are still pending. Current audit: `.inspector/state/HARDENING_6-AUDIT.md`. No M24/release/tag/publication.
+- Mode: **HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity** (COMPLETE 2026-08-28; OpenSpec: `openspec/changes/hardening-6-repair-trust/`). Implementation SHA `8b00f69697596872073d490538e8722688ab41b1` passed exact-SHA hosted run `33142638356` across Linux quality/full integration, Windows path/native, Electron Xvfb, and installed-artifact smoke. The final audit is `.inspector/state/HARDENING_6-AUDIT.md` with 590 tracked / 480 reviewed / 0 unreviewed. No M24/release/tag/publication.
 
 - Mode: **HARDENING_5 — Fleet Execution Truth, extended through deep-audit
   verification-outcome-truth, replay-backend-provenance, and durable-history-

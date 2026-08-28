@@ -1,6 +1,6 @@
 # Inspector Execution Prompt — HARDENING_6 (post-M23 rebase)
 
-**Status:** ACTIVE  
+**Status:** COMPLETE (2026-08-28; implementation SHA `8b00f69697596872073d490538e8722688ab41b1`, hosted run `33142638356` SUCCESS)
 **Campaign:** HARDENING_6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity  
 **Mode:** HARDENING  
 **Target branch:** `main` only  
@@ -46,12 +46,13 @@ Also inspect the live implementation/tests and latest 30 meaningful commits. Nev
 Red-test confirmed behavior before production changes. For REPRO REQUIRED items, prove reachability/blast radius first.
 
 ## Work queue
-H6.0-H6.7 are implemented and locally evidenced on the candidate tree:
+H6.0-H6.8 are complete and evidenced on the implementation tree:
 positive repair evidence, durable resolution/atomic application/isolation, core
 correlation/artifact integrity, protocol validation, durable-corruption
 negative space, exact-blob semantic review, and mutation/fault/soak proof.
-Continue with H6.8 reconciliation plus exact-tree local and hosted
-certification; the campaign remains ACTIVE until those gates pass.
+H6.8 reconciliation and exact-tree certification passed. Hosted run
+`33142638356` is SUCCESS for the exact implementation SHA; the final state-sync
+commit is subject to the anti-circular hosted check described below.
 
 Rebalance time when necessary, but do not spend campaign budget on cosmetic refactors while correctness/safety/audit/certification work remains.
 
