@@ -53,6 +53,8 @@ export class FakeAdapterHandler implements AdapterHandler {
   private readonly sm = new FakeStateMachine();
   private readonly faults: FakeFaults;
   private readonly artifactStore: ArtifactStore;
+  private runId = "run";
+  private environmentId = "env";
   private sequence = 0;
   private readonly startTime = Date.now();
 
@@ -74,8 +76,8 @@ export class FakeAdapterHandler implements AdapterHandler {
     }
     return {
       id: `obs_${this.sequence}`,
-      runId: "run",
-      environmentId: "env",
+      runId: this.runId,
+      environmentId: this.environmentId,
       sequence: this.sequence++,
       source: "adapter-fake",
       capturedAt: new Date().toISOString(),
@@ -123,7 +125,13 @@ export class FakeAdapterHandler implements AdapterHandler {
     return outcome;
   }
 
-  async lifecycle(params: { op: string }): Promise<{ ok: boolean }> {
+  async lifecycle(params: { op: string; options?: Record<string, unknown> }): Promise<{ ok: boolean }> {
+    if (params.op === "create") {
+      const runId = params.options?.runId;
+      const environmentId = params.options?.environmentId;
+      if (typeof runId === "string" && runId) this.runId = runId;
+      if (typeof environmentId === "string" && environmentId) this.environmentId = environmentId;
+    }
     if (params.op === "reset") this.sm.reset();
     return { ok: true };
   }

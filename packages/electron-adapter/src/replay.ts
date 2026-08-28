@@ -54,7 +54,13 @@ export class ElectronReplayDriver {
         ? (this.handler ??= this.createHandler())
         : this.createHandler();
     try {
-      await handler.lifecycle({ op: "create" });
+      const first = actions[0];
+      await handler.lifecycle({
+        op: "create",
+        ...(first
+          ? { options: { runId: first.runId, environmentId: first.environmentId } }
+          : {}),
+      });
       for (const a of actions) {
         const outcome = await handler.act({ action: a });
         outcomes.push(outcome);

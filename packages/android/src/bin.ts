@@ -3,7 +3,11 @@ import { createAdbBackendFromEnv } from "./real-backend.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
 
 const { backend } = await createAdbBackendFromEnv();
-const handler = new AndroidAdapterHandler(backend);
+const handler = new AndroidAdapterHandler(
+  backend,
+  {},
+  process.env.INSPECTOR_ARTIFACT_BASE_DIR,
+);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
 process.on("SIGTERM", () => {

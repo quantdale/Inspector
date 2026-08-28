@@ -56,15 +56,24 @@ The core uses a typed, versioned internal adapter protocol. MCP is an **external
 
 ## Repository status
 
-The implementation campaign **M0–M7 is complete and hardened** (HARDENING_1 closed
-66 defects), and the **RC1 dogfood campaign** ran six unscripted hunts against real
-production backends (web/Playwright, CLI/ConPTY PTY, Windows UIA via PowerShell
-bridge, Android ADB on a headless emulator). The independent finding audit found
-zero unresolved Critical/High defects after the fixes landed. M8 (iOS) is deferred
-for lack of a macOS/Xcode runtime. See `docs/STATUS.md` for gates and numbers,
-and `.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
+The implementation campaign **M0–M23 is complete and hardened** (HARDENING_1
+through HARDENING_5 closed their recorded defects), and the **RC1 dogfood
+campaign** ran six unscripted hunts against real production backends
+(web/Playwright, CLI/ConPTY PTY, Windows UIA via PowerShell bridge, Android ADB
+on a headless emulator). M8 (iOS) remains deferred for lack of a macOS/Xcode
+runtime. See `docs/STATUS.md` for gates and numbers, and
+`.inspector/rc-work/audit/FINDING-AUDIT.md` for the audit ledger.
 
-Current status: **M14-M23 implementation series COMPLETE; HARDENING_6 ACTIVE (post-M23 rebase, 2026-08-28).** Current baseline `main@8e6bdb0` has exact-SHA Actions run `33092343085` SUCCESS across Linux quality/full integration, Windows path/native, Electron Xvfb real-runtime, and installed-artifact smoke. The current hardening audit nevertheless confirms release-blocking repair/evidence trust defects (positive execution proof, durable-before-RESOLVED ordering, atomic accepted-patch application, attempt isolation, controller identity/artifact integrity, and protocol validation). See `.inspector/state/HARDENING_6-AUDIT.md` and `openspec/changes/hardening-6-repair-trust/`. M8 iOS remains `DEFERRED_ENVIRONMENT` pending real macOS/Xcode proof. No release, tag, or publish has been performed.
+Current status: **M14-M23 COMPLETE; HARDENING_6 ACTIVE on the post-M23 candidate
+(2026-08-28).** H6 targeted repair/core/protocol/property/fault/soak gates are
+green; final exact-tree local gates and exact-SHA hosted certification remain
+pending. H6 closes positive repair-evidence, durable-before-RESOLVED ordering,
+atomic accepted-patch application, attempt isolation, controller
+identity/artifact integrity, durable-corruption, and protocol-validation gaps.
+See `.inspector/state/HARDENING_6-AUDIT.md` and
+`openspec/changes/hardening-6-repair-trust/`. M8 iOS remains
+`DEFERRED_ENVIRONMENT` pending real macOS/Xcode proof. No release, tag, or
+publish has been performed.
 
 ## Quickstart
 

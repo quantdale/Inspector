@@ -96,7 +96,7 @@ export class WindowsAdapterHandler implements AdapterHandler {
     // Use the RETURNED unique directory so concurrent instances never share
     // one artifact tree.
     this.artifactDir = mkdtempSync(join(artifactBaseDir, "inst-"));
-    this.artifacts = new ArtifactStore(this.artifactDir);
+    this.artifacts = new ArtifactStore(artifactBaseDir);
     void this.artifacts;
   }
 

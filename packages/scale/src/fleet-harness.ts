@@ -282,11 +282,12 @@ export function spawnTrackedAdapter(
   binPath: string,
   pids: PidTracker,
   label: string,
+  adapterEnv: NodeJS.ProcessEnv = process.env,
 ): Promise<SpawnedAdapter> {
   return new Promise((resolve, reject) => {
     const proc = spawn(process.execPath, ["--import", "tsx", binPath], {
       stdio: ["pipe", "pipe", "inherit"],
-      env: process.env,
+      env: adapterEnv,
     });
     if (!proc.pid || !proc.stdout || !proc.stdin) {
       reject(new Error(`failed to spawn adapter subprocess: ${label}`));
@@ -895,18 +896,28 @@ export function makeWebExecutor(common: {
       WEB_BIN,
       common.pids,
       `web:${ctx.item.id}:a${ctx.attempt}`,
+      {
+        ...process.env,
+        INSPECTOR_ARTIFACT_BASE_DIR: join(ctx.workspace, "artifacts"),
+      },
     );
     const store = Store.open(join(ctx.workspace, "runs.db"));
     let run: RunController | null = null;
     try {
-      await spawned.client.request("lifecycle", { op: "create" }, 30000);
-
       // The direct RunController construction skips RunManager, so the durable
       // run/environment rows must exist before any step commit (FK enforced).
       const runId = `run-${ctx.item.id}-a${ctx.attempt}`;
       const envId = `env-${ctx.item.id}-a${ctx.attempt}`;
       store.createRun({ id: runId, adapter: spawned.caps.adapter });
       store.createEnvironment({ id: envId, runId, adapter: spawned.caps.adapter });
+      // The controller is also the authority for protocol attribution. Pass
+      // its durable identity at creation time so the first observation is
+      // correlated instead of arriving with the adapter's default run/env.
+      await spawned.client.request(
+        "lifecycle",
+        { op: "create", options: { runId, environmentId: envId } },
+        30000,
+      );
 
       // CHAOS (b): kill the adapter subprocess mid-item, exactly once. The
       // item must classify as adapter-error, stay durably recorded, and be
@@ -952,7 +963,14 @@ export function makeWebExecutor(common: {
           observeFields: ["url", "title", "uiTree", "storage", "pageErrors", "screenshot"],
         },
         replayDriverFactory: () =>
-          new WebReplayDriver({ artifactBaseDir: join(ctx.workspace, "replay-artifacts") }),
+          // Minimization can issue many bounded replays. Keep one browser
+          // process per exploration and reset it between replays so detached
+          // fleet claims do not spend their whole lease budget relaunching
+          // Chromium while preserving per-replay attribution.
+          new WebReplayDriver({
+            artifactBaseDir: join(ctx.workspace, "replay-artifacts"),
+            persistent: true,
+          }),
       });
 
       // CHAOS (d): planner role routed through the flaky provider chain.
@@ -1020,6 +1038,7 @@ export function makeWebExecutor(common: {
         },
       };
     } finally {
+      await spawned.close();
       store.close();
     }
   };

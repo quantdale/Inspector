@@ -78,7 +78,7 @@ export class RealElectronHandler implements AdapterHandler {
   ) {
     mkdirSync(artifactBaseDir, { recursive: true });
     this.artifactDir = mkdtempSync(join(artifactBaseDir, "real-"));
-    this.artifacts = new ArtifactStore(this.artifactDir);
+    this.artifacts = new ArtifactStore(artifactBaseDir);
     this.fixturePath = fixturePath;
     this.settleMs = Math.max(0, settleMs);
   }

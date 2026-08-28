@@ -721,54 +721,61 @@ hardening6:
       - {id: 98588294187, name: Windows path/native gate, conclusion: SUCCESS}
       - {id: 98591344212, name: Electron real-runtime proof (Xvfb), conclusion: SUCCESS}
       - {id: 98591344186, name: Linux installed-artifact smoke, conclusion: SUCCESS}
+  current_phase: H6.8
+  candidate_note: >-
+    H6.0-H6.7 implementation and targeted evidence are complete on the
+    candidate tree; final exact-tree local gates and exact-SHA hosted lanes
+    remain pending. Do not mark COMPLETE before those gates pass.
   phases:
-    - {id: H6.0, name: rehydrate-audit-truth, state: PENDING}
-    - {id: H6.1, name: repair-positive-evidence, state: PENDING}
-    - {id: H6.2, name: repair-durability-atomic-apply, state: PENDING}
-    - {id: H6.3, name: core-correlation-artifact-integrity, state: PENDING}
-    - {id: H6.4, name: adapter-protocol-boundary, state: PENDING}
-    - {id: H6.5, name: durable-corruption-negative-space, state: PENDING}
-    - {id: H6.6, name: every-file-semantic-review, state: PENDING}
-    - {id: H6.7, name: mutation-fault-soak, state: PENDING}
-    - {id: H6.8, name: reconcile-certify, state: PENDING}
+    - {id: H6.0, name: rehydrate-audit-truth, state: DONE}
+    - {id: H6.1, name: repair-positive-evidence, state: DONE}
+    - {id: H6.2, name: repair-durability-atomic-apply, state: DONE}
+    - {id: H6.3, name: core-correlation-artifact-integrity, state: DONE}
+    - {id: H6.4, name: adapter-protocol-boundary, state: DONE}
+    - {id: H6.5, name: durable-corruption-negative-space, state: DONE}
+    - {id: H6.6, name: every-file-semantic-review, state: DONE}
+    - {id: H6.7, name: mutation-fault-soak, state: DONE}
+    - {id: H6.8, name: reconcile-certify, state: IN_PROGRESS}
   defects:
     - >-
-      H6-D0 CONFIRMED HIGH audit-certificate incompleteness/self-attestation:
-      exact baseline tree has 536 blobs while H5 audit has 534 rows and omits
-      two H5 workflow tests; generator hashes content but assigns REVIEWED by path.
+      H6-D0 CLOSED HIGH: audit certification now separates inventory from
+      semantic evidence; every final authored tracked blob is bound to its
+      exact current Git blob hash and concrete review basis by the H6 ledger.
     - >-
-      H6-D1 CONFIRMED HIGH repair post-patch no-hard-oracle can collapse
-      operational/zero-work replay to clean.
+      H6-D1 CLOSED HIGH: typed replay evidence requires complete positive
+      execution; operational and zero-work results cannot become clean.
     - >-
-      H6-D2 CONFIRMED HIGH masking probe treats operational non-success outcomes
-      as surviving unless they are target-failure/signals.
+      H6-D2 CLOSED HIGH: masking probes use the same positive execution gate.
     - >-
-      H6-D3 CONFIRMED HIGH finding may transition RESOLVED before required repair
-      evidence persistence while finish treats required writes as best-effort.
+      H6-D3 CLOSED HIGH: required evidence is atomically durable before the
+      finding RESOLVED transition, with copy/write/fsync/rename fault tests.
     - >-
-      H6-D4 CONFIRMED HIGH accepted-patch application lacks target revision/
-      cleanliness proof and all-or-nothing rollback.
+      H6-D4 CLOSED HIGH: explicit application requires exact clean revision,
+      certified preimages, contained paths, and transactional rollback.
     - >-
-      H6-D5 CONFIRMED HIGH rejected-attempt rollback preserves ignored files
-      because disposable worktree cleanup uses git clean -fd.
+      H6-D5 CLOSED HIGH: disposable attempt rollback removes ignored/untracked
+      contamination and failed creation cleans its temporary base.
     - >-
-      H6-D6 CONFIRMED MEDIUM generated regression provenance hard-codes
-      adapter-web for generic repair providers.
+      H6-D6 CLOSED MEDIUM: regression provenance follows the finding/provider,
+      including non-web repair tests.
     - >-
-      H6-D7 CONFIRMED HIGH action outcome identity is shape-valid but not
-      correlated to submitted action/current run/environment before acceptance.
+      H6-D7 CLOSED HIGH: action outcome actionId/runId/environmentId identity is
+      checked before durable step commit and accounting.
     - >-
-      H6-D8 REPRO-REQUIRED HIGH observation identity is shape-valid but explicit
-      enclosing run/environment correlation is absent in controller code.
+      H6-D8 DISMISSED WITH PROOF HIGH: adapter run/environment identity is
+      required; controller-owned sequence/step attribution is normalized and
+      covered by mismatch/normalization tests.
     - >-
-      H6-D9 CONFIRMED MEDIUM missing declared artifact refs are silently filtered
-      and uncharged instead of becoming evidence failure.
+      H6-D9 CLOSED MEDIUM: missing, cross-run, metadata-mismatched, or corrupt
+      declared artifacts fail closed and only verified bytes are charged.
     - >-
-      H6-D10 CONFIRMED MEDIUM AdapterServer validates act/observe but not full
-      JSON-RPC and initialize/lifecycle/health/cancel parameter contracts.
+      H6-D10 CLOSED MEDIUM: AdapterServer validates JSON-RPC envelope and every
+      initialize/observe/act/lifecycle/health/cancel parameter boundary.
     - >-
-      H6-D11 REPRO-REQUIRED MEDIUM malformed durable action error_json is
-      silently omitted during outcome reconstruction; prove reachability.
+      H6-D11 DISMISSED WITH PROOF MEDIUM: raw malformed action status/error/
+      timestamp rows and malformed checkpoints are reachable and now fail
+      closed with ProtocolError; durable metadata parsers refuse malformed JSON.
+  blockers: []
 
 hardening1_history:
   campaign: HARDENING_1

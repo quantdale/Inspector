@@ -1,4 +1,5 @@
 import type { FindingStatus } from "@inspector/finding";
+import type { ReplayEvidenceDisposition } from "./replay-evidence.js";
 
 /** A single file rewrite proposed by a patch agent. */
 export interface PatchFile {
@@ -6,6 +7,10 @@ export interface PatchFile {
   path: string;
   /** Full new file content (whole-file patches keep the contract simple). */
   content: string;
+  /** Certified bytes in the repair worktree before the patch was written. */
+  preimageSha256?: string | null;
+  /** Whether the certified preimage existed as a regular file. */
+  preimageExists?: boolean;
 }
 
 export interface Patch {
@@ -37,6 +42,33 @@ export interface PatchAttempt {
   filesTouched: string[];
   /** Full proposed patch embedded for audit (accepted AND rejected attempts). */
   patch?: Patch;
+  /** Positive/negative replay evidence associated with a patch decision. */
+  verification?: {
+    postPatch: ReplayEvidenceSummary;
+    maskingProbe: ReplayEvidenceSummary;
+  };
+  at: string;
+}
+
+/** Redacted, durable summary of a replay gate; raw driver output is not copied. */
+export interface ReplayEvidenceSummary {
+  disposition: ReplayEvidenceDisposition;
+  expectation: "reproduction" | "clean";
+  requiredActions: number;
+  executedOutcomes: number;
+  matchedOracleIds: string[];
+  reason: string;
+}
+
+export interface RepairVerification {
+  prePatch: ReplayEvidenceSummary;
+}
+
+export interface PatchApplication {
+  status: "APPLIED" | "REFUSED" | "ROLLED_BACK";
+  paths: string[];
+  rollbackSucceeded: boolean;
+  reason?: string;
   at: string;
 }
 
@@ -62,6 +94,10 @@ export interface RepairRecord {
   worktreeCommit?: string | null;
   outcome: RepairOutcome;
   attempts: PatchAttempt[];
+  /** Verification summaries that support the repair conclusion. */
+  verification?: RepairVerification;
+  /** Durable truth about explicit application to an operator checkout. */
+  application?: PatchApplication;
   regressionArtifact?: string;
   startedAt: string;
   finishedAt: string;

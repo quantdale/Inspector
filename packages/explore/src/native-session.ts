@@ -581,8 +581,10 @@ function parseNativeMetadata(raw: string | null): NativeStoredMetadata | null {
       ...(typeof exploration.stateBefore === "string" ? { stateBefore: exploration.stateBefore } : {}),
       ...(exploration.rngAfter !== undefined ? { rngAfter: exploration.rngAfter } : {}),
     };
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(
+      `durable native action metadata is malformed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -608,7 +610,9 @@ function nativeActionFromRecord(record: ActionRecord, metadata: NativeStoredMeta
         exploration: metadata,
       },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(
+      `durable native action record is malformed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

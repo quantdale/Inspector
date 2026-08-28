@@ -40,7 +40,10 @@ function inProcessAdapter(handler: AdapterHandler): AdapterClient {
   return client;
 }
 
-function deterministicWebHandler(): AdapterHandler {
+function deterministicWebHandler(
+  runId = "run_resume",
+  environmentId = "env_resume",
+): AdapterHandler {
   let observationSequence = 0;
   const caps: CapabilityDoc = {
     protocolVersion: "0.1",
@@ -72,7 +75,7 @@ function deterministicWebHandler(): AdapterHandler {
     observe: (params) => {
       const request = params as { observe: string[] };
       void request;
-      return observation("run_resume", "env_resume");
+      return observation(runId, environmentId);
     },
     act: (params) => {
       const action = (params as { action: { id: string; runId: string; environmentId: string } }).action;
@@ -114,7 +117,7 @@ async function makeHarness(path: string, runId: string, fresh = true): Promise<H
       config: CONFIG,
     });
   }
-  const client = inProcessAdapter(deterministicWebHandler());
+  const client = inProcessAdapter(deterministicWebHandler(runId, `env_${runId}`));
   const caps = await client.request("initialize", {}) as CapabilityDoc;
   await client.request("lifecycle", { op: "create" });
   const run = new RunController(store, artifacts, new PolicyEngine(), {
@@ -349,6 +352,45 @@ describe("M10 deterministic exploration restart", () => {
       expect(resumed.store.countRunActions("run_unknown")).toBe(CONFIG.maxActions);
       expect(explorationKeys(resumed.store, "run_unknown")).not.toContain("click:unknown");
       expect(resumed.store.getAction("act_unknown")?.status).toBe("unknown");
+    } finally {
+      if (first) await finishHarness(first);
+      if (resumed) await finishHarness(resumed);
+      removeDir(dir);
+    }
+  });
+
+  it("fails closed when a committed action metadata row is corrupt", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "inspector-m10-corrupt-action-"));
+    const path = join(dir, "run.db");
+    let first: Harness | null = null;
+    let resumed: Harness | null = null;
+    try {
+      first = await makeHarness(path, "run_corrupt_action");
+      const submit = first.run.submitAction.bind(first.run);
+      first.run.submitAction = async (action) => {
+        await submit(action);
+        throw new Error("injected death after committed action");
+      };
+      await expect(new ExploreController({
+        run: first.run,
+        store: first.store,
+        config: CONFIG,
+      }).run_()).rejects.toThrow("injected death after committed action");
+      expect(first.store.countRunActions("run_corrupt_action")).toBe(1);
+      first.store.raw
+        .prepare("UPDATE actions SET metadata_json = ? WHERE run_id = ?")
+        .run("{", "run_corrupt_action");
+      await finishHarness(first);
+      first = null;
+
+      const resumedHarness = await makeHarness(path, "run_corrupt_action", false);
+      resumed = resumedHarness;
+      expect(() => new ExploreController({
+        run: resumedHarness.run,
+        store: resumedHarness.store,
+        config: CONFIG,
+        resume: true,
+      })).toThrow(/durable exploration action metadata is malformed/i);
     } finally {
       if (first) await finishHarness(first);
       if (resumed) await finishHarness(resumed);

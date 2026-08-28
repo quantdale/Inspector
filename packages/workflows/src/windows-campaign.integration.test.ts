@@ -147,8 +147,12 @@ describe("HARDENING_5 H5.3: windows/uia campaign truth", () => {
     const prev = process.env.INSPECTOR_WINDOWS_BACKEND;
     delete process.env.INSPECTOR_WINDOWS_BACKEND;
     const base = fresh("auto-provenance");
-    const { probeRealUia } = await import("../../windows-adapter/src/selection.js");
-    const realAvailable = await probeRealUia();
+    // Use the exact cached capability snapshot that the campaign will route
+    // against. A second independent UIA probe can disagree under a loaded
+    // desktop broker and would make the assertion test the probe race rather
+    // than the campaign's honest refusal/provenance contract.
+    const executor = new InspectorWorkflowExecutor({ campaignId: base });
+    const realAvailable = (await executor.capabilities()).families.includes("windows");
     const items: WorkItem[] = [
       {
         id: "windows-probe",
@@ -168,7 +172,7 @@ describe("HARDENING_5 H5.3: windows/uia campaign truth", () => {
         workerCount: 1,
         items,
         usagePerStep: USAGE,
-        executor: new InspectorWorkflowExecutor({ campaignId: base }),
+        executor,
         keepItemWorkspaces: true,
       },
       join(base, "artifacts"),

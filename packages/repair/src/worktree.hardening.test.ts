@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync, unlinkSync } from "node:fs";
 import { RepairWorkspace, PathPolicyError, ProvenanceError } from "./worktree.js";
 
 const runGit = promisify(execFile);
@@ -13,6 +13,7 @@ async function makeRepo(): Promise<{ repoRoot: string; revision: string }> {
   const repoRoot = join(base, "repo");
   mkdirSync(repoRoot, { recursive: true });
   writeFileSync(join(repoRoot, "app.txt"), "hello\n");
+  writeFileSync(join(repoRoot, ".gitignore"), "*.poison\n");
   const g = async (...args: string[]) => runGit("git", ["-C", repoRoot, ...args]);
   await g("init");
   await g("add", ".");
@@ -86,7 +87,7 @@ describe("RepairWorkspace hardening", () => {
     }
   });
 
-  it("D1: rejects symlink escapes for existing and newly-created files", async () => {
+  it("D1: rejects symlink escapes for existing, dangling, and newly-created files", async () => {
     const { repoRoot, revision } = await makeRepo();
     const outside = mkdtempSync(join(tmpdir(), "inspector-wt-symlink-outside-"));
     const ws = await RepairWorkspace.create(repoRoot, revision);
@@ -105,7 +106,16 @@ describe("RepairWorkspace hardening", () => {
         PathPolicyError,
       );
       expect(existsSync(join(outside, "deeper", "escaped.txt"))).toBe(false);
+
+      const danglingLink = join(ws.path, "dangling");
+      symlinkSync(join(outside, "does-not-exist"), danglingLink, "junction");
+      await expect(ws.writeFile("dangling/escaped.txt", "pwned")).rejects.toThrow(PathPolicyError);
     } finally {
+      // Remove junction entries before Git/Node recursively removes the
+      // disposable worktree; recursive junction cleanup can hang on Windows.
+      for (const linkPath of [join(ws.path, "linked"), join(ws.path, "nested", "link"), join(ws.path, "dangling")]) {
+        try { unlinkSync(linkPath); } catch { /* already absent */ }
+      }
       await ws.dispose();
     }
   });
@@ -115,6 +125,16 @@ describe("RepairWorkspace hardening", () => {
     const notARepo = join(base, "not-a-repo");
     mkdirSync(notARepo, { recursive: true });
     await expect(RepairWorkspace.create(notARepo, "HEAD")).rejects.toThrow(ProvenanceError);
+  });
+
+  it("D2: failed worktree creation removes its temporary base", async () => {
+    const base = mkdtempSync(join(tmpdir(), "inspector-wt-create-failure-"));
+    const notARepo = join(base, "not-a-repo");
+    mkdirSync(notARepo, { recursive: true });
+    const allocated = join(base, "allocated");
+    mkdirSync(allocated, { recursive: true });
+    await expect(RepairWorkspace.create(notARepo, "HEAD", allocated)).rejects.toThrow(ProvenanceError);
+    expect(existsSync(allocated)).toBe(false);
   });
 
   it("D2: still refuses a dirty repository", async () => {
@@ -129,6 +149,24 @@ describe("RepairWorkspace hardening", () => {
     const ws = await RepairWorkspace.create(repoRoot, revision, ownBase);
     await ws.dispose();
     expect(existsSync(ownBase)).toBe(false);
+  });
+
+  it("H6.2: rollback removes ignored contamination and restores the exact revision", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const ws = await RepairWorkspace.create(repoRoot, revision);
+    try {
+      await ws.writeFile("app.txt", "tampered\n");
+      await ws.writeFile("cache.poison", "ignored contamination\n");
+
+      await ws.rollback();
+
+      expect((await ws.readFile("app.txt")).replace(/\r\n/g, "\n")).toBe("hello\n");
+      expect(existsSync(join(ws.path, "cache.poison"))).toBe(false);
+      expect(await ws.isClean()).toBe(true);
+      expect(await ws.headCommit()).toBe(revision);
+    } finally {
+      await ws.dispose();
+    }
   });
 
   it("reports the detached HEAD commit of the worktree", async () => {

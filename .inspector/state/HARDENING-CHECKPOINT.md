@@ -858,3 +858,23 @@ All 15 defects CLOSED (H5-D0..H5-D15):
 This is the implementation SHA; the subsequent state-sync commit that records
 it carries a NEW SHA whose own CI must be queried per H4.10 anti-circular rule.
 No release/tag/publication. M13 remains COMPLETE, M8 DEFERRED_ENVIRONMENT.
+
+
+# HARDENING CAMPAIGN #6 — Repair Trust, Positive-Evidence Verification, and Audit Integrity
+
+- Campaign: HARDENING_6
+- Status: **ACTIVE — implementation candidate through H6.7 (2026-08-28); exact-tree local and hosted certification pending**
+- Base: post-M23 main@bcd2c91; planner baseline 8e6bdb0 retained in the H6 prompt
+- Ledger: .inspector/state/HARDENING_6-SEMANTIC-REVIEW.json plus generated .inspector/state/HARDENING_6-AUDIT.json
+
+## Candidate evidence
+
+H6-D1/D2: typed replay dispositions require complete positive action execution; adapter crash, cancellation, deadline, unknown, driver throw, zero-work, and mixed-action outcomes never become clean. H6-D3: required regression evidence and repair records are atomically copied/written, fsynced, and renamed before a RESOLVED transition; persistence fault injection covers copy, write, fsync, and rename. H6-D4/D5: explicit application checks the exact clean revision, certified preimages, contained real paths, and all-or-nothing rollback; disposable rejected attempts reset tracked and ignored files, including symlink/junction and failed-create cleanup. H6-D6: regression provenance follows the finding instead of a web constant.
+
+H6-D7/D8/D9: RunController rejects action/outcome run, environment, and action identity mismatches; adapter observation identity is checked while durable sequence/step attribution is controller-owned; missing, cross-run, metadata-mismatched, and corrupt artifacts fail closed and are charged from verified metadata. H6-D10: AdapterServer validates JSON-RPC version/method/id, request-vs-notification behavior, and initialize/observe/act/lifecycle/health/cancel params. H6-D11: raw malformed action error/status/timestamp rows and malformed checkpoints raise typed validation errors; native/web/fake durable metadata parsers now refuse malformed JSON. H6-D0: final authored tracked blobs require exact current Git blob hashes and concrete semantic review evidence; pathname/hash inventory alone cannot self-promote.
+
+Local evidence: repair hardening 28/28; worktree 11/11; core hardening 28/28; core integration 7/7; exploration restart/corruption 7/7; adapter protocol + artifact 43/43; finding 26/26; property/fuzz 37/37; mutation-kill 1/1; artifact/SQLite/scheduler soaks 1/1 + 1/1 + 6/6. Full exact-tree gates and hosted exact-SHA certification remain pending. M14-M23 remain COMPLETE, M8 remains DEFERRED_ENVIRONMENT, and no release/tag/publication action is taken.
+
+## HARDENING_6 LOCAL CERTIFICATION CANDIDATE (2026-08-28)
+
+Local H6.8 gates pass on the current candidate: frozen install, lint (0 errors; 4 pre-existing adapter-web warnings), typecheck, unit (81 files; 825 passed, 3 skipped), browser provisioning, integration (51 files; 230 passed, 2 skipped with the bounded four-worker platform pool), release smoke, and targeted H6 mutation/property/fault/soak plus available Windows UIA, Android, PTY, and source-vs-installed proofs. Hosted exact-SHA certification remains pending; do not mark HARDENING_6 COMPLETE until the pushed candidate passes all required hosted lanes. M14-M23 stay COMPLETE, M8 stays DEFERRED_ENVIRONMENT, and no release/tag/publication action is taken.

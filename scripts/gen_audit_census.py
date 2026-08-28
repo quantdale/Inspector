@@ -1,130 +1,282 @@
-import subprocess, re, pathlib, collections, hashlib
+"""Generate the HARDENING_6 inventory and semantic-review certificate.
 
-proc = subprocess.run(['git', 'ls-files'], capture_output=True, text=True)
-files = [l for l in proc.stdout.splitlines() if l]
+The old H5 generator treated enumeration, hashing, and pathname classification
+as semantic review. That is not a meaningful certification boundary. This
+generator deliberately separates those concerns:
 
-# H5-D14: content-aware audit. Each blob is hashed and review is bound to
-# exact content, not just path. A file is REVIEWED only after content has
-# been read and mapped to system behavior.
-def blob_hash(path):
-    try:
-        data = pathlib.Path(path).read_bytes()
-        # Git blob hash is sha1 of "blob <len>\\0<content>"
-        h = hashlib.sha1()
-        h.update(f'blob {len(data)}\0'.encode())
-        h.update(data)
-        return h.hexdigest()[:12]
-    except Exception as e:
-        return f'ERR:{e}'
+* inventory rows come from ``git ls-files`` and the current working-tree blob;
+* semantic-review rows come only from an explicit review ledger;
+* a review is accepted only when its exact blob hash and non-generic evidence
+  fields match the current inventory.
 
-def classify(path):
-    # returns (category, disposition_code, note)
-    # NOTE: disposition is now content-aware; the generator reads the blob
-    # and binds review to its hash. Path alone never emits R.
-    h = blob_hash(path)
-    content_note = f'blob:{h}'
-    if path.startswith('packages/'):
-        parts = path.split('/')
-        pkg = parts[1]
-        if re.search(r'\.(test|spec)\.ts$', path) or '.integration.test.ts' in path:
-            return ('package-tests', 'R', f'{pkg} test/fixture — {content_note} — reviewed: replay/backend/budget/cancellation maps')
-        if path.endswith('.ps1'):
-            return ('native-helpers', 'R', f'{pkg} native helper — {content_note}')
-        if path.endswith('.json') and ('package.json' in path or 'tsconfig' in path or path.endswith('.json')):
-            if path.endswith('package.json') or 'tsconfig' in path:
-                return ('package-manifests', 'R', f'{pkg} manifest/config — {content_note} — dependency resolution input')
-            return ('package-json', 'R', f'{pkg} json asset — {content_note}')
-        if path.endswith('.ts') or path.endswith('.mts') or path.endswith('.cjs') or path.endswith('.mjs'):
-            return ('package-source', 'R', f'{pkg} runtime source — {content_note} — reviewed: protocol/adapters/workflow/finding/replay/budget paths')
-        if path.endswith('.md'):
-            return ('package-docs', 'R', f'{pkg} doc — {content_note}')
-        return ('package-other', 'R', f'{pkg} other — {content_note}')
-    if path.startswith('.inspector/'):
-        if path.endswith('.log'):
-            return ('inspector-evidence-logs', 'R', f'campaign evidence log — {content_note} (checkpoint-reviewed)')
-        if path.endswith('.yaml') or path.endswith('.yml'):
-            return ('inspector-state-schemas', 'R', f'durable state schema/ledger — {content_note}')
-        if path.endswith('.md'):
-            return ('inspector-docs', 'R', f'campaign checkpoint/ledger doc — {content_note}')
-        return ('inspector-other', 'R', f'durable state asset — {content_note}')
-    if path.startswith('docs/'):
-        return ('docs', 'R', f'doc/ADR/spec prose — {content_note}')
-    if path.startswith('specs/'):
-        return ('specs', 'R', f'spec artifact — {content_note}')
-    if path.startswith('openspec/'):
-        return ('openspec', 'R', f'OpenSpec change artifact — {content_note}')
-    if path.startswith('dogfood/'):
-        return ('dogfood', 'R', f'repro/dogfood asset — {content_note}')
-    if path.startswith(('.agent/', '.opencode/', '.agents/', '.claude/', '.kimi-code/', '.github/')):
-        return ('agent-tool-config', 'R', f'agent/tool/CI config — {content_note}')
-    if path.startswith('scripts/'):
-        return ('scripts', 'R', f'build/release script — {content_note}')
-    if path == 'pnpm-lock.yaml':
-        return ('root-lockfile', 'R', f'tracked dependency lockfile — {content_note} — configuration/dependency surface, not untracked output')
-    if path.endswith('.md'):
-        return ('root-docs', 'R', f'root doc — {content_note}')
-    return ('root-config', 'R', f'root config/manifest — {content_note}')
+The historical ``HARDENING_5-AUDIT.md`` is never rewritten by this script.
+Use ``--output``/``--machine-output`` to write a prospective H6 certificate.
+"""
 
-# Excluded-by-rule definition (generated/vendor/cache). Tracked pnpm-lock.yaml IS an authored surface.
-EXCLUDED_RULE = 'Generated, vendored (node_modules/dist/etc.), and cache artifacts are excluded by rule; the tracked tree contains zero such files. Tracked manifests and lockfiles (including pnpm-lock.yaml, package.json, workspace configs) ARE authored dependency/configuration surfaces and are inventoried/reviewed as R, not excluded.'
+from __future__ import annotations
 
-rows = []
-cat_counts = collections.Counter()
-for f in sorted(files):
-    cat, code, note = classify(f)
-    cat_counts[cat] += 1
-    rows.append((f, cat, code, note))
+import argparse
+import hashlib
+import json
+import pathlib
+import subprocess
+from collections import Counter
+from typing import Any
 
-lines = []
-lines.append('# HARDENING_5 — Every-Tracked-File Audit Census')
-lines.append('')
-lines.append('Mandatory H5.0.4-5 deliverable. Generated mechanically from `git ls-files` on the')
-lines.append('HARDENING_5 working tree. Every tracked file has a disposition, enumerated either')
-lines.append('individually or via a clearly enumerated homogeneous group whose member paths are')
-lines.append('listed below. No file is omitted.')
-lines.append('')
-lines.append('## Exclusions rule')
-lines.append('')
-lines.append(EXCLUDED_RULE)
-lines.append('')
-lines.append('## Category summary (machine-checkable)')
-lines.append('')
-lines.append('| Category | Count | Disposition |')
-lines.append('| --- | ---: | --- |')
-total = 0
-for cat in sorted(cat_counts):
-    lines.append(f'| {cat} | {cat_counts[cat]} | R (reviewed) |')
-    total += cat_counts[cat]
-lines.append(f'| **TOTAL** | **{total}** | R={total} E=0 |')
-lines.append('')
-lines.append(f'Invariant check: tracked={len(files)} == reviewed({total}) + excluded(0) -> {len(files)==total}.')
-lines.append('')
-lines.append('## Enumerated dispositions')
-lines.append('')
-lines.append('Each line: `path | category | code | note`.')
-lines.append('')
-lines.append('| Path | Category | Code | Note |')
-lines.append('| --- | --- | --- | --- |')
-for f, cat, code, note in rows:
-    esc = f.replace('|', '\\|')
-    lines.append(f'| {esc} | {cat} | {code} | {note} |')
-lines.append('')
-lines.append('## Reconciliation')
-lines.append('')
-lines.append(f'- tracked (git ls-files): {len(files)}')
-lines.append(f'- reviewed (R): {total}')
-lines.append(f'- excluded (E): 0')
-lines.append(f'- R + E = {total} == tracked {len(files)}: {total == len(files)}')
-lines.append('')
-lines.append('## System maps (referenced)')
-lines.append('')
-lines.append('- Adapter family contract: `packages/workflows/src/families.ts` (FAMILY_CONTRACT, exhaustive over @inspector/scale AdapterFamily).')
-lines.append('- Workflow fleet truth resolution: `packages/workflows/src/workspace.ts`, `exploration.ts`, `campaign-executor.ts`, `replay-subject.ts`.')
-lines.append('- Electron durable lane: `packages/electron-adapter/src/{index,replay}.ts`.')
-lines.append('- Windows/UIA durable lane: `packages/windows-adapter/src/{index,replay,mock-uia,real-uia,native-hunt}.ts`.')
-lines.append('- Durable control-plane state: `packages/core/src/{state,run-manager}.ts`, `packages/workflows/src/meta.ts`.')
-lines.append('- Replay routing: `packages/workflows/src/replay-subject.ts` (REPLAY_DRIVER_FACTORIES / REPLAY_SUPPORTED_DURABLE_ADAPTERS).')
 
-out = pathlib.Path('.inspector/state/HARDENING_5-AUDIT.md')
-out.write_text('\n'.join(lines) + '\n')
-print('wrote', out, 'lines', len(lines), 'files', len(files), 'total', total)
+SCHEMA = "inspector-h6-audit/1"
+DEFAULT_MARKDOWN = pathlib.Path(".inspector/state/HARDENING_6-AUDIT.md")
+CERTIFICATION_ARTIFACTS = {
+    ".inspector/state/HARDENING_5-AUDIT.md",
+    ".inspector/state/HARDENING_6-AUDIT.md",
+    ".inspector/state/HARDENING_6-AUDIT.json",
+    ".inspector/state/HARDENING_6-SEMANTIC-REVIEW.json",
+}
+
+
+def tracked_files() -> list[str]:
+    proc = subprocess.run(
+        ["git", "ls-files", "-z"],
+        capture_output=True,
+        check=True,
+    )
+    return sorted(p.decode("utf-8") for p in proc.stdout.split(b"\0") if p)
+
+
+def blob_hash(path: str) -> str:
+    data = pathlib.Path(path).read_bytes()
+    digest = hashlib.sha1()
+    digest.update(f"blob {len(data)}\0".encode("ascii"))
+    digest.update(data)
+    return digest.hexdigest()
+
+
+def classify(path: str) -> tuple[str, str, bool, str | None]:
+    """Return category, review scope, authored flag, and exclusion reason."""
+
+    normalized = path.replace("\\", "/")
+    if normalized in CERTIFICATION_ARTIFACTS:
+        return (
+            "audit-certification-artifact",
+            "excluded",
+            False,
+            "generated inventory/certificate metadata; validated by the H6 gate itself",
+        )
+    if normalized.endswith(".log") and (
+        normalized.startswith(".inspector/") or normalized.startswith(".agent/")
+    ):
+        return (
+            "generated-evidence-log",
+            "excluded",
+            False,
+            "generated run/checkpoint evidence log; retained for provenance, not authored behavior",
+        )
+    if normalized.startswith(".inspector/ga-work/") or normalized.startswith(".inspector/rc-work/"):
+        return (
+            "generated-evidence-artifact",
+            "excluded",
+            False,
+            "generated field-proof/evidence artifact; retained for provenance, not authored behavior",
+        )
+    if normalized.startswith("packages/"):
+        if ".integration.test." in normalized or ".hardening.test." in normalized or ".test." in normalized:
+            return "package-test", "authored", True, None
+        if normalized.endswith((".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".ps1")):
+            return "package-runtime", "authored", True, None
+        if normalized.endswith((".json", ".yaml", ".yml")):
+            return "package-config", "authored", True, None
+        return "package-documentation-or-asset", "authored", True, None
+    if normalized.startswith("docs/"):
+        return "documentation", "authored", True, None
+    if normalized.startswith("specs/") or normalized.startswith("openspec/"):
+        return "specification", "authored", True, None
+    if normalized.startswith((".agent/", ".agents/", ".github/", ".opencode/", ".claude/", ".kimi-code/")):
+        return "tooling-and-ci-config", "authored", True, None
+    if normalized.startswith("scripts/"):
+        return "repository-script", "authored", True, None
+    if normalized.startswith(".inspector/"):
+        return "durable-state-or-ledger", "authored", True, None
+    if normalized.startswith("dogfood/"):
+        return "dogfood-fixture", "authored", True, None
+    if normalized.endswith((".md", ".txt")):
+        return "root-documentation", "authored", True, None
+    return "root-config", "authored", True, None
+
+
+def load_reviews(path: pathlib.Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema") != "inspector-h6-semantic-review/1":
+        raise ValueError("semantic review ledger has an unsupported schema")
+    reviews = raw.get("reviews")
+    if not isinstance(reviews, list):
+        raise ValueError("semantic review ledger requires a reviews array")
+    result: dict[str, dict[str, Any]] = {}
+    for item in reviews:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise ValueError("every semantic review entry requires a path")
+        path_key = item["path"].replace("\\", "/")
+        if path_key in result:
+            raise ValueError(f"duplicate semantic review entry: {path_key}")
+        result[path_key] = item
+    return result
+
+
+def valid_review(entry: dict[str, Any], expected_blob: str) -> tuple[bool, str]:
+    if entry.get("blob") != expected_blob:
+        return False, "stale or mismatched exact blob hash"
+    if not isinstance(entry.get("reviewer"), str) or not entry["reviewer"].strip():
+        return False, "missing reviewer"
+    maps = entry.get("system_maps")
+    if not isinstance(maps, list) or not maps or not all(isinstance(m, str) and m.strip() for m in maps):
+        return False, "semantic review requires one or more named system maps"
+    targets = entry.get("review_targets")
+    if not isinstance(targets, list) or not targets or not all(isinstance(t, str) and len(t.strip()) >= 8 for t in targets):
+        return False, "semantic review requires concrete inspected behavior targets"
+    basis = entry.get("basis")
+    if not isinstance(basis, str) or len(basis.strip()) < 24:
+        return False, "semantic review basis is missing or too generic"
+    if basis.strip().lower() in {"reviewed", "runtime source reviewed", "no findings"}:
+        return False, "semantic review basis is generic"
+    rationale = entry.get("rationale")
+    if not isinstance(rationale, str) or len(rationale.strip()) < 12:
+        return False, "semantic review rationale is missing"
+    return True, ""
+
+
+def make_inventory(reviews: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    tracked = tracked_files()
+    tracked_keys = {path.replace("\\", "/") for path in tracked}
+    unexpected = sorted(set(reviews) - tracked_keys)
+    if unexpected:
+        raise ValueError(
+            "semantic review ledger contains paths that are not tracked: "
+            + ", ".join(unexpected)
+        )
+    for path in tracked:
+        category, scope, authored, exclusion = classify(path)
+        current_blob = blob_hash(path)
+        review = reviews.get(path.replace("\\", "/"))
+        status = "EXCLUDED" if scope == "excluded" else "UNREVIEWED"
+        review_error = None
+        if authored and review is not None:
+            accepted, review_error = valid_review(review, current_blob)
+            if accepted:
+                status = "REVIEWED"
+                review_error = None
+        rows.append(
+            {
+                "path": path.replace("\\", "/"),
+                "blob": current_blob,
+                "category": category,
+                "scope": scope,
+                "authored": authored,
+                "review_status": status,
+                "exclusion_reason": exclusion,
+                "semantic_review": review if status == "REVIEWED" else None,
+                "review_error": review_error,
+            }
+        )
+    return rows
+
+
+def render_markdown(rows: list[dict[str, Any]], review_ledger: str | None) -> str:
+    counts = Counter(row["review_status"] for row in rows)
+    authored = [row for row in rows if row["authored"]]
+    lines = [
+        "# HARDENING_6 — Exact-Blob Inventory and Semantic-Review Certificate",
+        "",
+        "This is a prospective H6 certificate. Inventory and semantic review are",
+        "separate: hashing/enumeration/path classification never creates `REVIEWED`.",
+        "A reviewed authored row requires an explicit ledger entry whose exact blob",
+        "hash matches the current working tree and whose evidence names system maps,",
+        "a content/behavior review basis, and a no-finding/finding rationale.",
+        "",
+        "## Coverage summary",
+        "",
+        f"- tracked blobs: **{len(rows)}**",
+        f"- authored review scope: **{len(authored)}**",
+        f"- reviewed: **{counts['REVIEWED']}**",
+        f"- unreviewed: **{counts['UNREVIEWED']}**",
+        f"- excluded by explicit rule: **{counts['EXCLUDED']}**",
+        f"- semantic review ledger: `{review_ledger or '(none — all authored rows remain UNREVIEWED)'}`",
+        "",
+        "## Inventory and semantic-review evidence",
+        "",
+        "| Path | Exact blob | Category | Scope | Status | Evidence basis |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in rows:
+        review = row["semantic_review"]
+        if row["review_status"] == "REVIEWED" and review:
+            basis = f"maps: {', '.join(review['system_maps'])}; {review['basis']}"
+        elif row["review_status"] == "EXCLUDED":
+            basis = row["exclusion_reason"] or "explicitly excluded"
+        else:
+            basis = row["review_error"] or "no exact-blob semantic review evidence"
+        safe = str(basis).replace("|", "\\|").replace("\n", " ")
+        lines.append(
+            f"| `{row['path']}` | `{row['blob']}` | {row['category']} | {row['scope']} | **{row['review_status']}** | {safe} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Mechanical certification rule",
+            "",
+            "The H6 repo-contract gate compares this inventory with `git ls-files` and",
+            "fails on a missing path, an exact-blob mismatch, malformed review evidence,",
+            "or any authored row that is not `REVIEWED`. Certification artifacts and",
+            "generated evidence logs remain inventory-visible but are excluded only by",
+            "the explicit rules recorded in each row.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=pathlib.Path, default=DEFAULT_MARKDOWN)
+    parser.add_argument("--machine-output", type=pathlib.Path, default=None)
+    parser.add_argument("--review-ledger", type=pathlib.Path, default=None)
+    parser.add_argument("--no-markdown", action="store_true", help="write only the machine-readable inventory")
+    args = parser.parse_args()
+
+    reviews = load_reviews(args.review_ledger)
+    rows = make_inventory(reviews)
+    machine = {
+        "schema": SCHEMA,
+        "generated_from": "git ls-files + current working-tree blob bytes",
+        "review_ledger": str(args.review_ledger) if args.review_ledger else None,
+        "rows": rows,
+    }
+    if not args.no_markdown:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            render_markdown(rows, str(args.review_ledger) if args.review_ledger else None),
+            encoding="utf-8",
+            newline="\n",
+        )
+    if args.machine_output is not None:
+        args.machine_output.parent.mkdir(parents=True, exist_ok=True)
+        args.machine_output.write_text(
+            json.dumps(machine, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    print(
+        "wrote",
+        args.machine_output if args.no_markdown and args.machine_output is not None else args.output,
+        "tracked",
+        len(rows),
+        "reviewed",
+        sum(row["review_status"] == "REVIEWED" for row in rows),
+        "unreviewed",
+        sum(row["review_status"] == "UNREVIEWED" for row in rows),
+    )
+
+
+if __name__ == "__main__":
+    main()

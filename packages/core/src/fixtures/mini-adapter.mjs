@@ -6,6 +6,8 @@ import readline from "node:readline";
 
 const rl = readline.createInterface({ input: process.stdin });
 let seq = 0;
+let runId = "run";
+let environmentId = "env";
 
 rl.on("line", (line) => {
   if (!line.trim()) return;
@@ -31,14 +33,18 @@ rl.on("line", (line) => {
       });
       break;
     case "lifecycle":
+      if (req.params?.op === "create") {
+        if (typeof req.params.options?.runId === "string") runId = req.params.options.runId;
+        if (typeof req.params.options?.environmentId === "string") environmentId = req.params.options.environmentId;
+      }
       reply({ ok: true });
       break;
     case "observe":
       seq += 1;
       reply({
         id: `mini_obs_${seq}`,
-        runId: "run",
-        environmentId: "env",
+        runId,
+        environmentId,
         sequence: seq,
         source: "fixture-mini",
         capturedAt: new Date().toISOString(),
@@ -48,8 +54,8 @@ rl.on("line", (line) => {
     case "act":
       reply({
         actionId: req.params?.action?.id ?? "x",
-        runId: "run",
-        environmentId: "env",
+        runId,
+        environmentId,
         status: "success",
         observedAt: new Date().toISOString(),
       });

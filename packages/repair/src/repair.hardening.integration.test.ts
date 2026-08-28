@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { FindingEngine, OracleEngine } from "@inspector/finding";
 import type { Action, ReplayDriver, ReplayResult } from "@inspector/finding";
+import type { ActionOutcome } from "@inspector/protocol";
 import { OracleSuite, InvariantOracle } from "@inspector/oracle";
 import { RepairEngine } from "./engine.js";
 import type { Patch, PatchAgent, PatchContext, RepairRecord } from "./types.js";
@@ -28,12 +29,12 @@ function act(id: string, kind: string): Action {
 const BOOM = [act("b1", "boom")];
 const PROBE = [act("p1", "probe")];
 
-function outcome(status: string) {
+function outcome(status: ActionOutcome["status"], actionId = "x"): ActionOutcome {
   return {
-    actionId: "x",
+    actionId,
     runId: "run",
     environmentId: "env",
-    status: status as "success" | "target-failure",
+    status,
     observedAt: new Date().toISOString(),
   };
 }
@@ -55,14 +56,14 @@ class SentinelDriver implements ReplayDriver {
     }
     if (actions.every((a) => a.kind === "probe")) {
       return sentinel.includes("WRECKED")
-        ? { outcomes: [outcome("target-failure")], signals: [{ kind: "TARGET_FAILURE" }], observations: [] }
-        : { outcomes: [outcome("success")], signals: [], observations: [] };
+        ? { outcomes: [outcome("target-failure", actions[0]?.id)], signals: [{ kind: "TARGET_FAILURE" }], observations: [] }
+        : { outcomes: [outcome("success", actions[0]?.id)], signals: [], observations: [] };
     }
     if (sentinel.includes("FIXED")) {
-      return { outcomes: [outcome("success")], signals: [], observations: [] };
+      return { outcomes: [outcome("success", actions[0]?.id)], signals: [], observations: [] };
     }
     return {
-      outcomes: [outcome("success")],
+      outcomes: [outcome("success", actions[0]?.id)],
       signals: [{ kind: "PAGE_ERROR", detail: "seeded bug" }],
       observations: [],
     };
@@ -218,13 +219,13 @@ describe("repair hardening", () => {
 
     const record = await eng.repair(finding, BOOM, fixingAgent);
     expect(record.outcome).toBe("VERIFICATION_FAILED");
-    expect(record.attempts[0]?.verdict).toBe("ABORTED");
-    expect(record.attempts[0]?.reason).toMatch(/attempt 1 failed/);
+    expect(record.attempts[0]?.verdict).toBe("REJECTED");
+    expect(record.attempts[0]?.reason).toMatch(/post-patch replay is not clean/);
     expect(finding.status).toBe("CONFIRMED");
     expect(existsSync(join(evidenceDir, `repair-${finding.id}.json`))).toBe(true);
   });
 
-  it("D3: pipeline-level failure persists an ERROR record and keeps the finding recoverable", async () => {
+  it("H6.1: an operational masking probe is invalid and keeps the finding recoverable", async () => {
     const { repoRoot, revision } = await makeRepo();
     const { engine: fe, finding } = confirmedFinding(revision);
     const evidenceDir = mkdtempSync(join(tmpdir(), "inspector-harden-ev-d3c-"));
@@ -236,11 +237,94 @@ describe("repair hardening", () => {
     });
 
     const record: RepairRecord = await eng.repair(finding, BOOM, fixingAgent);
-    expect(record.outcome).toBe("ERROR");
+    expect(record.outcome).toBe("PROBE_INVALID");
     expect(record.attempts.some((a) => (a.reason ?? "").includes("driver factory exploded"))).toBe(true);
     expect(finding.status).toBe("CONFIRMED");
     expect(existsSync(join(evidenceDir, `repair-${finding.id}.json`))).toBe(true);
   });
+
+  it.each(["adapter-crash", "cancelled", "deadline-exceeded", "unknown"] as const)(
+    "H6.1: operational post-patch replay %s cannot be accepted",
+    async (status) => {
+      const { repoRoot, revision } = await makeRepo();
+      const { engine: fe, finding } = confirmedFinding(revision);
+      const evidenceDir = mkdtempSync(join(tmpdir(), `inspector-harden-ev-h61-${status}-`));
+
+      class OperationalPostPatchDriver extends SentinelDriver {
+        override async replay(actions: Action[]): Promise<ReplayResult> {
+          const patched = existsSync(join(this.root, "sentinel.json"));
+          if (patched && !actions.every((a) => a.kind === "probe")) {
+            return { outcomes: [outcome(status, actions[0]?.id)], signals: [], observations: [] };
+          }
+          return super.replay(actions);
+        }
+      }
+
+      const eng = makeEngine(fe, repoRoot, revision, evidenceDir, {
+        maxAttempts: 1,
+        driverFor: async (ws) => new OperationalPostPatchDriver(ws.path),
+      });
+      const record = await eng.repair(finding, BOOM, fixingAgent);
+
+      expect(record.outcome).toBe("VERIFICATION_FAILED");
+      expect(record.attempts[0]?.verdict).toBe("REJECTED");
+      expect(record.attempts[0]?.verification?.postPatch.disposition).toBe(status);
+      expect(finding.status).toBe("CONFIRMED");
+    },
+  );
+
+  it("H6.1: zero post-patch outcomes cannot be accepted as clean", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const { engine: fe, finding } = confirmedFinding(revision);
+    const evidenceDir = mkdtempSync(join(tmpdir(), "inspector-harden-ev-h61-zero-"));
+
+    class ZeroPostPatchDriver extends SentinelDriver {
+      override async replay(actions: Action[]): Promise<ReplayResult> {
+        if (existsSync(join(this.root, "sentinel.json")) && !actions.every((a) => a.kind === "probe")) {
+          return { outcomes: [], signals: [], observations: [] };
+        }
+        return super.replay(actions);
+      }
+    }
+
+    const eng = makeEngine(fe, repoRoot, revision, evidenceDir, {
+      maxAttempts: 1,
+      driverFor: async (ws) => new ZeroPostPatchDriver(ws.path),
+    });
+    const record = await eng.repair(finding, BOOM, fixingAgent);
+
+    expect(record.outcome).toBe("VERIFICATION_FAILED");
+    expect(record.attempts[0]?.verification?.postPatch.disposition).toBe("not-executed");
+    expect(finding.status).toBe("CONFIRMED");
+  });
+
+  it.each(["adapter-crash", "cancelled", "deadline-exceeded", "unknown"] as const)(
+    "H6.1: operational masking probe %s cannot survive",
+    async (status) => {
+      const { repoRoot, revision } = await makeRepo();
+      const { engine: fe, finding } = confirmedFinding(revision);
+      const evidenceDir = mkdtempSync(join(tmpdir(), `inspector-harden-ev-h61-probe-${status}-`));
+
+      class OperationalProbeDriver extends SentinelDriver {
+        override async replay(actions: Action[]): Promise<ReplayResult> {
+          if (existsSync(join(this.root, "sentinel.json")) && actions.every((a) => a.kind === "probe")) {
+            return { outcomes: [outcome(status, actions[0]?.id)], signals: [], observations: [] };
+          }
+          return super.replay(actions);
+        }
+      }
+
+      const eng = makeEngine(fe, repoRoot, revision, evidenceDir, {
+        maxAttempts: 1,
+        driverFor: async (ws) => new OperationalProbeDriver(ws.path),
+      });
+      const record = await eng.repair(finding, BOOM, fixingAgent);
+
+      expect(record.outcome).toBe("VERIFICATION_FAILED");
+      expect(record.attempts[0]?.verification?.maskingProbe.disposition).toBe(status);
+      expect(finding.status).toBe("CONFIRMED");
+    },
+  );
 
   it("D4: accepted patch and regression evidence survive dispose; worktree identity recorded", async () => {
     const { repoRoot, revision } = await makeRepo();
@@ -263,7 +347,34 @@ describe("repair hardening", () => {
     expect(record.workspacePath).not.toBe(repoRoot);
     expect(record.workspacePath).toContain("inspector-repair-");
     expect(record.worktreeCommit).toBe(revision);
+    expect(record.verification?.prePatch.disposition).toBe("reproduced");
+    expect(record.attempts.find((a) => a.verdict === "ACCEPTED")?.verification?.postPatch.disposition)
+      .toBe("clean-executed");
   });
+
+  it.each(["copyArtifact", "writeRecord", "fsync", "rename"] as const)(
+    "H6.2: required evidence fault at %s cannot expose RESOLVED",
+    async (fault) => {
+      const { repoRoot, revision } = await makeRepo();
+      const { engine: fe, finding } = confirmedFinding(revision);
+      const evidenceDir = mkdtempSync(join(tmpdir(), `inspector-harden-ev-h62-${fault}-`));
+      const persistence = {
+        [fault]: () => {
+          throw new Error(`injected ${fault} failure`);
+        },
+      };
+      const eng = makeEngine(fe, repoRoot, revision, evidenceDir, { persistence });
+
+      const record = await eng.repair(finding, BOOM, fixingAgent);
+
+      expect(record.outcome).not.toBe("RESOLVED");
+      expect(finding.status).toBe("CONFIRMED");
+      const durableRecord = join(evidenceDir, `repair-${finding.id}.json`);
+      if (existsSync(durableRecord)) {
+        expect(JSON.parse(readFileSync(durableRecord, "utf8")).outcome).not.toBe("RESOLVED");
+      }
+    },
+  );
 
   it("D6a: rejects patches that tamper with test files unless allow-listed", async () => {
     const { repoRoot, revision } = await makeRepo();
@@ -383,7 +494,9 @@ describe("repair hardening", () => {
     const record = await eng.repair(finding, BOOM, fixingAgent);
     expect(record.outcome).toBe("RESOLVED");
 
-    const target = mkdtempSync(join(tmpdir(), "inspector-harden-target-"));
+    const targetBase = mkdtempSync(join(tmpdir(), "inspector-harden-target-"));
+    const target = join(targetBase, "checkout");
+    await runGit("git", ["clone", "--no-local", repoRoot, target]);
     const written = await eng.applyAcceptedPatch(record, target);
     expect(written).toEqual(["sentinel.json"]);
     expect(readFileSync(join(target, "sentinel.json"), "utf8")).toContain("FIXED");
@@ -404,5 +517,88 @@ describe("repair hardening", () => {
     } as unknown as RepairRecord;
     await expect(eng.applyAcceptedPatch(evilRecord, target)).rejects.toThrow();
     expect(existsSync(join(target, "..", "outside.txt"))).toBe(false);
+  });
+
+  it("H6.2: target provenance is checked before any application write", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const { engine: fe, finding } = confirmedFinding(revision);
+    const evidenceDir = mkdtempSync(join(tmpdir(), "inspector-harden-ev-h62-provenance-"));
+    const eng = makeEngine(fe, repoRoot, revision, evidenceDir);
+    const record = await eng.repair(finding, BOOM, fixingAgent);
+
+    const targetBase = mkdtempSync(join(tmpdir(), "inspector-harden-target-provenance-"));
+    const target = join(targetBase, "checkout");
+    await runGit("git", ["clone", "--no-local", repoRoot, target]);
+    writeFileSync(join(target, "dirty.txt"), "dirty\n");
+
+    await expect(eng.applyAcceptedPatch(record, target)).rejects.toThrow(/not clean/i);
+    expect(existsSync(join(target, "sentinel.json"))).toBe(false);
+    expect(record.application?.status).toBe("REFUSED");
+
+    const nonRepo = mkdtempSync(join(tmpdir(), "inspector-harden-nonrepo-"));
+    await expect(eng.applyAcceptedPatch(record, nonRepo)).rejects.toThrow();
+    expect(record.application?.status).toBe("REFUSED");
+  });
+
+  it("H6.2: a preimage mismatch is refused before writing the target", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const { engine: fe, finding } = confirmedFinding(revision);
+    const evidenceDir = mkdtempSync(join(tmpdir(), "inspector-harden-ev-h62-preimage-"));
+    const eng = makeEngine(fe, repoRoot, revision, evidenceDir);
+    const record = await eng.repair(finding, BOOM, fixingAgent);
+
+    const targetBase = mkdtempSync(join(tmpdir(), "inspector-harden-target-preimage-"));
+    const target = join(targetBase, "checkout");
+    await runGit("git", ["clone", "--no-local", repoRoot, target]);
+    const altered = structuredClone(record) as RepairRecord;
+    const accepted = altered.attempts.find((attempt) => attempt.verdict === "ACCEPTED");
+    if (!accepted?.patch) throw new Error("fixture did not produce an accepted patch");
+    accepted.patch.files[0]!.preimageSha256 = "0".repeat(64);
+
+    await expect(eng.applyAcceptedPatch(altered, target)).rejects.toThrow(/preimage hash/i);
+    expect(existsSync(join(target, "sentinel.json"))).toBe(false);
+    expect(altered.application?.status).toBe("REFUSED");
+  });
+
+  it("H6.2: a multi-file application rolls back earlier writes on failure", async () => {
+    const { repoRoot, revision } = await makeRepo();
+    const { engine: fe, finding } = confirmedFinding(revision);
+    const evidenceDir = mkdtempSync(join(tmpdir(), "inspector-harden-ev-h62-rollback-"));
+    const multiFileAgent: PatchAgent = {
+      id: "multi-fixer",
+      async proposePatch(): Promise<Patch> {
+        return {
+          files: [
+            { path: "sentinel.json", content: '{"state":"FIXED"}' },
+            { path: "nested/second.txt", content: "second\n" },
+          ],
+          rationale: "fix with a second related file",
+        };
+      },
+    };
+    let writes = 0;
+    const eng = makeEngine(fe, repoRoot, revision, evidenceDir, {
+      application: {
+        writeFile: async (path, content) => {
+          writes += 1;
+          if (writes === 2) throw new Error("injected target write failure");
+          const { writeFile } = await import("node:fs/promises");
+          await writeFile(path, content, "utf8");
+        },
+      },
+    });
+    const record = await eng.repair(finding, BOOM, multiFileAgent);
+    const targetBase = mkdtempSync(join(tmpdir(), "inspector-harden-target-rollback-"));
+    const target = join(targetBase, "checkout");
+    await runGit("git", ["clone", "--no-local", repoRoot, target]);
+
+    await expect(eng.applyAcceptedPatch(record, target)).rejects.toThrow(/target write failure/i);
+    expect(existsSync(join(target, "sentinel.json"))).toBe(false);
+    expect(existsSync(join(target, "nested", "second.txt"))).toBe(false);
+    expect(record.application).toMatchObject({
+      status: "ROLLED_BACK",
+      rollbackSucceeded: true,
+      paths: ["sentinel.json"],
+    });
   });
 });

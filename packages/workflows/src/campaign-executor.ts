@@ -359,14 +359,29 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     // HARDENING_2 D1/D2: action/reset usage was already permitted and
     // committed incrementally INSIDE the loops (pre-consumption). Only
     // artifact bytes — outputs, not permissions — are charged post-hoc.
-    const artifactBytes = outcome.bundlePaths.reduce((total, entry) => {
+    let artifactBytes = 0;
+    const missingEvidencePaths: string[] = [];
+    for (const entry of outcome.bundlePaths) {
       try {
-        return total + statSync(entry.path).size;
+        artifactBytes += statSync(entry.path).size;
       } catch {
-        return total;
+        missingEvidencePaths.push(entry.path);
       }
-    }, 0);
+    }
     if (artifactBytes > 0) ctx.charge({ artifactBytes });
+    if (missingEvidencePaths.length > 0) {
+      return failedResult(
+        "execution-failure",
+        `exploration produced missing evidence artifact(s): ${missingEvidencePaths.join(", ")}`,
+        {
+          findings: r.findings,
+          evidencePaths: outcome.bundlePaths.map((b) => b.path),
+          runIds: [r.runId],
+          usage,
+          notes: { missingEvidencePaths },
+        },
+      );
+    }
 
     // Cooperative cancellation is never a failure: throw so the scheduler
     // reconciles the claim against durable lease truth (requeue when owned).
@@ -481,9 +496,14 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         }
         try {
           const result: import("@inspector/finding").ReplayResult = await driver.replay(subject.bundle.minimizedSteps);
+          if (!isCompleteReplay(result, subject.bundle.minimizedSteps)) {
+            errorCount += 1;
+            continue;
+          }
           const evaluation = OracleEngine.defaults().evaluate(result);
           if (evaluation.reproduced) reproducedCount += 1;
-          else cleanCount += 1; // executed cleanly and did not reproduce
+          else if (isCleanReplay(result)) cleanCount += 1;
+          else errorCount += 1;
         } catch {
           errorCount += 1; // adapter/environment failure: NOT clean evidence
         } finally {
@@ -599,7 +619,12 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
         let errorThis = false;
         try {
           const result = await driver.replay(subject.bundle.minimizedSteps);
-          reproducedThis = OracleEngine.defaults().evaluate(result).reproduced;
+          if (!isCompleteReplay(result, subject.bundle.minimizedSteps)) {
+            errorThis = true;
+          } else {
+            reproducedThis = OracleEngine.defaults().evaluate(result).reproduced;
+            if (!reproducedThis && !isCleanReplay(result)) errorThis = true;
+          }
         } catch {
           errorThis = true; // adapter/environment failure: NOT clean evidence
         } finally {
@@ -653,6 +678,33 @@ export class InspectorWorkflowExecutor implements WorkItemExecutor {
     _ctx.progress(`replay driver resolving for ${findingId} (${subject.run.adapter})`);
     return replayDriverFor(subject, base);
   }
+}
+
+function isCompleteReplay(
+  result: import("@inspector/finding").ReplayResult,
+  actions: import("@inspector/protocol").Action[],
+): boolean {
+  return (
+    actions.length > 0 &&
+    result.outcomes.length === actions.length &&
+    result.outcomes.every((outcome, index) => {
+      const action = actions[index];
+      return (
+        action !== undefined &&
+        outcome.actionId === action.id &&
+        outcome.runId === action.runId &&
+        outcome.environmentId === action.environmentId
+      );
+    })
+  );
+}
+
+function isCleanReplay(result: import("@inspector/finding").ReplayResult): boolean {
+  return (
+    result.outcomes.length > 0 &&
+    result.outcomes.every((outcome) => outcome.status === "success") &&
+    !result.signals.some((signal) => signal.kind === "TARGET_FAILURE" || signal.kind === "ADAPTER_CRASH")
+  );
 }
 
 /**

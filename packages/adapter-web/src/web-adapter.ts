@@ -177,7 +177,9 @@ export class WebAdapterHandler implements AdapterHandler {
     // Use the RETURNED unique directory so concurrent instances never share
     // one artifact tree (and trace temp files cannot collide across processes).
     this.artifactDir = mkdtempSync(join(artifactBaseDir, "inst-"));
-    this.artifacts = new ArtifactStore(this.artifactDir);
+    // The controller validates refs against this same canonical root. The
+    // per-instance directory above is scratch space for trace archives only.
+    this.artifacts = new ArtifactStore(artifactBaseDir);
   }
 
   async initialize(): Promise<CapabilityDoc> {

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,11 +77,11 @@ const basePolicy: Policy = {
   },
 };
 
-function act(id: string, kind = "noop"): Action {
+function act(id: string, kind = "noop", runId = "runH", environmentId = "envH"): Action {
   return {
     id,
-    runId: "runH",
-    environmentId: "envH",
+    runId,
+    environmentId,
     kind,
     risk: "interact",
     deadlineMs: 5000,
@@ -90,9 +90,13 @@ function act(id: string, kind = "noop"): Action {
 }
 
 interface MockKnobs {
+  runId?: string;
+  environmentId?: string;
   observeResult?: unknown;
+  observeResultFactory?: (runId: string, environmentId: string) => unknown;
   fixedObserveId?: string;
   actResult?: unknown;
+  actResultFactory?: (action: Action) => unknown;
   failLifecycleClose?: boolean;
   artifactBytes?: number;
 }
@@ -116,10 +120,16 @@ function mockHandler(knobs: MockKnobs = {}): MockHandler {
       seq += 1;
       if (knobs.observeResult !== undefined)
         return knobs.observeResult as never;
+      if (knobs.observeResultFactory) {
+        return knobs.observeResultFactory(
+          knobs.runId ?? "runH",
+          knobs.environmentId ?? "envH",
+        ) as never;
+      }
       return {
         id: knobs.fixedObserveId ?? `mock_obs_${seq}`,
-        runId: "runH",
-        environmentId: "envH",
+        runId: knobs.runId ?? "runH",
+        environmentId: knobs.environmentId ?? "envH",
         sequence: seq,
         source: "mock",
         capturedAt: new Date().toISOString(),
@@ -129,6 +139,7 @@ function mockHandler(knobs: MockKnobs = {}): MockHandler {
     async act(params) {
       actCalls += 1;
       if (knobs.actResult !== undefined) return knobs.actResult as never;
+      if (knobs.actResultFactory) return knobs.actResultFactory(params.action) as never;
       const outcome: Record<string, unknown> = {
         actionId: params.action.id,
         runId: params.action.runId,
@@ -184,7 +195,7 @@ async function hardeningController(
   const s = store!;
   s.createRun({ id: runId });
   s.createEnvironment({ id: envId, runId, adapter: "mock" });
-  const handler = mockHandler(knobs);
+  const handler = mockHandler({ ...knobs, runId, environmentId: envId });
   const client = inProcessAdapter(handler);
   const controller = new RunController(s, artifacts!, engine, {
     runId,
@@ -199,8 +210,8 @@ describe("core hardening wave 2", () => {
   it("C1 (D1): committed observations are attributed to their enclosing step", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId } = await hardeningController();
-    await controller.submitAction(act("h1"));
+    const { controller, runId, envId } = await hardeningController();
+    await controller.submitAction(act("h1", "noop", runId, envId));
     await controller.observe(["state"]);
     const steps = store!.getRunSteps(runId);
     expect(steps.length).toBe(2);
@@ -218,10 +229,10 @@ describe("core hardening wave 2", () => {
   it("C2 (D2): resubmitting a decided action replays its recorded outcome without adapter contact", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, handler, runId } = await hardeningController();
-    const first = await controller.submitAction(act("h_dup"));
+    const { controller, handler, runId, envId } = await hardeningController();
+    const first = await controller.submitAction(act("h_dup", "noop", runId, envId));
     expect(first.kind).toBe("outcome");
-    const second = await controller.submitAction(act("h_dup"));
+    const second = await controller.submitAction(act("h_dup", "noop", runId, envId));
     expect(second.kind).toBe("outcome");
     expect((second as { outcome: { status: string } }).outcome.status).toBe(
       "success",
@@ -248,7 +259,7 @@ describe("core hardening wave 2", () => {
       budgets: { ...basePolicy.budgets, max_actions: 1 },
     });
     const first = await hardeningController({}, firstEngine);
-    expect((await first.controller.submitAction(act("h_b1"))).kind).toBe(
+    expect((await first.controller.submitAction(act("h_b1", "noop", first.runId, first.envId))).kind).toBe(
       "outcome",
     );
     await first.controller.close();
@@ -258,14 +269,18 @@ describe("core hardening wave 2", () => {
       ...basePolicy,
       budgets: { ...basePolicy.budgets, max_actions: 1 },
     });
-    const client = inProcessAdapter(mockHandler());
+    const client = inProcessAdapter(
+      mockHandler({ runId: first.runId, environmentId: first.envId }),
+    );
     const second = new RunController(store!, artifacts!, secondEngine, {
       runId: first.runId,
       envId: first.envId,
       adapter: client,
       caps,
     });
-    const retry = await second.submitAction(act("h_b2"));
+    const retry = await second.submitAction(
+      act("h_b2", "noop", first.runId, first.envId),
+    );
     expect(retry.kind).toBe("rejected");
     expect((retry as { decision: { code: string } }).decision.code).toBe(
       "BUDGET_EXHAUSTED",
@@ -278,11 +293,11 @@ describe("core hardening wave 2", () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
     const engine = new PolicyEngine(basePolicy);
-    const { controller, runId } = await hardeningController(
+    const { controller, runId, envId } = await hardeningController(
       { artifactBytes: 4096 },
       engine,
     );
-    const action = { ...act("h_art"), runId };
+    const action = act("h_art", "noop", runId, envId);
     await controller.submitAction(action);
     expect(engine.counters.artifactBytes).toBe(4096);
     await controller.close();
@@ -293,7 +308,9 @@ describe("core hardening wave 2", () => {
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
     const firstEngine = new PolicyEngine(basePolicy);
     const first = await hardeningController({ artifactBytes: 4096 }, firstEngine);
-    await first.controller.submitAction({ ...act("h_art_restart"), runId: first.runId });
+    await first.controller.submitAction(
+      act("h_art_restart", "noop", first.runId, first.envId),
+    );
     await first.controller.close();
 
     const secondEngine = new PolicyEngine(basePolicy);
@@ -340,7 +357,7 @@ describe("core hardening wave 2", () => {
     insert.run("ck_stale", "runTie", sameTs, JSON.stringify({ stepSeq: 1 }));
     insert.run("ck_current", "runTie", sameTs, JSON.stringify({ stepSeq: 2 }));
 
-    const handler = mockHandler();
+    const handler = mockHandler({ runId: "runTie", environmentId: "envTie" });
     const client = inProcessAdapter(handler);
     const controller = new RunController(
       s,
@@ -354,7 +371,7 @@ describe("core hardening wave 2", () => {
       },
     );
     // Restoring the stale stepSeq (1) would collide with UNIQUE(run_id,sequence).
-    const result = await controller.submitAction(act("h_after_tie"));
+    const result = await controller.submitAction(act("h_after_tie", "noop", "runTie", "envTie"));
     expect(result.kind).toBe("outcome");
     const sequences = s.getRunSteps("runTie").map((b) => b.step.sequence);
     expect(sequences).toEqual([1, 2, 3]);
@@ -397,7 +414,7 @@ describe("core hardening wave 2", () => {
       JSON.stringify({ stepSeq: 1 }),
     );
 
-    const handler = mockHandler();
+    const handler = mockHandler({ runId: "runLag", environmentId: "envLag" });
     const client = inProcessAdapter(handler);
     const controller = new RunController(
       s,
@@ -483,6 +500,194 @@ describe("core hardening wave 2", () => {
     await controller.close();
   });
 
+  it.each(["actionId", "runId", "environmentId"] as const)(
+    "H6.3: mismatched action outcome %s is rejected before durable commit",
+    async (field) => {
+      openMemStore();
+      artifacts = new ArtifactStore(join(tmpBase(), "art"));
+      const engine = new PolicyEngine(basePolicy);
+      const { controller, runId, envId } = await hardeningController(
+        {
+          actResultFactory: (action) => ({
+            actionId: field === "actionId" ? "wrong_action" : action.id,
+            runId: field === "runId" ? "wrong_run" : action.runId,
+            environmentId: field === "environmentId" ? "wrong_env" : action.environmentId,
+            status: "success",
+            observedAt: new Date().toISOString(),
+          }),
+        },
+        engine,
+      );
+      const action = act("h_correl", "noop", runId, envId);
+
+      await expect(controller.submitAction(action)).rejects.toMatchObject({
+        name: "ProtocolError",
+        code: "VALIDATION",
+      });
+      expect(store!.getRunSteps(runId)).toHaveLength(0);
+      expect(store!.getAction(action.id)?.status).toBe("pending");
+      expect(engine.counters.actions).toBe(0);
+      await controller.close();
+    },
+  );
+
+  it.each(["runId", "environmentId"] as const)(
+    "H6.3/H6-D8: mismatched observation %s is rejected before a step exists",
+    async (field) => {
+      openMemStore();
+      artifacts = new ArtifactStore(join(tmpBase(), "art"));
+      const { controller, runId } = await hardeningController({
+        observeResultFactory: (currentRun, currentEnv) => ({
+          id: "obs_wrong_context",
+          runId: field === "runId" ? "wrong_run" : currentRun,
+          environmentId: field === "environmentId" ? "wrong_env" : currentEnv,
+          sequence: 999,
+          stepId: "adapter_step_should_not_be_trusted",
+          source: "mock",
+          capturedAt: new Date().toISOString(),
+          summary: {},
+        }),
+      });
+
+      await expect(controller.observe(["state"])).rejects.toMatchObject({
+        name: "ProtocolError",
+        code: "VALIDATION",
+      });
+      expect(store!.getRunSteps(runId)).toHaveLength(0);
+      await controller.close();
+    },
+  );
+
+  it("H6.3/H6-D8: adapter sequence and step identity are normalized to controller truth", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const { controller, runId } = await hardeningController({
+      observeResultFactory: (currentRun, currentEnv) => ({
+        id: "obs_wrong_sequence",
+        runId: currentRun,
+        environmentId: currentEnv,
+        sequence: 999,
+        stepId: "adapter_step_should_not_be_trusted",
+        source: "mock",
+        capturedAt: new Date().toISOString(),
+        summary: {},
+      }),
+    });
+
+    const returned = await controller.observe(["state"]);
+    const step = store!.getRunSteps(runId)[0]!;
+    expect(returned.sequence).toBe(1);
+    expect(returned.stepId).toBe(step.step.id);
+    expect(returned.stepId).not.toBe("adapter_step_should_not_be_trusted");
+    expect(step.step.sequence).toBe(1);
+    expect(step.observations[0]?.sequence).toBe(1);
+    expect(step.observations[0]?.step_id).toBe(step.step.id);
+    await controller.close();
+  });
+
+  it("H6.3/H6-D9: missing or cross-run action artifacts are evidence failures", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const missing = "a".repeat(64);
+    const { controller, runId, envId } = await hardeningController({
+      actResultFactory: (action) => ({
+        actionId: action.id,
+        runId: action.runId,
+        environmentId: action.environmentId,
+        status: "success",
+        observedAt: new Date().toISOString(),
+        artifactRefs: [missing],
+      }),
+    });
+    const action = act("h_missing_artifact", "noop", runId, envId);
+    await expect(controller.submitAction(action)).rejects.toMatchObject({
+      name: "ProtocolError",
+      code: "VALIDATION",
+    });
+    expect(store!.getRunSteps(runId)).toHaveLength(0);
+    expect(store!.getAction(action.id)?.status).toBe("pending");
+    await controller.close();
+
+    const other = artifacts.write({ runId: "otherRun", content: Buffer.from("foreign"), mime: "text/plain" });
+    const second = await hardeningController({
+      actResultFactory: (nextAction) => ({
+        actionId: nextAction.id,
+        runId: nextAction.runId,
+        environmentId: nextAction.environmentId,
+        status: "success",
+        observedAt: new Date().toISOString(),
+        artifactRefs: [other.sha256],
+      }),
+    });
+    const secondAction: Action = {
+      ...act("h_foreign_artifact", "noop", second.runId, second.envId),
+      idempotency: "never-retry",
+    };
+    await expect(second.controller.submitAction(secondAction)).rejects.toMatchObject({
+      name: "ProtocolError",
+      code: "VALIDATION",
+    });
+    expect(store!.getRunSteps(second.runId)).toHaveLength(0);
+    await second.controller.close();
+  });
+
+  it("H6.3/H6-D9: corrupt action artifacts never become zero-byte evidence", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const { controller, runId, envId } = await hardeningController({
+      actResultFactory: (action) => {
+        const meta = artifacts!.write({ runId: action.runId, content: Buffer.from("valid"), mime: "text/plain" });
+        writeFileSync(meta.path, "tampered");
+        return {
+          actionId: action.id,
+          runId: action.runId,
+          environmentId: action.environmentId,
+          status: "success",
+          observedAt: new Date().toISOString(),
+          artifactRefs: [meta.sha256],
+        };
+      },
+    });
+    const action = act("h_corrupt_artifact", "noop", runId, envId);
+    await expect(controller.submitAction(action)).rejects.toMatchObject({
+      name: "ProtocolError",
+      code: "VALIDATION",
+    });
+    expect(store!.getRunSteps(runId)).toHaveLength(0);
+    expect(store!.getAction(action.id)?.status).toBe("pending");
+    await controller.close();
+  });
+
+  it("H6.3/H6-D9: observation artifacts are integrity-checked and persisted", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const { controller, runId, envId } = await hardeningController({
+      observeResultFactory: (currentRun, currentEnv) => {
+        const meta = artifacts!.write({ runId: currentRun, content: Buffer.from("snapshot"), mime: "text/plain" });
+        return {
+          id: "obs_with_artifact",
+          runId: currentRun,
+          environmentId: currentEnv,
+          sequence: 777,
+          stepId: "adapter_step",
+          source: "mock",
+          capturedAt: new Date().toISOString(),
+          summary: {},
+          artifacts: [{ sha256: meta.sha256, mime: meta.mime, size: meta.size, path: meta.path }],
+        };
+      },
+    });
+
+    const returned = await controller.observe(["state"]);
+    const step = store!.getRunSteps(runId)[0]!;
+    expect(returned.artifacts).toHaveLength(1);
+    expect(step.observations[0]?.artifacts).toHaveLength(1);
+    expect(step.observations[0]?.artifacts[0]?.sha256).toBe(returned.artifacts?.[0]?.sha256);
+    expect(step.observations[0]?.run_id).toBe(runId);
+    expect(step.observations[0]?.environment_id).toBe(envId);
+    await controller.close();
+  });
+
   it("C10 (D11): malformed observations are rejected with ProtocolError and leave no partial step", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
@@ -500,10 +705,10 @@ describe("core hardening wave 2", () => {
   it("C11 (D11): malformed action outcomes are rejected before persistence; action stays recoverable", async () => {
     openMemStore();
     artifacts = new ArtifactStore(join(tmpBase(), "art"));
-    const { controller, runId } = await hardeningController({
+    const { controller, runId, envId } = await hardeningController({
       actResult: { totally: "malformed" },
     });
-    await expect(controller.submitAction(act("h_bad"))).rejects.toMatchObject({
+    await expect(controller.submitAction(act("h_bad", "noop", runId, envId))).rejects.toMatchObject({
       name: "ProtocolError",
       code: "VALIDATION",
     });
@@ -511,6 +716,50 @@ describe("core hardening wave 2", () => {
     expect(store!.getRunSteps(runId)).toHaveLength(0);
     expect(store!.getAction("h_bad")?.status).toBe("pending");
     await controller.close();
+  });
+
+  it.each([
+    ["malformed error JSON", "UPDATE actions SET error_code = ?, error_json = ? WHERE id = ?", ["TARGET_FAILURE", "{", "h_raw_corrupt"]],
+    ["invalid status", "UPDATE actions SET status = ?, error_code = NULL, error_json = NULL WHERE id = ?", ["not-a-status", "h_raw_invalid_status"]],
+    ["missing decided timestamp", "UPDATE actions SET decided_at = NULL WHERE id = ?", ["h_raw_missing_time"]],
+  ])("H6.5/D11: %s durable action rows fail closed on replay", async (_label, sql, params) => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const { controller, handler, runId, envId } = await hardeningController();
+    const actionId = params[params.length - 1] as string;
+    const action = act(actionId, "noop", runId, envId);
+    await expect(controller.submitAction(action)).resolves.toMatchObject({ kind: "outcome" });
+    store!.raw.prepare(sql).run(...params);
+
+    await expect(controller.submitAction(action)).rejects.toMatchObject({
+      name: "ProtocolError",
+      code: "VALIDATION",
+    });
+    expect(handler.actCalls).toBe(1);
+    expect(store!.getRunSteps(runId)).toHaveLength(1);
+  });
+
+  it("H6.5/D11: malformed checkpoint JSON refuses controller construction", async () => {
+    openMemStore();
+    artifacts = new ArtifactStore(join(tmpBase(), "art"));
+    const { controller, runId, envId } = await hardeningController();
+    await controller.close();
+    store!.raw
+      .prepare(
+        `INSERT INTO checkpoints(id, run_id, step_id, created_at, payload_json) VALUES(?, ?, NULL, ?, ?)`,
+      )
+      .run("ck_bad_json", runId, new Date(Date.now() + 1000).toISOString(), "{");
+    const client = inProcessAdapter(mockHandler({ runId, environmentId: envId }));
+    expect(
+      () =>
+        new RunController(store!, artifacts!, new PolicyEngine(basePolicy), {
+          runId,
+          envId,
+          adapter: client,
+          caps,
+        }),
+    ).toThrowError(/checkpoint .* malformed/i);
+    await client.close();
   });
 
   it("C12 (D11): validation failures do not consume step sequence numbers", async () => {
@@ -523,7 +772,7 @@ describe("core hardening wave 2", () => {
       ProtocolError,
     );
     // A subsequent well-formed observation continues at sequence 1.
-    const good = mockHandler();
+    const good = mockHandler({ runId, environmentId: envId });
     const client = inProcessAdapter(good);
     const recovered = new RunController(
       store!,

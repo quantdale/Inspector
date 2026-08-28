@@ -1431,8 +1431,10 @@ function parseStoredActionMetadata(raw: string | null): StoredActionExplorationM
         : {}),
       ...(exploration.plannerSuggested === true ? { plannerSuggested: true } : {}),
     };
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(
+      `durable exploration action metadata is malformed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -1461,8 +1463,10 @@ function actionFromStoredRecord(
         exploration: metadata,
       },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(
+      `durable exploration action record is malformed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

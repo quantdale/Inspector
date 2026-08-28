@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, vi } from "vitest";
 import { createServer, type Server } from "node:http";
 import { WebReplayDriver } from "./web-replay.js";
 import { FindingEngine } from "@inspector/finding";
 import type { Action } from "@inspector/protocol";
+import { WebAdapterHandler } from "@inspector/adapter-web";
 
 /**
  * External-target reproduction tests: a hunt discovers an anomaly on a REAL
@@ -48,6 +49,24 @@ function act(id: string, kind: string, input?: Record<string, unknown>): Action 
 const huntActionPath = [act("h1", "click", { selector: "#crashBtn" })];
 
 describe("WebReplayDriver external targetUrl", () => {
+  it("reuses one persistent lifecycle across replay probes", async () => {
+    const lifecycle = vi.spyOn(WebAdapterHandler.prototype, "lifecycle");
+    const driver = new WebReplayDriver({ persistent: true });
+    let ops: string[] = [];
+    try {
+      await driver.replay([]);
+      await driver.replay([]);
+    } finally {
+      await driver.dispose();
+      ops = lifecycle.mock.calls.map(([params]) => params.op);
+      lifecycle.mockRestore();
+    }
+
+    expect(ops.filter((op) => op === "create")).toHaveLength(1);
+    expect(ops.filter((op) => op === "reset")).toHaveLength(2);
+    expect(ops.filter((op) => op === "close")).toHaveLength(1);
+  }, 60000);
+
   it("reproduces the external app's crash when targetUrl is set", async () => {
     const app = await startApp();
     apps.push(app);

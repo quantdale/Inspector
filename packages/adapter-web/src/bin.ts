@@ -14,7 +14,14 @@ function parseFaults(): WebFaults {
 /** Optional external local target (RC1 dogfood); validated by the handler. */
 const targetUrl = process.env.WEB_TARGET_URL || undefined;
 
-const handler = new WebAdapterHandler(parseFaults(), undefined, undefined, 50, false, targetUrl);
+const handler = new WebAdapterHandler(
+  parseFaults(),
+  process.env.INSPECTOR_ARTIFACT_BASE_DIR,
+  undefined,
+  50,
+  false,
+  targetUrl,
+);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
 // Graceful signal shutdown: release the browser/context/seed server before

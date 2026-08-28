@@ -36,6 +36,21 @@ describe("artifact store", () => {
     expect(second.path).toBe(first.path);
   });
 
+  it("resolves named content-addressed artifacts from a fresh process", () => {
+    const store = tmpStore();
+    const content = Buffer.from("named cross-process evidence");
+    const first = store.write({
+      runId: "run1",
+      content,
+      mime: "text/plain",
+      name: "evidence.txt",
+    });
+    const reopened = new ArtifactStore(store.baseDir);
+    const meta = reopened.meta("run1", first.sha256);
+    expect(meta?.path).toBe(first.path);
+    expect(reopened.verify("run1", first.sha256)).toBe(true);
+  });
+
   it("detects corruption on read", () => {
     const store = tmpStore();
     const content = Buffer.from("important bytes");

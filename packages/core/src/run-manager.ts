@@ -5,6 +5,7 @@ import {
 } from "@inspector/store-sqlite";
 import type { ArtifactStore } from "@inspector/artifact-store";
 import { AdapterClient, stripUrlCredentialsInText } from "@inspector/adapter-sdk";
+import { resolve } from "node:path";
 import {
   PolicyEngine,
   DEFAULT_POLICY,
@@ -12,7 +13,7 @@ import {
   type PolicyDecision,
 } from "./policy.js";
 import { parseActionOutcome, parseAdapterObservation } from "./validation.js";
-import { newId, type ActionOutcomeStatus } from "@inspector/protocol";
+import { newId, ProtocolError, type ActionOutcomeStatus } from "@inspector/protocol";
 import type {
   Action,
   Observation,
@@ -75,25 +76,107 @@ function adapterLabel(command: string): string {
   return base.length > 0 ? base : "unknown";
 }
 
+function assertActionContext(action: Action, runId: string, environmentId: string): void {
+  if (action.runId !== runId || action.environmentId !== environmentId) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: `action ${action.id} is not attributed to the current run/environment`,
+      detail: {
+        action: { runId: action.runId, environmentId: action.environmentId },
+        controller: { runId, environmentId },
+      },
+    });
+  }
+}
+
+function assertOutcomeContext(
+  outcome: ActionOutcome,
+  action: Action,
+  runId: string,
+  environmentId: string,
+): void {
+  if (
+    outcome.actionId !== action.id ||
+    outcome.runId !== runId ||
+    outcome.environmentId !== environmentId
+  ) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: `adapter outcome is not correlated to action ${action.id} and current run/environment`,
+      detail: {
+        expected: { actionId: action.id, runId, environmentId },
+        received: {
+          actionId: outcome.actionId,
+          runId: outcome.runId,
+          environmentId: outcome.environmentId,
+        },
+      },
+    });
+  }
+}
+
+function assertObservationContext(
+  observation: Observation,
+  runId: string,
+  environmentId: string,
+): void {
+  if (observation.runId !== runId || observation.environmentId !== environmentId) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: "adapter observation is not correlated to the current run/environment",
+      detail: {
+        expected: { runId, environmentId },
+        received: { runId: observation.runId, environmentId: observation.environmentId },
+      },
+    });
+  }
+}
+
 /** Rebuild the recorded outcome of an already-decided action so a duplicate
  * submission can replay durable truth instead of re-contacting the adapter. */
 function outcomeFromRecord(rec: ActionRecord): ActionOutcome {
+  if (rec.status === "pending" || !rec.decided_at) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: `durable action ${rec.id} is missing a decided outcome`,
+      detail: { status: rec.status, decidedAt: rec.decided_at },
+    });
+  }
+  if ((rec.error_code === null) !== (rec.error_json === null)) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: `durable action ${rec.id} has inconsistent error evidence columns`,
+      detail: { errorCode: rec.error_code, hasErrorJson: rec.error_json !== null },
+    });
+  }
   const outcome: ActionOutcome = {
     actionId: rec.id,
     runId: rec.run_id,
     environmentId: rec.environment_id,
     status: rec.status as ActionOutcomeStatus,
-    observedAt: rec.decided_at ?? rec.requested_at,
+    observedAt: rec.decided_at,
   };
   if (rec.state_after) outcome.stateAfter = rec.state_after;
   if (rec.error_json) {
     try {
       outcome.error = JSON.parse(rec.error_json);
-    } catch {
-      /* unparsable legacy error payload: omit rather than fabricate */
+    } catch (err) {
+      throw new ProtocolError({
+        code: "VALIDATION",
+        message: `durable action ${rec.id} carries malformed error evidence`,
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   }
-  return outcome;
+  const validated = parseActionOutcome(outcome);
+  if (rec.error_code !== null && validated.error?.code !== rec.error_code) {
+    throw new ProtocolError({
+      code: "VALIDATION",
+      message: `durable action ${rec.id} has mismatched error code evidence`,
+      detail: { errorCode: rec.error_code, error: validated.error },
+    });
+  }
+  return validated;
 }
 
 /**
@@ -114,10 +197,24 @@ export class RunController {
     const latest = store.getLatestCheckpoint(ctx.runId);
     if (latest) {
       try {
-        const payload = JSON.parse(latest.payload_json) as { stepSeq?: number };
-        this.stepSeq = payload.stepSeq ?? 0;
-      } catch {
-        this.stepSeq = 0;
+        const payload = JSON.parse(latest.payload_json) as unknown;
+        if (
+          payload === null ||
+          typeof payload !== "object" ||
+          Array.isArray(payload) ||
+          typeof (payload as { stepSeq?: unknown }).stepSeq !== "number" ||
+          !Number.isSafeInteger((payload as { stepSeq: number }).stepSeq) ||
+          (payload as { stepSeq: number }).stepSeq < 0
+        ) {
+          throw new Error("checkpoint stepSeq must be a non-negative safe integer");
+        }
+        this.stepSeq = (payload as { stepSeq: number }).stepSeq;
+      } catch (err) {
+        throw new ProtocolError({
+          code: "VALIDATION",
+          message: `durable checkpoint ${latest.id} is malformed; refusing to resume`,
+          detail: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     // Sequence numbers are monotonic per run across restarts. The checkpoint
@@ -152,8 +249,21 @@ export class RunController {
         this.ctx.observeTimeoutMs ?? 10000,
       ),
     );
+    assertObservationContext(obs, this.ctx.runId, this.ctx.envId);
     const nextSeq = this.stepSeq + 1;
     const stepId = newId("step");
+    const observationArtifacts = this.resolveObservationArtifacts(obs.artifacts ?? []);
+    const canonicalObservation: Observation = {
+      ...obs,
+      id: this.uniqueObservationId(obs.id || newId("obs")),
+      runId: this.ctx.runId,
+      environmentId: this.ctx.envId,
+      // Adapter sequence/step fields are descriptive only. The controller
+      // owns durable step attribution and returns the canonical form.
+      sequence: nextSeq,
+      stepId,
+      artifacts: observationArtifacts,
+    };
     this.store.commitObservationStep({
       stepId,
       runId: this.ctx.runId,
@@ -161,12 +271,13 @@ export class RunController {
       sequence: nextSeq,
       observations: [
         {
-          id: this.uniqueObservationId(obs.id || newId("obs")),
+          id: canonicalObservation.id,
           stepId,
           sequence: nextSeq,
-          source: obs.source,
-          capturedAt: obs.capturedAt,
-          summary: obs.summary,
+          source: canonicalObservation.source,
+          capturedAt: canonicalObservation.capturedAt,
+          summary: canonicalObservation.summary,
+          artifacts: observationArtifacts,
         },
       ],
     });
@@ -174,7 +285,7 @@ export class RunController {
     // transaction cannot desynchronize memory from disk.
     this.stepSeq = nextSeq;
     this.checkpoint();
-    return obs;
+    return canonicalObservation;
   }
 
   /**
@@ -183,6 +294,7 @@ export class RunController {
    * can be recovered without blind re-submission.
    */
   async submitAction(action: Action): Promise<SubmitResult> {
+    assertActionContext(action, this.ctx.runId, this.ctx.envId);
     const decision = this.engine.evaluate(action);
     if (!decision.allowed) {
       return { kind: "rejected", decision };
@@ -237,6 +349,8 @@ export class RunController {
     // ADR 0002: validate the outcome before any persistence; on failure the
     // action stays pending (recoverable) and no partial step is written.
     const outcome = parseActionOutcome(rawOutcome);
+    assertOutcomeContext(outcome, action, this.ctx.runId, this.ctx.envId);
+    const outcomeArtifacts = this.resolveActionArtifacts(outcome.artifactRefs ?? []);
 
     const nextSeq = this.stepSeq + 1;
     const stepId = newId("step");
@@ -265,21 +379,13 @@ export class RunController {
           source: this.ctx.caps.adapter,
           capturedAt: outcome.observedAt,
           summary: { stateAfter: outcome.stateAfter, status: outcome.status },
-          artifacts: (outcome.artifactRefs ?? [])
-            .map((sha256) => this.artifactStore.meta(this.ctx.runId, sha256))
-            .filter((meta): meta is NonNullable<typeof meta> => meta !== undefined)
-            .map((meta) => ({
-              sha256: meta.sha256,
-              mime: meta.mime,
-              size: meta.size,
-              path: meta.path,
-            })),
+          artifacts: outcomeArtifacts,
         },
       ],
     });
     this.stepSeq = nextSeq;
     this.engine.recordAction();
-    this.accountArtifactBytes(outcome);
+    this.accountArtifactBytes(outcomeArtifacts);
     this.checkpoint();
     return { kind: "outcome", outcome };
   }
@@ -305,15 +411,70 @@ export class RunController {
     }
   }
 
-  /** Charge artifact bytes referenced by a committed outcome against the
-   * policy budget. Sizes come from the artifact store's metadata. */
-  private accountArtifactBytes(outcome: ActionOutcome): void {
-    if (!outcome.artifactRefs?.length) return;
-    let bytes = 0;
-    for (const ref of outcome.artifactRefs) {
-      bytes += this.artifactStore.meta(this.ctx.runId, ref)?.size ?? 0;
-    }
+  /** Charge bytes from the already-validated artifact metadata. */
+  private accountArtifactBytes(artifacts: Array<{ size: number }>): void {
+    const bytes = artifacts.reduce((sum, artifact) => sum + artifact.size, 0);
     if (bytes > 0) this.engine.recordArtifactBytes(bytes);
+  }
+
+  private resolveActionArtifacts(
+    refs: readonly string[],
+  ): Array<{ sha256: string; mime: string; size: number; path: string }> {
+    const seen = new Set<string>();
+    const resolved: Array<{ sha256: string; mime: string; size: number; path: string }> = [];
+    for (const sha256 of refs) {
+      if (seen.has(sha256)) continue;
+      seen.add(sha256);
+      const meta = this.requireArtifact(sha256);
+      resolved.push({
+        sha256: meta.sha256,
+        mime: meta.mime,
+        size: meta.size,
+        path: meta.path,
+      });
+    }
+    return resolved;
+  }
+
+  private resolveObservationArtifacts(
+    refs: NonNullable<Observation["artifacts"]>,
+  ): NonNullable<Observation["artifacts"]> {
+    const seen = new Set<string>();
+    const resolved: NonNullable<Observation["artifacts"]> = [];
+    for (const ref of refs) {
+      if (seen.has(ref.sha256)) continue;
+      seen.add(ref.sha256);
+      const meta = this.requireArtifact(ref.sha256);
+      if (meta.size !== ref.size || resolve(meta.path) !== resolve(ref.path)) {
+        throw new ProtocolError({
+          code: "VALIDATION",
+          message: `observation artifact metadata mismatch for ${ref.sha256}`,
+          detail: { declared: ref, stored: meta },
+        });
+      }
+      resolved.push({
+        sha256: meta.sha256,
+        mime: ref.mime,
+        size: meta.size,
+        path: meta.path,
+      });
+    }
+    return resolved;
+  }
+
+  private requireArtifact(sha256: string) {
+    try {
+      const meta = this.artifactStore.meta(this.ctx.runId, sha256);
+      if (!meta) throw new Error("artifact is missing");
+      this.artifactStore.verifyStrict(this.ctx.runId, sha256);
+      return meta;
+    } catch (err) {
+      throw new ProtocolError({
+        code: "VALIDATION",
+        message: `declared artifact ${sha256} is not valid evidence for run ${this.ctx.runId}`,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private checkpoint(): void {
@@ -358,6 +519,30 @@ export class RunManager {
     private readonly artifactStore: ArtifactStore,
     private readonly engine: PolicyEngine = new PolicyEngine(DEFAULT_POLICY),
   ) {}
+
+  private adapterEnv(
+    supplied: NodeJS.ProcessEnv | undefined,
+    requestedArtifactBaseDir: string | undefined,
+  ): NodeJS.ProcessEnv {
+    const canonical = resolve(this.artifactStore.baseDir);
+    const requested = requestedArtifactBaseDir === undefined
+      ? undefined
+      : resolve(requestedArtifactBaseDir);
+    const sameBase = requested === undefined || (process.platform === "win32"
+      ? requested.toLowerCase() === canonical.toLowerCase()
+      : requested === canonical);
+    if (!sameBase) {
+      throw new Error(
+        `artifactBaseDir must match the controller artifact store (${canonical})`,
+      );
+    }
+    return {
+      ...(supplied ?? process.env),
+      // The controller is the authority for evidence ownership. Do not allow
+      // caller-supplied adapter env to silently point at another store.
+      INSPECTOR_ARTIFACT_BASE_DIR: canonical,
+    };
+  }
 
   async startRun(opts: StartRunOptions): Promise<RunController> {
     const runId = newId("run");
@@ -408,7 +593,7 @@ export class RunManager {
       adapter = await AdapterClient.spawn({
         command: opts.adapterCommand,
         args: opts.adapterArgs,
-        env: opts.adapterEnv,
+        env: this.adapterEnv(opts.adapterEnv, opts.artifactBaseDir),
       });
       const caps = (await adapter.request("initialize", {}, opts.initializeTimeoutMs ?? 30000)) as CapabilityDoc;
       // Honest identity: the adapter's own initialize answer replaces the
@@ -419,9 +604,14 @@ export class RunManager {
       this.store.recordAdapterIdentity(runId, envId, caps.adapter);
       await adapter.request(
         "lifecycle",
-        opts.createOptions
-          ? { op: "create", options: opts.createOptions }
-          : { op: "create" },
+        {
+          op: "create",
+          options: {
+            ...(opts.createOptions ?? {}),
+            runId,
+            environmentId: envId,
+          },
+        },
         30000,
       );
       this.store.setRunStatus(runId, "running");
@@ -475,7 +665,10 @@ export class RunManager {
     // process would observe an environment that was never created, and a
     // targeted web run would silently fall back to its default target.
     let spawnEnv = opts.adapterEnv;
-    let createRequest: { op: string; options?: Record<string, unknown> } = { op: "create" };
+    let createRequest: { op: string; options?: Record<string, unknown> } = {
+      op: "create",
+      options: { runId, environmentId: env.id },
+    };
     if (env.spawn_env) {
       try {
         const parsed = JSON.parse(env.spawn_env) as unknown;
@@ -493,7 +686,14 @@ export class RunManager {
         if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
           throw new Error("create-options resume spec is not an object");
         }
-        createRequest = { op: "create", options: parsed as Record<string, unknown> };
+        createRequest = {
+          op: "create",
+          options: {
+            ...(parsed as Record<string, unknown>),
+            runId,
+            environmentId: env.id,
+          },
+        };
       } catch {
         throw new Error(`run ${runId} has malformed durable adapter create options; refusing to guess`);
       }
@@ -509,7 +709,7 @@ export class RunManager {
       adapter = await AdapterClient.spawn({
         command: opts.adapterCommand,
         args: opts.adapterArgs,
-        env: spawnEnv,
+        env: this.adapterEnv(spawnEnv, undefined),
       });
       const caps = (await adapter.request("initialize", {}, opts.initializeTimeoutMs ?? 30000)) as CapabilityDoc;
       const expectedAdapter = env.adapter || run.adapter;

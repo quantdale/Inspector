@@ -26,7 +26,11 @@ async function selectBackend(): Promise<PtyBackend> {
 
 const program = process.env.INSPECTOR_CLI_PROGRAM ?? "seedcli";
 const usingRealPty = process.env.INSPECTOR_PTY === "real";
-const handler = new CliAdapterHandler(await selectBackend(), undefined, program);
+const handler = new CliAdapterHandler(
+  await selectBackend(),
+  process.env.INSPECTOR_ARTIFACT_BASE_DIR,
+  program,
+);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
 // Guarded shutdown: when stdin EOF ends the JSON-RPC session and the real

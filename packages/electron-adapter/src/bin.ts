@@ -1,7 +1,10 @@
 import { ElectronAdapterHandler } from "./electron-adapter.js";
 import { AdapterServer } from "@inspector/adapter-sdk";
 
-const handler = new ElectronAdapterHandler();
+const handler = new ElectronAdapterHandler(
+  {},
+  process.env.INSPECTOR_ARTIFACT_BASE_DIR,
+);
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
 // Graceful signal shutdown: release the underlying browser/context/seed server

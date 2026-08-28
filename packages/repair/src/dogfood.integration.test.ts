@@ -162,7 +162,14 @@ describe("HARDENING_1 final dogfood: Inspector repairs its own seeded defect end
           noveltyPlateauLimit: 50,
         },
         replayDriverFactory: () =>
-          new WebReplayDriver({ artifactBaseDir: join(base, "replay") }),
+          new WebReplayDriver({
+            artifactBaseDir: join(base, "replay"),
+            // H6 minimization may spend its bounded probe budget looking for
+            // a clean positive reproducer. Keep the adapter alive across
+            // those probes so the dogfood gate measures the repair pipeline,
+            // not repeated Chromium startup cost.
+            persistent: true,
+          }),
       });
 
       try {
@@ -390,8 +397,7 @@ describe("HARDENING_1 final dogfood: Inspector repairs its own seeded defect end
     "STEP 4 applies the accepted patch to a fixture checkout and replays the original defect clean",
     async () => {
       const checkout = join(state.wsA!, "apply-checkout");
-      mkdirSync(checkout, { recursive: true });
-      writeFileSync(join(checkout, "app.html"), SEED_HTML);
+      await runGit("git", ["clone", state.repoA!.repoRoot, checkout]);
 
       const written = await state.engineA!.applyAcceptedPatch(state.goodRecord!, checkout);
       expect(written).toEqual(["app.html"]);

@@ -116,6 +116,25 @@ function summarizeObserved(result: ReplayResult): string {
   return parts.length > 0 ? [...new Set(parts)].sort().join(",") : "(none)";
 }
 
+/** A reproducer suitable for a later clean post-patch comparison. */
+function isCleanReproductionResult(result: ReplayResult, actionCount: number): boolean {
+  return (
+    result.outcomes.length === actionCount &&
+    actionCount > 0 &&
+    result.outcomes.some(
+      (outcome) =>
+        outcome.status === "target-failure" &&
+        outcome.error?.code === "TARGET_FAILURE",
+    ) &&
+    result.outcomes.every(
+      (outcome) =>
+        outcome.status === "success" ||
+        (outcome.status === "target-failure" &&
+          outcome.error?.code === "TARGET_FAILURE"),
+    )
+  );
+}
+
 // PART2
 
 export class FindingEngine {
@@ -198,13 +217,25 @@ export class FindingEngine {
       throw new Error(`invalid finding transition ${finding.status} -> ${next}`);
     }
     const from = finding.status;
+    const previousUpdatedAt = finding.updatedAt;
+    const previousTransition = finding.lastTransition;
     finding.status = next;
     finding.updatedAt = new Date().toISOString();
     const recorded: TransitionMeta = { from, to: next, at: finding.updatedAt };
     if (meta.reason !== undefined) recorded.reason = meta.reason;
     if (meta.actor !== undefined) recorded.actor = meta.actor;
     finding.lastTransition = recorded;
-    this.persist(finding);
+    try {
+      this.persist(finding);
+    } catch (error) {
+      // Keep the in-memory lifecycle aligned with durable truth when the
+      // store rejects the transition. A later recovery path must never see a
+      // locally RESOLVED/PATCHING finding whose durable row stayed behind.
+      finding.status = from;
+      finding.updatedAt = previousUpdatedAt;
+      finding.lastTransition = previousTransition;
+      throw error;
+    }
     return finding;
   }
 
@@ -324,10 +355,13 @@ export class FindingEngine {
     // Baseline verification: the full sequence must reproduce the original
     // signature before any reduction is attempted.
     let verified = false;
+    let currentIsCleanReproduction = false;
+    let currentResult: ReplayResult | null = null;
     if (replaysLeft > 0) {
       replaysLeft -= 1;
       probes += 1;
       const baseResult = await driver.replay(current);
+      currentResult = baseResult;
       const baseSig = this.signatureExtractor(baseResult);
       if (originalSignature === null) originalSignature = baseSig;
       const baseEvaluation = this.oracle.evaluate(baseResult);
@@ -343,11 +377,62 @@ export class FindingEngine {
         baseSig !== null &&
         baseSig === originalSignature &&
         baseEvaluation.reproduced;
+      currentIsCleanReproduction = isCleanReproductionResult(baseResult, current.length);
     }
     if (!verified) {
       finding.minimization = { probes, removals: 0, verifiedReproduction: false };
       this.persist(finding);
       return current;
+    }
+
+    // Remove known operational misses before coarse chunk reduction. A
+    // locator timeout can cost several seconds, so spending the whole probe
+    // budget on large candidates that retain the same miss can starve the
+    // positive clean-path proof. Accept only signature-preserving candidates;
+    // the loop recomputes failure indexes after each accepted removal because
+    // removing one action shifts every later index.
+    while (!currentIsCleanReproduction && replaysLeft > 0) {
+      const priority = (currentResult?.outcomes ?? [])
+        .map((outcome, index) =>
+          outcome.status !== "success" && outcome.error?.code !== "TARGET_FAILURE"
+            ? index
+            : null,
+        )
+        .filter((index): index is number => index !== null)
+        .filter((index) => index < current.length);
+      if (priority.length === 0) break;
+      let reduced = false;
+      for (const i of priority) {
+        if (replaysLeft <= 0) break;
+        const candidate = current.filter((_, idx) => idx !== i);
+        if (candidate.length === 0) continue;
+        const result = await driver.replay(candidate);
+        replaysLeft -= 1;
+        probes += 1;
+        const candidateSig = this.signatureExtractor(result);
+        const candidateEvaluation = this.oracle.evaluate(result);
+        this.persistOracleEvaluations(candidateEvaluation.evaluations, {
+          phase: "minimize",
+          findingId: finding.id,
+          runId: finding.runId,
+          subjectKey: subjectKeyOf(candidate),
+          expected: `operational-failure cleanup preserves signature ${originalSignature ?? "(unknown)"}`,
+          observed: summarizeObserved(result),
+        });
+        if (
+          candidateSig !== null &&
+          candidateSig === originalSignature &&
+          candidateEvaluation.reproduced
+        ) {
+          removals += current.length - candidate.length;
+          current = candidate;
+          currentResult = result;
+          currentIsCleanReproduction = isCleanReproductionResult(result, current.length);
+          reduced = true;
+          break;
+        }
+      }
+      if (!reduced) break;
     }
 
     let changed = true;
@@ -378,7 +463,63 @@ export class FindingEngine {
         ) {
           removals += current.length - candidate.length;
           current = candidate;
+          currentResult = result;
+          currentIsCleanReproduction = isCleanReproductionResult(result, current.length);
           changed = true;
+          break;
+        }
+      }
+    }
+    // Exploratory paths can contain a stale locator miss before the genuine
+    // defect fires. Spend the remaining bounded replay budget looking for a
+    // shorter, cleanly executable reproducer so strict repair verification can
+    // distinguish a real fix from a path that merely stopped working. This is
+    // deliberately a positive clean-path preference; failure to find one does
+    // not weaken the reproduction result above.
+    if (!currentIsCleanReproduction) {
+      const priority = new Set(
+        (currentResult?.outcomes ?? [])
+          .map((outcome, index) =>
+            outcome.status !== "success" && outcome.error?.code !== "TARGET_FAILURE"
+              ? index
+              : null,
+          )
+          .filter((index): index is number => index !== null)
+          .filter((index) => index < current.length),
+      );
+      const candidateIndices = [
+        ...priority,
+        ...Array.from({ length: current.length }, (_, index) => index).filter(
+          (index) => !priority.has(index),
+        ),
+      ];
+      for (const i of candidateIndices) {
+        if (replaysLeft <= 0) break;
+        const candidate = current.filter((_, idx) => idx !== i);
+        if (candidate.length === 0) continue;
+        const result = await driver.replay(candidate);
+        replaysLeft -= 1;
+        probes += 1;
+        const candidateSig = this.signatureExtractor(result);
+        const candidateEvaluation = this.oracle.evaluate(result);
+        this.persistOracleEvaluations(candidateEvaluation.evaluations, {
+          phase: "minimize",
+          findingId: finding.id,
+          runId: finding.runId,
+          subjectKey: subjectKeyOf(candidate),
+          expected: `clean replay reproduces signature ${originalSignature ?? "(unknown)"}`,
+          observed: summarizeObserved(result),
+        });
+        if (
+          candidateSig !== null &&
+          candidateSig === originalSignature &&
+          candidateEvaluation.reproduced &&
+          isCleanReproductionResult(result, candidate.length)
+        ) {
+          removals += current.length - candidate.length;
+          current = candidate;
+          currentResult = result;
+          currentIsCleanReproduction = true;
           break;
         }
       }

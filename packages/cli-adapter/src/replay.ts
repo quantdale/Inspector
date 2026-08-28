@@ -57,9 +57,13 @@ export class CliPtyReplayDriver {
     const outcomes: ActionOutcome[] = [];
     const signals: OracleSignal[] = [];
     try {
+      const first = actions[0];
       await handler.lifecycle({
         op: "create",
-        options: { runId: "replay", environmentId: "env" },
+        options: {
+          runId: first?.runId ?? "replay",
+          environmentId: first?.environmentId ?? "env",
+        },
       });
       await sleep(this.opts.bootSettleMs ?? 700);
       for (const a of actions) {

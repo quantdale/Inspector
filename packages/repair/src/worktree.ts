@@ -1,13 +1,18 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const run = promisify(execFile);
 
 export interface GitResult {
   stdout: string;
+}
+
+export interface CleanCheckout {
+  root: string;
+  head: string;
 }
 
 /** Raised when a path violates the source-write policy (spec 004 P0/P3). */
@@ -23,6 +28,47 @@ export class ProvenanceError extends Error {
   constructor(message: string, options?: { cause: unknown }) {
     super(message, options ? { cause: options.cause } : undefined);
     this.name = "ProvenanceError";
+  }
+}
+
+/** Establish the exact, clean checkout that an accepted patch may target. */
+export async function assertCleanCheckout(
+  repoRoot: string,
+  expectedRevision: string,
+): Promise<CleanCheckout> {
+  if (!/^[0-9a-f]{40}$/i.test(expectedRevision)) {
+    throw new ProvenanceError(`repair revision is not a full commit hash: ${expectedRevision}`);
+  }
+  try {
+    const [{ stdout: rootOut }, { stdout: headOut }, { stdout: statusOut }] = await Promise.all([
+      run("git", ["-C", repoRoot, "rev-parse", "--show-toplevel"]),
+      run("git", ["-C", repoRoot, "rev-parse", "HEAD"]),
+      run("git", ["-C", repoRoot, "status", "--porcelain=v1", "--untracked-files=all", "--ignored"]),
+    ]);
+    const root = resolve(rootOut.trim());
+    const requested = resolve(repoRoot);
+    const sameRoot = process.platform === "win32"
+      ? root.toLowerCase() === requested.toLowerCase()
+      : root === requested;
+    if (!sameRoot) {
+      throw new ProvenanceError(`target path is not the repository root: ${repoRoot}`);
+    }
+    const head = headOut.trim();
+    if (head.toLowerCase() !== expectedRevision.toLowerCase()) {
+      throw new ProvenanceError(
+        `target HEAD ${head} does not match certified revision ${expectedRevision}`,
+      );
+    }
+    if (statusOut.trim().length > 0) {
+      throw new ProvenanceError("target checkout is not clean, including ignored files");
+    }
+    return { root, head };
+  } catch (err) {
+    if (err instanceof ProvenanceError) throw err;
+    throw new ProvenanceError(
+      `could not establish clean target checkout at ${repoRoot}`,
+      { cause: err },
+    );
   }
 }
 
@@ -68,13 +114,38 @@ export function resolveContainedPath(rootDir: string, relPath: string): string {
     throw new PathPolicyError(`workspace root cannot be resolved: ${root}`);
   }
 
-  let probe = full;
-  while (!existsSync(probe)) {
-    const parent = dirname(probe);
-    if (parent === probe) {
+  // `existsSync` is false for a dangling final symlink. Inspect the final
+  // directory entry explicitly so a write cannot follow it outside the root.
+  try {
+    if (lstatSync(full).isSymbolicLink()) {
+      throw new PathPolicyError(`symlink targets are not patchable: ${relPath}`);
+    }
+  } catch (err) {
+    if (err instanceof PathPolicyError) throw err;
+    if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) {
       throw new PathPolicyError(`workspace path cannot be resolved: ${relPath}`);
     }
-    probe = parent;
+  }
+
+  let probe = full;
+  while (true) {
+    try {
+      const probeStat = lstatSync(probe);
+      if (probeStat.isSymbolicLink()) {
+        throw new PathPolicyError(`symlink targets are not patchable: ${relPath}`);
+      }
+      break;
+    } catch (err) {
+      if (err instanceof PathPolicyError) throw err;
+      if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) {
+        throw new PathPolicyError(`workspace path cannot be resolved: ${relPath}`);
+      }
+      const parent = dirname(probe);
+      if (parent === probe) {
+        throw new PathPolicyError(`workspace path cannot be resolved: ${relPath}`);
+      }
+      probe = parent;
+    }
   }
 
   let realProbe: string;
@@ -104,6 +175,15 @@ export function resolveContainedPath(rootDir: string, relPath: string): string {
 
 const disposeDelayMs = (ms: number): Promise<void> =>
   new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
+
+/** Cleanup after a failed create without masking the provenance refusal. */
+function removeBaseDir(baseDir: string): void {
+  try {
+    rmSync(baseDir, { recursive: true, force: true });
+  } catch {
+    /* The primary create error remains the authoritative result. */
+  }
+}
 
 /**
  * Exact-revision repair workspace (M4 P0). A linked, detached git worktree is
@@ -137,12 +217,14 @@ export class RepairWorkspace {
     try {
       status = await run("git", ["-C", repoRoot, "status", "--porcelain"]);
     } catch (err) {
+      removeBaseDir(baseDir);
       throw new ProvenanceError(
         `git status failed for repository at ${repoRoot}; refusing to create repair workspace`,
         { cause: err },
       );
     }
     if (status.stdout.trim().length > 0) {
+      removeBaseDir(baseDir);
       throw new ProvenanceError(
         "repository has uncommitted changes; refusing to create repair workspace",
       );
@@ -151,6 +233,7 @@ export class RepairWorkspace {
     try {
       await run("git", ["-C", repoRoot, "worktree", "add", "--detach", wtPath, revision]);
     } catch (err) {
+      removeBaseDir(baseDir);
       throw new ProvenanceError(`failed to create repair worktree at ${revision}`, { cause: err });
     }
     return new RepairWorkspace(repoRoot, revision, wtPath, baseDir);
@@ -163,8 +246,10 @@ export class RepairWorkspace {
 
   /** Restore every tracked file to the exact revision and drop extras. */
   async rollback(): Promise<void> {
-    await run("git", ["-C", this.wtPath, "checkout", "--", "."]);
-    await run("git", ["-C", this.wtPath, "clean", "-fd"]).catch(() => undefined);
+    // Reset tracked changes and remove ignored/untracked files as well. An
+    // ignored poison file must not survive into the next repair attempt.
+    await run("git", ["-C", this.wtPath, "reset", "--hard", this.revision]);
+    await run("git", ["-C", this.wtPath, "clean", "-fdx"]);
   }
 
   /** Detached HEAD commit of this worktree. */

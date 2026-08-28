@@ -10,6 +10,8 @@ import { appendFileSync } from "node:fs";
 
 const rl = readline.createInterface({ input: process.stdin });
 let created = false;
+let runId = "run";
+let environmentId = "env";
 
 rl.on("line", (line) => {
   if (!line.trim()) return;
@@ -42,6 +44,8 @@ rl.on("line", (line) => {
     case "lifecycle":
       if (req.params?.op === "create") {
         created = true;
+        if (typeof req.params.options?.runId === "string") runId = req.params.options.runId;
+        if (typeof req.params.options?.environmentId === "string") environmentId = req.params.options.environmentId;
         if (process.env.LIFECYCLE_LOG_FILE) {
           appendFileSync(
             process.env.LIFECYCLE_LOG_FILE,
@@ -62,8 +66,8 @@ rl.on("line", (line) => {
       }
       reply({
         id: `strict_obs_${req.id}`,
-        runId: "run",
-        environmentId: "env",
+        runId,
+        environmentId,
         sequence: 1,
         source: "fixture-strict-lifecycle",
         capturedAt: new Date().toISOString(),
@@ -80,8 +84,8 @@ rl.on("line", (line) => {
       }
       reply({
         actionId: req.params?.action?.id ?? "x",
-        runId: "run",
-        environmentId: "env",
+        runId,
+        environmentId,
         status: "success",
         observedAt: new Date().toISOString(),
       });

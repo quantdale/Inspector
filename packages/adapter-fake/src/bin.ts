@@ -11,7 +11,10 @@ function parseFaults(): FakeFaults {
   }
 }
 
-const handler = new FakeAdapterHandler({ faults: parseFaults() });
+const handler = new FakeAdapterHandler({
+  faults: parseFaults(),
+  artifactBaseDir: process.env.INSPECTOR_ARTIFACT_BASE_DIR,
+});
 const server = new AdapterServer(process.stdin, process.stdout, handler);
 
 process.on("SIGTERM", () => {

@@ -43,8 +43,15 @@ function fakeRunOptions(faults: Record<string, unknown> = {}) {
   };
 }
 
-function act(id: string, kind: string, risk: Action["risk"] = "interact", input?: Record<string, unknown>): Action {
-  return { id, runId: "run", environmentId: "env", kind, risk, deadlineMs: 5000, idempotency: "safe-retry", input };
+function act(
+  id: string,
+  kind: string,
+  risk: Action["risk"] = "interact",
+  input?: Record<string, unknown>,
+  runId = "run",
+  environmentId = "env",
+): Action {
+  return { id, runId, environmentId, kind, risk, deadlineMs: 5000, idempotency: "safe-retry", input };
 }
 
 function inProcessAdapter(handler: AdapterHandler): AdapterClient {
@@ -76,10 +83,12 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
     artifacts = new ArtifactStore(join(base, "artifacts"));
     const mgr = new RunManager(store, artifacts);
     const run = await mgr.startRun(fakeRunOptions());
+    const runAct = (id: string, kind: string, risk: Action["risk"] = "interact", input?: Record<string, unknown>): Action =>
+      act(id, kind, risk, input, run.runId, run.environmentId);
 
-    await run.submitAction(act("a1", "openForm"));
-    await run.submitAction(act("a2", "fillField", "interact", { name: "default", value: "ok" }));
-    const submit = await run.submitAction(act("a3", "submit"));
+    await run.submitAction(runAct("a1", "openForm"));
+    await run.submitAction(runAct("a2", "fillField", "interact", { name: "default", value: "ok" }));
+    const submit = await run.submitAction(runAct("a3", "submit"));
     expect(submit.kind).toBe("outcome");
 
     const steps = store!.getRunSteps(run.runId);
@@ -87,6 +96,31 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
     expect(actionSteps.map((s) => s.action?.id)).toEqual(["a1", "a2", "a3"]);
     expect(actionSteps.every((s) => s.action?.status === "success")).toBe(true);
     expect(steps.map((s) => s.step.sequence)).toEqual([1, 2, 3]);
+    await run.close();
+  });
+
+  it("H6.3: spawned adapters use controller attribution and the canonical artifact store", async () => {
+    const base = tmpDir();
+    store = Store.open(join(base, "run.db"));
+    artifacts = new ArtifactStore(join(base, "artifacts"));
+    const mgr = new RunManager(store, artifacts);
+    const run = await mgr.startRun(fakeRunOptions());
+    const runAct = (id: string, kind: string): Action =>
+      act(id, kind, "interact", undefined, run.runId, run.environmentId);
+
+    const result = await run.submitAction(runAct("shared-artifact", "createArtifact"));
+    expect(result.kind).toBe("outcome");
+    const refs = (result as { outcome: ActionOutcome }).outcome.artifactRefs ?? [];
+    expect(refs).toHaveLength(1);
+    const meta = artifacts.meta(run.runId, refs[0]!);
+    expect(meta).toBeDefined();
+    expect(meta!.runId).toBe(run.runId);
+    expect(meta!.size).toBeGreaterThan(0);
+    expect(artifacts.verify(run.runId, refs[0]!)).toBe(true);
+
+    const observation = await run.observe(["state"]);
+    expect(observation.runId).toBe(run.runId);
+    expect(observation.environmentId).toBe(run.environmentId);
     await run.close();
   });
 
@@ -127,7 +161,7 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
       caps: (await client.request("initialize", {})) as CapabilityDoc,
     });
 
-    const result = await controller.submitAction(act("bad", "publish", "publish"));
+    const result = await controller.submitAction(act("bad", "publish", "publish", undefined, "runX", "envX"));
     expect(result.kind).toBe("rejected");
     expect((result as { decision: { code: string } }).decision.code).toBe("CAPABILITY_DENIED");
     expect(actCalls).toBe(0);
@@ -142,8 +176,9 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
     const tiny: Policy = { ...denyPublish, name: "tiny", budgets: { ...denyPublish.budgets, max_actions: 1 } };
     const mgr = new RunManager(store, artifacts, new PolicyEngine(tiny));
     const run = await mgr.startRun(fakeRunOptions());
-    expect((await run.submitAction(act("a1", "openForm"))).kind).toBe("outcome");
-    const second = await run.submitAction(act("a2", "openForm"));
+    const runAct = (id: string, kind: string): Action => act(id, kind, "interact", undefined, run.runId, run.environmentId);
+    expect((await run.submitAction(runAct("a1", "openForm"))).kind).toBe("outcome");
+    const second = await run.submitAction(runAct("a2", "openForm"));
     expect(second.kind).toBe("rejected");
     await run.close();
   });
@@ -155,7 +190,9 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
     const mgr = new RunManager(store, artifacts);
 
     const run1 = await mgr.startRun(fakeRunOptions({ crashActionId: "crash1" }));
-    const crashed = await run1.submitAction(act("crash1", "openForm"));
+    const runAct = (id: string, kind: string, input?: Record<string, unknown>): Action =>
+      act(id, kind, "interact", input, run1.runId, run1.environmentId);
+    const crashed = await run1.submitAction(runAct("crash1", "openForm"));
     expect(crashed.kind).toBe("adapter-error");
     // The action is still pending in durable store (not finalized).
     expect(store.getAction("crash1")?.status).toBe("pending");
@@ -195,11 +232,13 @@ describe("core run manager (acceptance 1-5,7,8)", () => {
       // Simulates hunt.ts's WEB_TARGET_URL spawn-env delta.
       spawnEnvDelta: { STRICT_TARGET: "http://127.0.0.1:9/" },
     });
-    expect((await run1.submitAction(act("s1", "noop"))).kind).toBe("outcome");
+    const runAct = (id: string, kind: string, input?: Record<string, unknown>): Action =>
+      act(id, kind, "interact", input, run1.runId, run1.environmentId);
+    expect((await run1.submitAction(runAct("s1", "noop"))).kind).toBe("outcome");
 
     // Abrupt host death: the adapter dies mid-flight and NEITHER process runs
     // a cooperative close(). A fresh manager (fresh "process") resumes.
-    const dieOutcome = await run1.submitAction(act("die1", "noop", "interact", { value: "die" }));
+    const dieOutcome = await run1.submitAction(runAct("die1", "noop", { value: "die" }));
     expect(dieOutcome.kind).toBe("adapter-error");
 
     const mgr2 = new RunManager(store!, artifacts!);

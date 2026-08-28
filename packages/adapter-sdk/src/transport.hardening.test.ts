@@ -202,6 +202,71 @@ describe("server: boundary param validation (defect 8)", () => {
   });
 });
 
+describe("server: complete JSON-RPC and method validation (H6.4)", () => {
+  it.each([
+    ["wrong version", '{"jsonrpc":"1.0","id":1,"method":"health"}'],
+    ["missing method", '{"jsonrpc":"2.0","id":1}'],
+    ["empty method", '{"jsonrpc":"2.0","id":1,"method":""}'],
+    ["invalid id", '{"jsonrpc":"2.0","id":null,"method":"health"}'],
+  ])("rejects %s without invoking a handler", async (_label, line) => {
+    const h = makeServerHarness();
+    const spy = vi.spyOn(h.handler, "health");
+    h.send(line);
+    await sleep(50);
+    if (_label === "invalid id") {
+      expect(h.frames).toHaveLength(0);
+    } else {
+      const response = await waitForFrame(h.frames, (f) => f.id === 1);
+      expect(response.error?.code).toBe(-32600);
+    }
+    expect(spy).not.toHaveBeenCalled();
+    h.server.close();
+  });
+
+  it.each([
+    ["initialize", '{"jsonrpc":"2.0","id":1,"method":"initialize","params":[]}'],
+    ["lifecycle", '{"jsonrpc":"2.0","id":1,"method":"lifecycle","params":{}}'],
+    ["health", '{"jsonrpc":"2.0","id":1,"method":"health","params":{"echo":7}}'],
+    ["cancel", '{"jsonrpc":"2.0","id":1,"method":"cancel","params":{}}'],
+  ])("rejects malformed %s params with -32602", async (_label, line) => {
+    const h = makeServerHarness();
+    h.send(line);
+    const response = await waitForFrame(h.frames, (f) => f.id === 1);
+    expect(response.error?.code).toBe(-32602);
+    h.server.close();
+  });
+
+  it("validates cancellation notifications and never fabricates an empty action id", async () => {
+    const h = makeServerHarness();
+    const spy = vi.spyOn(h.handler, "cancel");
+    h.send('{"jsonrpc":"2.0","method":"cancel","params":{}}');
+    await sleep(50);
+    expect(spy).not.toHaveBeenCalled();
+    h.send('{"jsonrpc":"2.0","method":"cancel","params":{"actionId":"act_cancel"}}');
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ actionId: "act_cancel" }));
+    h.server.close();
+  });
+
+  it("dispatches valid notifications without sending a response", async () => {
+    const h = makeServerHarness();
+    const spy = vi.spyOn(h.handler, "health");
+    h.send('{"jsonrpc":"2.0","method":"health"}');
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({}));
+    expect(h.frames).toHaveLength(0);
+    h.server.close();
+  });
+
+  it("supports a request-form cancel with a null result", async () => {
+    const h = makeServerHarness();
+    const spy = vi.spyOn(h.handler, "cancel");
+    h.send('{"jsonrpc":"2.0","id":"cancel-1","method":"cancel","params":{"actionId":"act_cancel"}}');
+    const response = await waitForFrame(h.frames, (f) => f.id === "cancel-1");
+    expect(response.result).toBeNull();
+    expect(spy).toHaveBeenCalledWith({ actionId: "act_cancel" });
+    h.server.close();
+  });
+});
+
 describe("client: initialize result validation (defect 8)", () => {
   /** Fire an initialize request and answer it with a canned result. */
   function initializeWith(result: unknown): Promise<unknown> {

@@ -9,6 +9,7 @@ import {
   FlakyDriver,
   OracleEngine,
   type Action,
+  type ActionOutcome,
   type OracleSignal,
   type ReplayDriver,
   type ReplayResult,
@@ -121,6 +122,67 @@ describe("finding engine (M2)", () => {
     expect(minimized.length).toBeLessThanOrEqual(noisy.length);
     const rerun = await new FakeStateMachineDriver().replay(minimized);
     expect(OracleEngine.defaults().evaluate(rerun).reproduced).toBe(true);
+  });
+
+  it("prioritizes an automation miss when seeking a clean reproducer", async () => {
+    const engine = new FindingEngine();
+    const finding = engine.ingest({ kind: "PAGE_ERROR" });
+    const actions = [
+      act("a0", "openForm"),
+      act("stale", "click"),
+      act("boom", "click"),
+      act("tail", "click"),
+    ];
+    const probes: string[][] = [];
+    const driver: ReplayDriver = {
+      async replay(candidate) {
+        probes.push(candidate.map((a) => a.id));
+        const hasBoom = candidate.some((a) => a.id === "boom");
+        const hasContext = candidate.some((a) => a.id === "a0") && candidate.some((a) => a.id === "tail");
+        const outcomes: ActionOutcome[] = candidate.map((a) => {
+          if (a.id === "stale") {
+            return {
+              actionId: a.id,
+              runId: a.runId,
+              environmentId: a.environmentId,
+              status: "target-failure",
+              observedAt: new Date().toISOString(),
+              error: { code: "ACTION_FAILED", message: "stale locator" },
+            };
+          }
+          if (a.id === "boom" && hasBoom) {
+            return {
+              actionId: a.id,
+              runId: a.runId,
+              environmentId: a.environmentId,
+              status: "target-failure",
+              observedAt: new Date().toISOString(),
+              error: { code: "TARGET_FAILURE", message: "boom" },
+            };
+          }
+          return {
+            actionId: a.id,
+            runId: a.runId,
+            environmentId: a.environmentId,
+            status: "success",
+            observedAt: new Date().toISOString(),
+          };
+        });
+        return {
+          outcomes,
+          signals: hasBoom && hasContext ? [{ kind: "PAGE_ERROR" }] : [],
+          observations: [],
+        };
+      },
+    };
+
+    const minimized = await engine.minimize(finding, actions, driver, { maxReplays: 5 });
+
+    // The operational-failure cleanup runs before coarse chunk reduction, so
+    // the first post-baseline probe should remove the stale locator directly.
+    expect(probes[1]).toEqual(["a0", "boom", "tail"]);
+    expect(minimized.map((a) => a.id)).toEqual(["a0", "boom", "tail"]);
+    expect(finding.minimization).toMatchObject({ removals: 1, verifiedReproduction: true });
   });
 
   it("flaky behavior is not mislabeled deterministic", async () => {
@@ -404,3 +466,19 @@ describe("oracle evaluation provenance records", () => {
   });
 });
 
+describe("finding transition durability", () => {
+  it("restores the in-memory lifecycle when durable transition persistence fails", () => {
+    dir = mkdtempSync(join(tmpdir(), "inspector-finding-transition-"));
+    store = Store.open(join(dir, "run.db"));
+    const base = new FindingEngine().ingest({ kind: "PAGE_ERROR" });
+    const throwing = Object.assign(Object.create(Object.getPrototypeOf(store)), store);
+    throwing.putFinding = () => {
+      throw new Error("simulated finding persistence failure");
+    };
+    const engine = new FindingEngine(undefined, throwing as Store);
+
+    expect(() => engine.transition(base, "CONFIRMED")).toThrow(/persistence failure/);
+    expect(base.status).toBe("CANDIDATE");
+    expect(base.lastTransition).toBeNull();
+  });
+});

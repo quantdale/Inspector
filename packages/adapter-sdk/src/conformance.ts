@@ -42,7 +42,11 @@ export async function runCommonConformance(hooks: ConformanceHooks): Promise<voi
   // Version/capability negotiation.
   let client = await hooks.start();
   try {
-    const caps = (await client.request("initialize", {})) as { protocolVersion: string };
+    // Cold adapter startup can be delayed by a platform broker (PowerShell,
+    // ADB, or a browser) while the host is running the full conformance
+    // matrix. Keep the protocol check bounded, but do not turn scheduler load
+    // into a false capability failure.
+    const caps = (await client.request("initialize", {}, 30000)) as { protocolVersion: string };
     if (caps.protocolVersion !== "0.1") {
       throw new Error(`unexpected protocol version ${caps.protocolVersion}`);
     }

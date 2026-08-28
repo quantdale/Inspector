@@ -130,7 +130,7 @@ describe("M4 autonomous repair", () => {
     expect(
       repairVerify.some(
         (e) =>
-          e.expected === "post-patch reproducer replay fires no hard oracle" && !e.reproduced,
+          e.expected === "regression scenario passes post-patch" && !e.reproduced,
       ),
     ).toBe(true);
     expect(repairVerify.every((e) => e.oracleId === "page-error")).toBe(true);

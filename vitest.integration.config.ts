@@ -36,6 +36,12 @@ export default defineConfig({
     include: ["packages/**/*.integration.test.ts"],
     environment: "node",
     pool: "forks",
+    // Platform integration files launch browsers, PowerShell/UIA, ADB, and
+    // native PTY hosts. Unbounded worker fan-out makes those brokers compete
+    // for the same desktop/process resources and turns cold-start deadlines
+    // into nondeterministic test failures.
+    minWorkers: 1,
+    maxWorkers: 4,
     testTimeout: 60000,
     // Cold Chromium/emulator spawns under concurrent file execution can
     // exceed the 10s default beforeAll budget on Windows; observed as

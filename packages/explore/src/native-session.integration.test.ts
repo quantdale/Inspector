@@ -46,7 +46,14 @@ describe("SPEC-009 A4: native exploration session over a live adapter", () => {
       expect(caps.capabilities.vocabulary?.length).toBeGreaterThan(0);
       // Manual construction (vs RunManager.startRun): create the environment
       // explicitly before exploring.
-      await client.request("lifecycle", { op: "create", options: {} }, 10000);
+      await client.request(
+        "lifecycle",
+        {
+          op: "create",
+          options: { runId: "run_native", environmentId: "env_native" },
+        },
+        10000,
+      );
 
       const controller = new RunController(store, artifacts, new PolicyEngine(), {
         runId: "run_native",

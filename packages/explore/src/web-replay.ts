@@ -33,6 +33,7 @@ export interface WebReplayOptions {
  */
 export class WebReplayDriver {
   private handler: WebAdapterHandler | null = null;
+  private persistentAttribution: string | null = null;
   private readonly base: string;
 
   constructor(private readonly opts: WebReplayOptions = {}) {
@@ -44,15 +45,41 @@ export class WebReplayDriver {
   async replay(actions: Action[]): Promise<ReplayResult> {
     const outcomes: ActionOutcome[] = [];
     const signals: OracleSignal[] = [];
-    const handler =
-      this.opts.persistent === true
-        ? (this.handler ??= new WebAdapterHandler({}, this.base, this.opts.seedHtml))
-        : new WebAdapterHandler({}, this.base, this.opts.seedHtml);
+    const persistent = this.opts.persistent === true;
+    const first = actions[0];
+    const attribution = first
+      ? `${first.runId}\u0000${first.environmentId}`
+      : null;
+    let handler: WebAdapterHandler;
+    if (!persistent) {
+      handler = new WebAdapterHandler({}, this.base, this.opts.seedHtml);
+    } else if (
+      this.handler === null ||
+      (attribution !== null && attribution !== this.persistentAttribution)
+    ) {
+      // A persistent driver is scoped to one run/environment. If a caller
+      // reuses it for another identity, recreate the adapter so outcomes can
+      // never be attributed to the previous lifecycle context.
+      if (this.handler) await this.handler.lifecycle({ op: "close" }).catch(() => {});
+      handler = new WebAdapterHandler({}, this.base, this.opts.seedHtml);
+      await handler.lifecycle({
+        op: "create",
+        ...(Object.keys(this.createOptions(actions)).length > 0
+          ? { options: this.createOptions(actions) }
+          : {}),
+      });
+      this.handler = handler;
+      this.persistentAttribution = attribution;
+    } else {
+      handler = this.handler;
+    }
     try {
-      if (this.opts.targetUrl !== undefined) {
-        await handler.lifecycle({ op: "create", options: { targetUrl: this.opts.targetUrl } });
-      } else {
-        await handler.lifecycle({ op: "create" });
+      if (!persistent) {
+        const createOptions = this.createOptions(actions);
+        await handler.lifecycle({
+          op: "create",
+          ...(Object.keys(createOptions).length > 0 ? { options: createOptions } : {}),
+        });
       }
       for (const a of actions) {
         const outcome = await handler.act({ action: a });
@@ -76,10 +103,19 @@ export class WebReplayDriver {
     return { outcomes, signals, observations: [] };
   }
 
+  private createOptions(actions: Action[]): Record<string, unknown> {
+    const first = actions[0];
+    return {
+      ...(this.opts.targetUrl !== undefined ? { targetUrl: this.opts.targetUrl } : {}),
+      ...(first ? { runId: first.runId, environmentId: first.environmentId } : {}),
+    };
+  }
+
   /** Release the persistent adapter subprocess (required when persistent). */
   async dispose(): Promise<void> {
     const handler = this.handler;
     this.handler = null;
+    this.persistentAttribution = null;
     if (handler) {
       await handler.lifecycle({ op: "close" }).catch(() => {});
     }

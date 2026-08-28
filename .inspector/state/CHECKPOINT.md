@@ -649,3 +649,19 @@ the production default); web exploration replay cost measured at ~291s+98s in
 this sweep and remains product-acceptable documented debt; two-controller
 fleet scenario runtime varies with filesystem latency (semantics now
 fencing-deterministic; fixture clock gentled to 2.5x with explicit bound).
+
+## HARDENING_6 IMPLEMENTATION CANDIDATE (2026-08-28)
+
+HARDENING_6 repair-trust implementation is locally complete through H6.7 and awaits exact-tree certification. The candidate closes positive replay-evidence, durable repair resolution, atomic target application, isolated rollback, adapter provenance, controller identity/artifact integrity, complete AdapterServer validation, and durable-corruption fail-closed gaps. The exact-blob semantic-review certificate is stored at `.inspector/state/HARDENING_6-SEMANTIC-REVIEW.json` with its generated inventory companion. Local targeted evidence is green: repair hardening 28/28, worktree hardening 11/11, core hardening 28/28, core integration 7/7, exploration restart/corruption 7/7, adapter protocol + artifact tests 43/43, finding tests 26/26, property/fuzz tests 37/37, artifact/SQLite/scheduler soaks 1/1 + 1/1 + 6/6, and H6 mutation-kill 1/1. Full exact-tree gates and hosted exact-SHA certification remain pending. M14-M23 stay COMPLETE, M8 stays DEFERRED_ENVIRONMENT, and no release/tag/publication action is taken.
+
+## HARDENING_6 LOCAL CERTIFICATION CANDIDATE (2026-08-28)
+
+Local H6.8 gates pass on the current candidate: frozen install, lint (0 errors;
+4 pre-existing adapter-web warnings), typecheck, unit (81 files; 825 passed,
+3 skipped), browser provisioning, integration (51 files; 230 passed, 2
+skipped with the bounded four-worker platform pool), release smoke, and the
+targeted H6 mutation/property/fault/soak plus available Windows UIA, Android,
+PTY, and source-vs-installed proofs. Hosted exact-SHA certification remains
+pending; do not mark HARDENING_6 COMPLETE until the pushed candidate passes all
+required hosted lanes. M14-M23 stay COMPLETE, M8 stays DEFERRED_ENVIRONMENT,
+and no release/tag/publication action is taken.

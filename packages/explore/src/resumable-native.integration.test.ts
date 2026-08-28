@@ -26,7 +26,10 @@ function inProcessAdapter(handler: AdapterHandler): AdapterClient {
   return client;
 }
 
-function deterministicUiaHandler(): AdapterHandler {
+function deterministicUiaHandler(
+  runId = "run_native_resume",
+  environmentId = "env_native_resume",
+): AdapterHandler {
   let observationSequence = 0;
   const caps: CapabilityDoc = {
     protocolVersion: "0.1",
@@ -77,7 +80,7 @@ function deterministicUiaHandler(): AdapterHandler {
   });
   return {
     initialize: () => caps,
-    observe: () => observation("run_native_resume", "env_native_resume"),
+    observe: () => observation(runId, environmentId),
     act: (params) => {
       const action = (params as { action: { id: string; runId: string; environmentId: string } }).action;
       const outcome: ActionOutcome = {
@@ -116,7 +119,7 @@ async function makeHarness(path: string, runId: string, fresh = true): Promise<H
       config: CONFIG,
     });
   }
-  const client = inProcessAdapter(deterministicUiaHandler());
+  const client = inProcessAdapter(deterministicUiaHandler(runId, `env_${runId}`));
   const caps = await client.request("initialize", {}) as CapabilityDoc;
   await client.request("lifecycle", { op: "create" });
   const run = new RunController(store, artifacts, new PolicyEngine(), {

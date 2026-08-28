@@ -31,7 +31,7 @@ function act(id: string, kind: string, input?: Record<string, unknown>): Action 
 describe("web adapter conformance (M1)", () => {
   it("1: passes initialize/version/capability negotiation", async () => {
     client = await startWeb();
-    const caps = (await client.request("initialize", {})) as { protocolVersion: string; adapter: string; capabilities: { act: string[] } };
+    const caps = (await client.request("initialize", {}, 30000)) as { protocolVersion: string; adapter: string; capabilities: { act: string[] } };
     expect(caps.protocolVersion).toBe("0.1");
     expect(caps.adapter).toBe("web-playwright");
     expect(caps.capabilities.act).toContain("click");

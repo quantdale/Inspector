@@ -154,6 +154,11 @@ export class ArtifactStore {
     cleanupOrphanTemps(this.baseAbs);
   }
 
+  /** Absolute root shared with adapter subprocesses for this workspace. */
+  get baseDir(): string {
+    return this.baseAbs;
+  }
+
   /** Refuse any resolved path that is not strictly inside the store base. */
   private contain(p: string): string {
     const resolved = resolve(p);
@@ -291,12 +296,37 @@ export class ArtifactStore {
     assertSha256(sha256);
     const cached = this.index.get(this.key(runId, sha256));
     if (cached) return cached;
-    const absPath = this.contain(join(this.runDir(runId), sha256));
+    const runDir = this.runDir(runId);
+    let absPath = this.contain(join(runDir, sha256));
     let stat: Stats;
     try {
       stat = statSync(absPath);
     } catch {
-      return undefined; // absent
+      // Named writes use `${sha256}-${name}` for operator readability. A
+      // controller in another process has only the content hash, so discover
+      // that canonical content-addressed prefix without accepting arbitrary
+      // paths or directory entries outside the run-scoped store.
+      let entries;
+      try {
+        entries = readdirSync(runDir, { withFileTypes: true });
+      } catch {
+        return undefined; // absent
+      }
+      const candidates = entries
+        .filter(
+          (entry) =>
+            entry.isFile() && entry.name.startsWith(`${sha256}-`),
+        )
+        .map((entry) => this.contain(join(runDir, entry.name)))
+        .sort();
+      const candidate = candidates[0];
+      if (!candidate) return undefined;
+      absPath = candidate;
+      try {
+        stat = statSync(absPath);
+      } catch {
+        return undefined;
+      }
     }
     // Never surface metadata for an entry that resolves outside the store.
     this.contain(realpathSync(absPath));

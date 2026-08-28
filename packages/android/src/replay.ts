@@ -90,7 +90,17 @@ export class AndroidReplayDriver {
           await backend.shell(serial, `am force-stop ${createPkg}`).catch(() => {});
         }
       }
-      await handler.lifecycle({ op: "create", options: this.opts.createOptions });
+      const first = actions[0];
+      const createOptions = {
+        ...(this.opts.createOptions ?? {}),
+        ...(first
+          ? { runId: first.runId, environmentId: first.environmentId }
+          : {}),
+      };
+      await handler.lifecycle({
+        op: "create",
+        ...(Object.keys(createOptions).length > 0 ? { options: createOptions } : {}),
+      });
       for (const a of actions) {
         const outcome = await handler.act({ action: a });
         outcomes.push(outcome);

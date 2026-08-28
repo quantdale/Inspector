@@ -32,8 +32,8 @@ function readLifecycleCalls(logFile: string): Array<Record<string, unknown>> {
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 }
 
-describe("startRun createOptions forwarding", () => {
-  it("forwards createOptions as lifecycle-create options", async () => {
+describe("startRun lifecycle-create attribution", () => {
+  it("forwards createOptions alongside controller attribution", async () => {
     const { base, logFile } = setup();
     const store = Store.open(join(base, "run.db"));
     const mgr = new RunManager(store, new ArtifactStore(join(base, "artifacts")));
@@ -47,11 +47,15 @@ describe("startRun createOptions forwarding", () => {
 
     const creates = readLifecycleCalls(logFile).filter((c) => c.op === "create");
     expect(creates).toHaveLength(1);
-    expect(creates[0]!.options).toEqual({ targetUrl: "http://127.0.0.1:3000/" });
+    expect(creates[0]!.options).toEqual({
+      targetUrl: "http://127.0.0.1:3000/",
+      runId: run.runId,
+      environmentId: run.environmentId,
+    });
     store.close();
   });
 
-  it("omits options when createOptions is absent (backward compatible)", async () => {
+  it("supplies controller attribution when createOptions is absent", async () => {
     const { base, logFile } = setup();
     const store = Store.open(join(base, "run.db"));
     const mgr = new RunManager(store, new ArtifactStore(join(base, "artifacts")));
@@ -64,7 +68,10 @@ describe("startRun createOptions forwarding", () => {
 
     const creates = readLifecycleCalls(logFile).filter((c) => c.op === "create");
     expect(creates).toHaveLength(1);
-    expect(creates[0]).not.toHaveProperty("options");
+    expect(creates[0]!.options).toEqual({
+      runId: run.runId,
+      environmentId: run.environmentId,
+    });
     store.close();
   });
 });

@@ -19,8 +19,14 @@ import { adapterSpawn, openWorkspace, remapWorkspaceConflict } from "./workspace
 export { openWorkspace, adapterSpawn, workspaceDirFrom } from "./workspace.js";
 export type { Workspace, AdapterSpawnSpec } from "./workspace.js";
 
-function act(id: string, kind: string, input?: Record<string, unknown>): Action {
-  return { id, runId: "run", environmentId: "env", kind, risk: "interact", deadlineMs: 5000, idempotency: "safe-retry", input };
+function act(
+  id: string,
+  kind: string,
+  input?: Record<string, unknown>,
+  runId = "run",
+  environmentId = "env",
+): Action {
+  return { id, runId, environmentId, kind, risk: "interact", deadlineMs: 5000, idempotency: "safe-retry", input };
 }
 
 export interface CliResult {
@@ -223,18 +229,20 @@ async function runDemo(parsed: ParsedInvocation, ctx: CommandContext): Promise<C
     } catch (e) {
       throw remapWorkspaceConflict(e);
     }
+    const runAct = (id: string, kind: string, input?: Record<string, unknown>): Action =>
+      act(id, kind, input, run!.runId, run!.environmentId);
     const steps: unknown[] = [];
 
     if (adapterArg === "fake") {
-      for (const a of [act("d1", "openForm"), act("d2", "fillField", { name: "default", value: "ok" }), act("d3", "submit")]) {
+      for (const a of [runAct("d1", "openForm"), runAct("d2", "fillField", { name: "default", value: "ok" }), runAct("d3", "submit")]) {
         const r = await run.submitAction(a);
         steps.push({ id: a.id, outcome: (r as { outcome?: unknown }).outcome });
       }
       await run.observe(["state"]);
       await run.reset();
-      await run.submitAction(act("d4", "openForm"));
-      await run.submitAction(act("d5", "fillField", { name: "default", value: "BAD" }));
-      const fail = await run.submitAction(act("d6", "submit"));
+      await run.submitAction(runAct("d4", "openForm"));
+      await run.submitAction(runAct("d5", "fillField", { name: "default", value: "BAD" }));
+      const fail = await run.submitAction(runAct("d6", "submit"));
       const summary = {
         runId: run.runId,
         adapter: "fake",
@@ -246,17 +254,17 @@ async function runDemo(parsed: ParsedInvocation, ctx: CommandContext): Promise<C
     }
 
     // Web traversal of the seeded target.
-    await run.submitAction(act("w1", "fill", { selector: "#username", value: "admin" }));
-    await run.submitAction(act("w2", "fill", { selector: "#password", value: "admin" }));
-    await run.submitAction(act("w3", "click", { selector: "#loginBtn" }));
+    await run.submitAction(runAct("w1", "fill", { selector: "#username", value: "admin" }));
+    await run.submitAction(runAct("w2", "fill", { selector: "#password", value: "admin" }));
+    await run.submitAction(runAct("w3", "click", { selector: "#loginBtn" }));
     const obs1 = await run.observe(["url", "uiTree"]);
-    await run.submitAction(act("w4", "click", { selector: "#increment" }));
-    await run.submitAction(act("w5", "click", { selector: "#save" }));
+    await run.submitAction(runAct("w4", "click", { selector: "#increment" }));
+    await run.submitAction(runAct("w5", "click", { selector: "#save" }));
     const obs2 = await run.observe(["storage", "screenshot", "console", "network", "trace"]);
     // Deterministic target crash (boom button) -> target-failure, not adapter crash.
-    const crash = await run.submitAction(act("w6", "click", { selector: "#boom" }));
+    const crash = await run.submitAction(runAct("w6", "click", { selector: "#boom" }));
     // Forbidden origin navigation must be rejected by policy/adapter.
-    const forbidden = await run.submitAction(act("w7", "navigate", { value: "https://evil.example.com/secret" }));
+    const forbidden = await run.submitAction(runAct("w7", "navigate", { value: "https://evil.example.com/secret" }));
     const obs3 = await run.observe(["url", "pageErrors"]);
     const uiTree = (obs1.summary as { uiTree?: Array<{ id: string; hidden?: boolean }> }).uiTree ?? [];
     const incrementNode = uiTree.find((e) => e.id === "increment");

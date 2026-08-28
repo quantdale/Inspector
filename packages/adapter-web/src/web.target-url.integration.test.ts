@@ -52,19 +52,49 @@ const PAGE2 = `<!doctype html><html><head><title>Dogfood Page 2</title></head>
   </script>
 </body></html>`;
 
+// Chromium rejects these ports even for local HTTP fixtures.  Binding port 0
+// is otherwise ideal for parallel tests, so retry only when the OS happens to
+// allocate one of Chromium's reserved ports.
+const CHROMIUM_UNSAFE_PORTS = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69,
+  77, 79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119,
+  123, 135, 139, 143, 179, 389, 427, 443, 465, 512, 513, 514, 515, 526,
+  530, 531, 532, 540, 556, 563, 587, 601, 636, 993, 995, 2049, 3659,
+  4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697, 10080,
+]);
+
 function startApp(): Promise<{ server: Server; origin: string }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       const path = (req.url ?? "/").split("?")[0];
       const body = path === "/page2.html" ? PAGE2 : PAGE_INDEX;
       res.writeHead(200, { "content-type": "text/html" });
       res.end(body);
     });
-    server.listen(0, "127.0.0.1", () => {
-      const addr = server.address();
-      if (typeof addr !== "object" || addr === null) throw new Error("no addr");
-      resolve({ server, origin: `http://127.0.0.1:${addr.port}` });
-    });
+    const listen = (): void => {
+      const onError = (error: Error): void => {
+        server.off("error", onError);
+        reject(error);
+      };
+      server.once("error", onError);
+      server.listen(0, "127.0.0.1", () => {
+        server.off("error", onError);
+        const addr = server.address();
+        if (typeof addr !== "object" || addr === null) {
+          reject(new Error("no addr"));
+          return;
+        }
+        if (CHROMIUM_UNSAFE_PORTS.has(addr.port)) {
+          server.close((error) => {
+            if (error) reject(error);
+            else listen();
+          });
+          return;
+        }
+        resolve({ server, origin: `http://127.0.0.1:${addr.port}` });
+      });
+    };
+    listen();
   });
 }
 

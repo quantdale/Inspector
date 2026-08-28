@@ -423,8 +423,10 @@ function parseFakeMetadata(raw: string | null): FakeStoredMetadata | null {
       ...(exploration.rngAfter !== undefined ? { rngAfter: exploration.rngAfter } : {}),
       ...(wrapper.input !== undefined ? { input: wrapper.input } : {}),
     };
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(
+      `durable fake action metadata is malformed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

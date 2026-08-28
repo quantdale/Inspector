@@ -5,10 +5,10 @@
 **Mode:** HARDENING  
 **Target branch:** `main` only  
 **Original H6 baseline:** `038550172866001ce8bfe44054b8146b3391af32`  
-**Current planner baseline:** `8e6bdb0e7951505972fd59bce550d3ad330d0c22`  
+**Current planner baseline:** `8e6bdb0e7951505972fd59bce550d3ad330d0c22` (rebased onto `main@bcd2c91`)
 **Current baseline hosted CI:** run `33092343085` SUCCESS on exact baseline SHA  
 **OpenSpec change:** `openspec/changes/hardening-6-repair-trust/`  
-**Current audit:** `.inspector/state/HARDENING_6-AUDIT.md`  
+**Current audit:** `.inspector/state/HARDENING_6-AUDIT.md` (candidate exact-blob inventory; semantic ledger `.inspector/state/HARDENING_6-SEMANTIC-REVIEW.json`)
 **Execution envelope:** approximately 12 hours of productive autonomous work; do not stop at the first green patch.
 
 ## One-shot objective
@@ -46,12 +46,21 @@ Also inspect the live implementation/tests and latest 30 meaningful commits. Nev
 Red-test confirmed behavior before production changes. For REPRO REQUIRED items, prove reachability/blast radius first.
 
 ## Work queue
-Execute `openspec/changes/hardening-6-repair-trust/tasks.md` in order: H6.0 baseline/audit truth; H6.1 positive repair evidence; H6.2 durable resolution + atomic application + attempt isolation; H6.3 core correlation/artifacts; H6.4 protocol boundary; H6.5 durable corruption; H6.6 every-file semantic review; H6.7 mutation/property/fault/soak; H6.8 reconciliation + exact-tree local/hosted certification.
+H6.0-H6.7 are implemented and locally evidenced on the candidate tree:
+positive repair evidence, durable resolution/atomic application/isolation, core
+correlation/artifact integrity, protocol validation, durable-corruption
+negative space, exact-blob semantic review, and mutation/fault/soak proof.
+Continue with H6.8 reconciliation plus exact-tree local and hosted
+certification; the campaign remains ACTIVE until those gates pass.
 
 Rebalance time when necessary, but do not spend campaign budget on cosmetic refactors while correctness/safety/audit/certification work remains.
 
 ## Every-file requirement
-The original H5/H6 activation audit is not sufficient. Current planner census is 584 tracked blobs on `8e6bdb0`, including post-activation M14-M23 additions. Build/maintain a replacement H6 ledger separating inventory from semantic review. Every final authored blob requires current exact hash + genuine content/behavior review basis. A changed blob invalidates stale review evidence. Add/retain a mechanical repo-contract gate for missing/stale coverage.
+The original H5/H6 activation audit is not sufficient. The candidate ledger is
+generated from the final tracked tree, including post-activation M14-M23
+additions. Every final authored blob requires current exact hash + genuine
+content/behavior review basis. A changed blob invalidates stale review evidence.
+The repo-contract gate rejects missing, stale, generic, or extra review rows.
 
 Review all systems, not only repair: protocol, SDK, fake/web/CLI/Android/Windows/Electron/iOS boundaries, core policy/run control, store/artifacts, explore/oracle/finding/reproduction/minimization/repair, workflows/fleet/scheduler/budgets/leases/settlement, model runtime, CLI, packaging, CI, dogfood, docs/specs/state/OpenSpec/tool configs.
 

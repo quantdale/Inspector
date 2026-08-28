@@ -167,6 +167,10 @@ export interface RegressionScenario {
   schema: "inspector-regression/1";
   findingId: string;
   adapter: string;
+  /** Actual backend identity when a generic adapter has multiple backends. */
+  backend?: string;
+  /** Stable target identity when the provider exposes one. */
+  target?: string;
   steps: Action[];
   expectOracle: OracleSignalKind;
 }
